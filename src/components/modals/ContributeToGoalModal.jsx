@@ -1,0 +1,43 @@
+import { useState } from 'react'
+import { Modal } from './Modal.jsx'
+import { FormField } from './FormField.jsx'
+import { useAppStore } from '../../store/useAppStore.js'
+import { formatCurrency } from '../../utils/format.js'
+import './modalForm.css'
+
+// Opened from a GoalCard's "+ Aggiungi" (see GoalsSection.jsx) — the one
+// place `saved` on a goal ever changes, via the store's contributeToGoal.
+export function ContributeToGoalModal({ goal, onClose }) {
+  const contributeToGoal = useAppStore((state) => state.contributeToGoal)
+  const [amount, setAmount] = useState('')
+
+  const amountValue = parseFloat(amount.replace(',', '.'))
+  const canSave = Number.isFinite(amountValue) && amountValue > 0
+
+  const handleSave = () => {
+    if (!canSave) return
+    contributeToGoal(goal.id, amountValue)
+    onClose()
+  }
+
+  return (
+    <Modal title={`${goal.emoji} ${goal.label}`} onClose={onClose}>
+      <FormField
+        label="Importo da aggiungere"
+        type="number"
+        inputMode="decimal"
+        placeholder="€ 0,00"
+        value={amount}
+        onChange={(event) => setAmount(event.target.value)}
+      />
+
+      <p className="modal-form__hint">
+        Hai risparmiato {formatCurrency(goal.saved)} su {formatCurrency(goal.target)}.
+      </p>
+
+      <button type="button" className="modal-form__submit" disabled={!canSave} onClick={handleSave}>
+        Aggiungi all'obiettivo
+      </button>
+    </Modal>
+  )
+}

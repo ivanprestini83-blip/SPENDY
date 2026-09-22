@@ -1,0 +1,32 @@
+.donut-chart {
+  position: relative;
+  margin: 0 auto;
+}
+
+.donut-chart svg circle {
+  transition: stroke-dasharray 0.5s var(--ease-standard), stroke-dashoffset 0.5s var(--ease-standard);
+}
+
+.donut-chart__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.donut-chart__center-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.donut-chart__center-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}

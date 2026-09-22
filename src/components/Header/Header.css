@@ -1,0 +1,74 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 2px;
+}
+
+.header__brand {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.header__logo {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 1.1px;
+  color: var(--color-text-primary);
+}
+
+.header__logo-accent {
+  color: var(--color-accent-mint);
+}
+
+/* Discreet on purpose: small, wide letter-spacing, muted — reads as a
+   quiet tagline under the logo, never competing with it. */
+.header__tagline {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.header__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header__icon-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-float);
+  color: var(--color-text-secondary);
+  transition: transform 0.15s var(--ease-standard), color 0.15s var(--ease-standard),
+    background 0.15s var(--ease-standard);
+}
+
+.header__icon-button:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-raised);
+}
+
+.header__icon-button:active {
+  transform: scale(0.92);
+}
+
+.header__badge {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-accent-coral);
+  box-shadow: 0 0 0 2px var(--color-surface);
+}

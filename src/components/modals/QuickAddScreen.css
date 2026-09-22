@@ -1,0 +1,377 @@
+.quick-add {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  animation: quick-add-in 0.2s var(--ease-standard);
+}
+
+@keyframes quick-add-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.quick-add__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(16px + env(safe-area-inset-top)) 18px 12px;
+  flex-shrink: 0;
+}
+
+.quick-add__back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: 15px;
+  color: var(--color-text-primary);
+}
+
+.quick-add__title {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+/* --- Icon grid ------------------------------------------------------ */
+
+.quick-add__grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 18px 32px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  align-content: start;
+  animation: quick-add-step-in 0.18s var(--ease-standard);
+}
+
+.quick-add__grid-hint {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+.quick-add__tile-wrap {
+  position: relative;
+}
+
+/* Only shown on a pinned custom category — sits opposite the delete "✕"
+   so the two never collide. */
+.quick-add__tile-pin {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  font-size: 15px;
+  filter: drop-shadow(0 1px 1px rgba(16, 26, 51, 0.25));
+  pointer-events: none;
+}
+
+.quick-add__tile {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  aspect-ratio: 1;
+  padding: 10px 6px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-float);
+  transition: transform 0.15s var(--ease-standard);
+}
+
+.quick-add__tile:active {
+  transform: scale(0.93);
+}
+
+.quick-add__tile--new {
+  background: var(--color-surface-raised);
+  box-shadow: none;
+  border: 1.5px dashed var(--color-border);
+}
+
+/* Only shown on a custom category's tile — a sibling of the tile button
+   itself (never nested inside it), positioned to overlap its corner. */
+.quick-add__tile-delete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-coral);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: var(--shadow-float);
+  transition: transform 0.15s var(--ease-standard);
+}
+
+.quick-add__tile-delete:active {
+  transform: scale(0.88);
+}
+
+.quick-add__tile-emoji {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.quick-add__tile-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  text-align: center;
+}
+
+/* --- Amount step ------------------------------------------------------ */
+
+.quick-add__amount-step {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: quick-add-step-in 0.2s var(--ease-standard);
+}
+
+@keyframes quick-add-step-in {
+  from { opacity: 0; transform: scale(0.97) translateY(4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.quick-add__picked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.quick-add__picked-emoji {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 76px;
+  height: 76px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-mint-soft);
+  font-size: 40px;
+}
+
+.quick-add__picked-label {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.quick-add__prompt {
+  margin-top: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.quick-add__amount-input {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 52px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  letter-spacing: -1px;
+}
+
+.quick-add__amount-input span {
+  font-size: 34px;
+  color: var(--color-text-tertiary);
+}
+
+.quick-add__amount-input input {
+  width: 180px;
+  border: none;
+  outline: none;
+  background: none;
+  font: inherit;
+  font-weight: inherit;
+  color: inherit;
+  text-align: center;
+}
+
+.quick-add__confirm {
+  margin-top: 28px;
+  width: 100%;
+  max-width: 320px;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-mint);
+  color: #04241a;
+  font-size: 16px;
+  font-weight: 800;
+  transition: transform 0.15s var(--ease-standard), filter 0.15s var(--ease-standard), opacity 0.15s var(--ease-standard);
+}
+
+.quick-add__confirm:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.quick-add__confirm:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.quick-add__confirm:disabled {
+  opacity: 0.4;
+}
+
+.quick-add__details-toggle {
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+}
+
+.quick-add__details {
+  margin-top: 16px;
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+  animation: quick-add-step-in 0.18s var(--ease-standard);
+}
+
+/* --- Shared field styles (details panel + new-category step) -------- */
+
+.quick-add__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.quick-add__field input,
+.quick-add__field select {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.quick-add__field input:focus,
+.quick-add__field select:focus {
+  outline: none;
+  border-color: var(--color-accent-mint);
+}
+
+/* --- New category step ------------------------------------------------ */
+
+.quick-add__new-category {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: quick-add-step-in 0.18s var(--ease-standard);
+}
+
+/* WhatsApp-style picker: a row of group tabs above a scrollable grid for
+   whichever group is selected — this is what makes "più emoticon"
+   actually browsable instead of one long flat row. */
+.quick-add__emoji-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 10px;
+}
+
+.quick-add__emoji-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.quick-add__emoji-tab {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  font-size: 17px;
+  opacity: 0.55;
+  transition: opacity 0.15s var(--ease-standard), background 0.15s var(--ease-standard);
+}
+
+.quick-add__emoji-tab--active {
+  opacity: 1;
+  background: var(--color-surface-raised);
+}
+
+.quick-add__emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  max-height: 168px;
+  overflow-y: auto;
+}
+
+.quick-add__emoji-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  font-size: 19px;
+  transition: transform 0.15s var(--ease-standard), background 0.15s var(--ease-standard);
+}
+
+.quick-add__emoji-chip--active {
+  background: var(--color-accent-mint-soft);
+  box-shadow: inset 0 0 0 1.5px var(--color-accent-mint);
+}
+
+.quick-add__emoji-chip:active {
+  transform: scale(0.9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quick-add,
+  .quick-add__grid,
+  .quick-add__amount-step,
+  .quick-add__details,
+  .quick-add__new-category {
+    animation: none;
+  }
+}

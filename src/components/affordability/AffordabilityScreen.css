@@ -1,0 +1,169 @@
+.affordability-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  animation: affordability-in 0.22s var(--ease-standard);
+}
+
+@keyframes affordability-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.affordability-screen__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(16px + env(safe-area-inset-top)) 18px 12px;
+  flex-shrink: 0;
+}
+
+.affordability-screen__back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: 16px;
+  color: var(--color-text-primary);
+}
+
+.affordability-screen__title {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.affordability-screen__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 20px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.affordability-screen__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.affordability-screen__amount-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.affordability-screen__amount-input input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  width: 100%;
+}
+
+.affordability-screen__text-input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.affordability-screen__text-input:focus,
+.affordability-screen__amount-input:has(input:focus) {
+  outline: none;
+  border-color: var(--color-accent-violet);
+}
+
+.affordability-screen__cta {
+  padding: 15px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-violet);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+  transition: transform 0.15s var(--ease-standard), filter 0.15s var(--ease-standard);
+}
+
+.affordability-screen__cta:hover {
+  filter: brightness(1.06);
+}
+
+.affordability-screen__cta:active {
+  transform: scale(0.98);
+}
+
+.affordability-screen__result {
+  padding: 18px;
+  border-radius: var(--radius-md);
+  text-align: center;
+  animation: affordability-result-in 0.3s var(--ease-standard);
+}
+
+@keyframes affordability-result-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.affordability-screen__result--green {
+  background: var(--color-accent-mint-soft);
+}
+
+.affordability-screen__result--yellow {
+  background: var(--color-accent-gold-soft);
+}
+
+.affordability-screen__result--red {
+  background: var(--color-accent-coral-soft);
+}
+
+.affordability-screen__result-emoji {
+  font-size: 30px;
+}
+
+.affordability-screen__result-title {
+  margin-top: 6px;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.affordability-screen__result-message {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.affordability-screen__disclaimer {
+  margin-top: auto;
+  font-size: 11.5px;
+  color: var(--color-text-tertiary);
+  text-align: center;
+  line-height: 1.4;
+}

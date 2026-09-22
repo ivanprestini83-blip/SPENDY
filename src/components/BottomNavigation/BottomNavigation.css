@@ -1,0 +1,98 @@
+.bottom-nav {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(18px);
+  border-top: 1px solid var(--color-border);
+}
+
+.bottom-nav__item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 4px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-tertiary);
+  transition: color 0.15s var(--ease-standard), transform 0.15s var(--ease-standard);
+}
+
+.bottom-nav__icon {
+  font-size: 20px;
+  line-height: 1;
+  transition: transform 0.2s var(--ease-standard);
+}
+
+.bottom-nav__label {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.bottom-nav__item--active {
+  color: var(--color-accent-mint);
+}
+
+.bottom-nav__item--active .bottom-nav__icon {
+  transform: translateY(-2px);
+}
+
+.bottom-nav__item:active {
+  transform: scale(0.94);
+}
+
+/* The "+" — inline in the SAME row as every other tab (no longer raised
+   above the bar), sitting exactly 3rd of 5 with 2 plain tabs on each
+   side (see mockNavItems' own comment on why that's what centers it),
+   but visually the app's one primary action: a bigger, glossy green
+   circle with its own gradient, shine and layered shadow instead of a
+   plain icon+label pair. */
+.bottom-nav__item--primary {
+  position: relative;
+  flex: 0 0 auto;
+  width: 54px;
+  height: 54px;
+  padding: 0;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(155deg, #3cf5bc 0%, var(--color-accent-mint) 50%, #0a9c6f 100%);
+  box-shadow:
+    0 10px 20px -6px rgba(18, 184, 134, 0.55),
+    0 2px 5px rgba(16, 26, 51, 0.18),
+    inset 0 1px 1px rgba(255, 255, 255, 0.5),
+    inset 0 -2px 4px rgba(6, 74, 54, 0.35);
+  overflow: hidden;
+}
+
+/* A glossy highlight blob near the top, like light catching a curved
+   surface — this is what reads as "brillante" rather than just a flat
+   colored circle. */
+.bottom-nav__item--primary::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 9px;
+  width: 22px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  filter: blur(1px);
+  transform: rotate(-18deg);
+}
+
+.bottom-nav__plus {
+  position: relative;
+  font-size: 27px;
+  font-weight: 800;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(6, 74, 54, 0.35);
+}
+
+.bottom-nav__item--primary:active {
+  transform: scale(0.92);
+}

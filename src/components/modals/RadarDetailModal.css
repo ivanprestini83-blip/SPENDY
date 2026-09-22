@@ -1,0 +1,119 @@
+.radar-detail__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.radar-detail__month {
+  flex: 1;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  text-align: center;
+}
+
+.radar-detail__month-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+}
+
+.radar-detail__month-amount {
+  margin-top: 6px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.radar-detail__month-amount--current {
+  color: var(--color-accent-coral);
+}
+
+.radar-detail__arrow {
+  color: var(--color-text-tertiary);
+  font-size: 18px;
+}
+
+.radar-detail__diff {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--color-accent-coral);
+}
+
+.radar-detail__spendy {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-violet-soft);
+}
+
+/* --- modalità "scheda del Radar" (vedi RadarDetailModal.jsx) --- */
+
+.radar-detail__headline {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.radar-detail__headline-value {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
+}
+
+.radar-detail__headline-label {
+  margin-top: 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+.radar-detail__section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.radar-detail__section-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.radar-detail__section-text {
+  margin-top: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.radar-detail__comparison {
+  margin-top: 6px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.radar-detail__comparison--up { color: var(--color-accent-coral); }
+.radar-detail__comparison--down { color: var(--color-accent-mint); }
+.radar-detail__comparison--flat { color: var(--color-text-secondary); }
+.radar-detail__comparison--goal { color: var(--color-accent-violet); }
+
+.radar-detail__action {
+  margin-top: 20px;
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-mint);
+  color: #04241a;
+  font-size: 15px;
+  font-weight: 800;
+  transition: transform 0.15s var(--ease-standard);
+}
+
+.radar-detail__action:active {
+  transform: scale(0.98);
+}

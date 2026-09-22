@@ -1,0 +1,109 @@
+.analytics-page__period {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.analytics-page__period-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  transition: transform 0.15s var(--ease-standard), opacity 0.15s var(--ease-standard);
+}
+
+.analytics-page__period-nav:active:not(:disabled) {
+  transform: scale(0.9);
+}
+
+.analytics-page__period-nav:disabled {
+  opacity: 0.35;
+}
+
+.analytics-page__heading {
+  min-width: 140px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.analytics-page__empty {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-align: center;
+  padding: 40px 0;
+}
+
+.analytics-page__legend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.analytics-page__legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.analytics-page__legend-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+}
+
+.analytics-page__legend-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analytics-page__legend-amount {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.analytics-page__legend-percent {
+  flex-shrink: 0;
+  min-width: 34px;
+  text-align: right;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+}
+
+.analytics-page__legend-change {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+}
+
+.analytics-page__legend-change--up {
+  color: var(--color-accent-coral);
+}
+
+.analytics-page__legend-change--down {
+  color: var(--color-accent-mint);
+}

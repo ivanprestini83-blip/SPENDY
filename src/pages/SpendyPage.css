@@ -1,0 +1,83 @@
+.spendy-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 24px 8px;
+}
+
+.spendy-page__transition {
+  width: 100%;
+  animation: spendy-page-state-in 300ms var(--ease-standard);
+}
+
+@keyframes spendy-page-state-in {
+  from { opacity: 0; transform: scale(0.97) translateY(3px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.spendy-page__blurb {
+  margin-top: 24px;
+  max-width: 300px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.spendy-page__radar {
+  margin-top: 28px;
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-coral-soft);
+  color: var(--color-accent-coral);
+  font-size: 15px;
+  font-weight: 800;
+  transition: transform 0.15s var(--ease-standard), opacity 0.15s var(--ease-standard);
+}
+
+.spendy-page__radar:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.spendy-page__radar:disabled {
+  opacity: 0.5;
+}
+
+.spendy-page__radar-arrow {
+  margin-left: 2px;
+}
+
+.spendy-page__radar-empty {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--color-text-tertiary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spendy-page__transition {
+    animation: none;
+  }
+}
+
+/* Il numero di segnalazioni attive, dentro al pulsante Radar: dice
+   quante cose Spendy ha trovato prima ancora di aprire la schermata. */
+.spendy-page__radar-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  margin-left: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-coral);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+}

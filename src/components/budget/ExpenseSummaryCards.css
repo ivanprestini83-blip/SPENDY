@@ -1,0 +1,44 @@
+.expense-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.expense-summary__card {
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-float);
+  transition: transform 0.15s var(--ease-standard), box-shadow 0.15s var(--ease-standard);
+}
+
+.expense-summary__card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
+.expense-summary__card:active {
+  transform: scale(0.97);
+}
+
+.expense-summary__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.expense-summary__amount {
+  margin-top: 6px;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  letter-spacing: -0.3px;
+}
+
+.expense-summary__meta {
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}

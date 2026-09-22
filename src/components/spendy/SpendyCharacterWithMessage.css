@@ -1,0 +1,35 @@
+.spendy-character-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.spendy-character-row__mascot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  animation: spendy-character-float 4.5s ease-in-out infinite;
+  filter: drop-shadow(0 6px 8px rgba(20, 20, 40, 0.16));
+}
+
+@keyframes spendy-character-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* The bubble gets the space that's left over — "la battuta deve avere
+   maggiore spazio rispetto alla mascotte" — and can still shrink/wrap on
+   narrow phones without pushing the mascot column around. */
+.spendy-character-row > .spendy-speech {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spendy-character-row__mascot {
+    animation: none;
+  }
+}

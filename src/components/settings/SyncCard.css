@@ -1,0 +1,200 @@
+.sync-card__form {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sync-card__form input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+.sync-card__primary {
+  margin-top: 12px;
+  width: 100%;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-mint);
+  color: #04241a;
+  font-size: 15px;
+  font-weight: 800;
+  transition: transform 0.15s var(--ease-standard), opacity 0.15s var(--ease-standard);
+}
+
+.sync-card__primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.sync-card__primary:disabled,
+.sync-card__secondary:disabled,
+.sync-card__signout:disabled {
+  opacity: 0.4;
+}
+
+.sync-card__secondary {
+  margin-top: 8px;
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.sync-card__signout {
+  margin-top: 8px;
+  width: 100%;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-accent-coral);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sync-card__status {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+}
+
+.sync-card__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+.sync-card__status--ok {
+  background: var(--color-accent-mint-soft);
+  color: var(--color-accent-mint);
+}
+
+.sync-card__status--ok .sync-card__dot {
+  background: var(--color-accent-mint);
+}
+
+.sync-card__status--busy .sync-card__dot {
+  background: var(--color-accent-violet);
+  animation: sync-card-pulse 1s ease-in-out infinite;
+}
+
+.sync-card__status--warn {
+  background: var(--color-accent-gold-soft);
+  color: var(--color-text-secondary);
+}
+
+.sync-card__status--warn .sync-card__dot {
+  background: var(--color-accent-gold);
+}
+
+.sync-card__status--error {
+  background: var(--color-accent-coral-soft);
+  color: var(--color-accent-coral);
+}
+
+.sync-card__status--error .sync-card__dot {
+  background: var(--color-accent-coral);
+}
+
+@keyframes sync-card-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.sync-card__rows {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sync-card__rows > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.sync-card__rows dt {
+  color: var(--color-text-tertiary);
+}
+
+.sync-card__rows dd {
+  color: var(--color-text-primary);
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.sync-card__migration {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-gold-soft);
+}
+
+.sync-card__migration-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.sync-card__migration-text {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.sync-card__error,
+.sync-card__message {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.sync-card__message--error,
+.sync-card__error {
+  color: var(--color-accent-coral);
+}
+
+.sync-card__message--ok {
+  color: var(--color-accent-mint);
+}
+
+.sync-card__note {
+  margin-top: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sync-card__status--busy .sync-card__dot {
+    animation: none;
+  }
+}

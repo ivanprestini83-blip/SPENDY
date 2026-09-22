@@ -1,0 +1,56 @@
+.affordability-cta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  background: var(--color-accent-violet);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.15s var(--ease-standard);
+}
+
+.affordability-cta:hover {
+  transform: translateY(-2px);
+}
+
+.affordability-cta:active {
+  transform: scale(0.98);
+}
+
+.affordability-cta__icon {
+  flex-shrink: 0;
+  font-size: 26px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.affordability-cta__text {
+  flex: 1;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.affordability-cta__title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.affordability-cta__subtitle {
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.affordability-cta__arrow {
+  font-size: 18px;
+  color: #ffffff;
+}

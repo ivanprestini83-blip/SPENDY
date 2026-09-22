@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* Surfaces — light, off-white, premium (not a dark-mode fintech app) */
+  --color-bg: #f6f8fc;
+  --color-bg-glow: #eef2fb;
+  --color-surface: #ffffff;
+  --color-surface-raised: #f7f9fd;
+  --color-border: rgba(16, 26, 51, 0.045);
+
+  /* Text — dark navy, not pure black, so it stays soft on the light bg */
+  --color-text-primary: #10182b;
+  --color-text-secondary: #5b6478;
+  --color-text-tertiary: #98a1b3;
+
+  /* Brand accents */
+  --color-accent-mint: #12b886;
+  --color-accent-mint-soft: rgba(18, 184, 134, 0.12);
+  --color-accent-violet: #6d5cf0;
+  --color-accent-violet-soft: rgba(109, 92, 240, 0.12);
+  --color-accent-coral: #f4645f;
+  --color-accent-coral-soft: rgba(244, 100, 95, 0.12);
+  --color-accent-gold: #f0ab1f;
+  --color-accent-gold-soft: rgba(240, 171, 31, 0.14);
+
+  /* Radii */
+  --radius-lg: 28px;
+  --radius-md: 20px;
+  --radius-sm: 14px;
+  --radius-pill: 999px;
+
+  /* Shadows — very light, premium, never heavy. Depth comes from these
+     alone: cards have no visible border, just white on --color-bg plus
+     a soft shadow, so nothing reads as "boxed". */
+  --shadow-card: 0 16px 32px -20px rgba(16, 26, 51, 0.16);
+  --shadow-float: 0 8px 20px -12px rgba(16, 26, 51, 0.12);
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: radial-gradient(120% 80% at 50% -10%, var(--color-bg-glow) 0%, var(--color-bg) 55%);
+  color: var(--color-text-primary);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+}
+
+button {
+  font-family: inherit;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--color-accent-mint);
+  outline-offset: 2px;
+}
+
+h1, h2, h3, p {
+  margin: 0;
+}
+
+img, svg {
+  display: block;
+}
+
+::selection {
+  background: var(--color-accent-mint-soft);
+}

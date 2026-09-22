@@ -1,0 +1,111 @@
+.goal-card {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-float);
+}
+
+.goal-card__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.goal-card__icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-gold-soft);
+  font-size: 16px;
+}
+
+.goal-card__heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.goal-card__label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.goal-card__amounts {
+  margin-top: 2px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.goal-card__target {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+.goal-card__percent {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-accent-gold);
+}
+
+.goal-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.goal-card__eta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.goal-card__actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.goal-card__contribute {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-gold-soft);
+  color: var(--color-accent-gold);
+  font-size: 12px;
+  font-weight: 700;
+  transition: transform 0.15s var(--ease-standard);
+}
+
+.goal-card__contribute:active {
+  transform: scale(0.94);
+}
+
+.goal-card__delete {
+  flex-shrink: 0;
+  padding: 5px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  color: var(--color-accent-coral);
+  font-size: 12px;
+  font-weight: 700;
+  transition: transform 0.15s var(--ease-standard), background 0.15s var(--ease-standard);
+}
+
+.goal-card__delete--confirm {
+  background: var(--color-accent-coral-soft);
+}
+
+.goal-card__delete:active {
+  transform: scale(0.94);
+}
