@@ -11,12 +11,14 @@
     "test": "node src/sync/backup.test.mjs && node src/sync/sync.test.mjs && node src/utils/radar.test.mjs && node src/utils/spendy.test.mjs"
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.2",
     "@supabase/supabase-js": "^2.116.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
