@@ -60,6 +60,41 @@
   border: 1px solid var(--color-border);
 }
 
+/* La riga è un pulsante: tocco -> dettaglio delle spese della categoria
+   (CategoryDetailModal). Stesso aspetto di prima, più la freccia › e un
+   feedback al tocco. */
+/* Il <li> ora avvolge il pulsante invece di essere lui la riga flex: senza
+   questo tornerebbe il pallino dell'elenco. */
+.analytics-page__legend > li {
+  list-style: none;
+}
+
+.analytics-page__legend-row--button {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease-standard), box-shadow 0.15s var(--ease-standard);
+}
+
+.analytics-page__legend-row--button:hover {
+  box-shadow: var(--shadow-float);
+}
+
+.analytics-page__legend-row--button:active {
+  transform: scale(0.985);
+}
+
+.analytics-page__legend-chevron {
+  flex-shrink: 0;
+  margin-left: 2px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--color-text-tertiary);
+}
+
 .analytics-page__legend-dot {
   flex-shrink: 0;
   width: 10px;
@@ -106,4 +141,60 @@
 
 .analytics-page__legend-change--down {
   color: var(--color-accent-mint);
+}
+
+/* Ingresso ad Andamento (components/andamento/AndamentoScreen.jsx). */
+.analytics-page__trend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  text-align: left;
+  transition: transform 0.15s var(--ease-standard);
+}
+
+.analytics-page__trend:active {
+  transform: scale(0.98);
+}
+
+.analytics-page__trend-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-violet-soft);
+  font-size: 22px;
+}
+
+.analytics-page__trend-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.analytics-page__trend-title {
+  font-size: 15.5px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.analytics-page__trend-subtitle {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.analytics-page__trend-arrow {
+  font-size: 17px;
+  color: var(--color-text-tertiary);
 }

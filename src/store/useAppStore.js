@@ -365,7 +365,7 @@ export const useAppStore = create(
           }
         }),
 
-      // modal: 'addTransaction' | 'quickAdd' | 'editExpense' | 'editIncome' | 'newGoal' | 'contributeGoal' | 'radar' | 'affordability' | 'emergencyFund' | 'settings' | null
+      // modal: 'addTransaction' | 'quickAdd' | 'editExpense' | 'editIncome' | 'newGoal' | 'contributeGoal' | 'radar' | 'andamento' | 'affordability' | 'emergencyFund' | 'settings' | null
       modal: null,
       modalPayload: null,
       openModal: (modal, payload = null) => set({ modal, modalPayload: payload }),

@@ -11,6 +11,7 @@ import { EditIncomeModal } from './components/modals/EditIncomeModal.jsx'
 import { NewGoalModal } from './components/modals/NewGoalModal.jsx'
 import { ContributeToGoalModal } from './components/modals/ContributeToGoalModal.jsx'
 import { RadarScreen } from './components/radar/RadarScreen.jsx'
+import { AndamentoScreen } from './components/andamento/AndamentoScreen.jsx'
 import { AffordabilityScreen } from './components/affordability/AffordabilityScreen.jsx'
 import { EmergencyFundScreen } from './components/goals/EmergencyFundScreen.jsx'
 import { SettingsScreen } from './components/modals/SettingsScreen.jsx'
@@ -99,6 +100,7 @@ function App() {
         <ContributeToGoalModal goal={modalPayload} onClose={closeModal} />
       )}
       {modal === 'radar' && <RadarScreen onClose={closeModal} />}
+      {modal === 'andamento' && <AndamentoScreen onClose={closeModal} />}
       {modal === 'affordability' && <AffordabilityScreen onClose={closeModal} />}
       {modal === 'emergencyFund' && <EmergencyFundScreen onClose={closeModal} />}
       {modal === 'settings' && <SettingsScreen onClose={closeModal} />}

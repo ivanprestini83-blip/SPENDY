@@ -1,0 +1,94 @@
+/* Dettaglio categoria (Analisi) — stessi token e toni del RadarDetailModal. */
+
+.category-detail__summary {
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  text-align: center;
+}
+
+.category-detail__total {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.category-detail__meta {
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.category-detail__empty {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.category-detail__days {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.category-detail__day-label {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.category-detail__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.category-detail__item {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-float);
+}
+
+.category-detail__item-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.category-detail__amount {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.category-detail__time {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+}
+
+.category-detail__note {
+  margin-top: 4px;
+  font-size: 14px;
+  color: var(--color-text-primary);
+}
+
+.category-detail__category {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+}

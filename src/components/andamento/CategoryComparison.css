@@ -1,0 +1,107 @@
+.category-comparison__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.category-comparison__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(16, 26, 51, 0.06);
+}
+
+.category-comparison__row:first-child {
+  border-top: none;
+  padding-top: 4px;
+}
+
+.category-comparison__emoji {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  font-size: 18px;
+}
+
+.category-comparison__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.category-comparison__label {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-comparison__values {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text-tertiary);
+}
+
+.category-comparison__values > span {
+  white-space: nowrap;
+}
+
+.category-comparison__change {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+}
+
+.category-comparison__change-amount {
+  font-size: 13.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.category-comparison__change-detail {
+  font-size: 11.5px;
+  font-weight: 700;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+.category-comparison__change--good { color: var(--color-accent-mint); }
+.category-comparison__change--bad { color: var(--color-accent-coral); }
+.category-comparison__change--flat { color: var(--color-text-tertiary); }
+
+.category-comparison__toggle {
+  width: 100%;
+  margin-top: 6px;
+  min-height: 44px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--color-text-secondary);
+}
+
+.category-comparison__toggle:active {
+  transform: scale(0.98);
+}
+
+.category-comparison__empty {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}

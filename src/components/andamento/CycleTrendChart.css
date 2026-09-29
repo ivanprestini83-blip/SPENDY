@@ -1,0 +1,160 @@
+.trend-chart {
+  flex-shrink: 0;
+  padding: 18px 16px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.trend-chart__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 0 4px;
+}
+
+.trend-chart__title {
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.trend-chart__legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+.trend-chart__legend-swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+
+.trend-chart__legend-swatch--income {
+  margin-left: 6px;
+  background: var(--color-accent-mint-soft);
+  border: 1px solid rgba(18, 184, 134, 0.35);
+}
+
+.trend-chart__legend-swatch--spent {
+  background: var(--color-accent-violet);
+}
+
+.trend-chart__columns {
+  margin-top: 14px;
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+/* Ogni colonna è un bersaglio touch alto e largo quanto lo spazio
+   disponibile, non solo la barra: su un telefono si tocca la colonna,
+   non il millimetro colorato. */
+.trend-chart__column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 2px 6px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s var(--ease-standard), transform 0.15s var(--ease-standard);
+}
+
+.trend-chart__column:active {
+  transform: scale(0.96);
+}
+
+.trend-chart__column--selected {
+  background: var(--color-accent-violet-soft);
+}
+
+.trend-chart__amount {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.trend-chart__column--selected .trend-chart__amount {
+  color: var(--color-text-primary);
+}
+
+.trend-chart__plot {
+  position: relative;
+  width: 100%;
+  max-width: 34px;
+  height: 128px;
+}
+
+.trend-chart__income,
+.trend-chart__spent {
+  position: absolute;
+  bottom: 0;
+  border-radius: 8px 8px 4px 4px;
+  transition: height 0.5s var(--ease-standard);
+}
+
+.trend-chart__income {
+  left: 0;
+  right: 0;
+  background: var(--color-accent-mint-soft);
+  border: 1px solid rgba(18, 184, 134, 0.22);
+}
+
+.trend-chart__spent {
+  left: 5px;
+  right: 5px;
+  background: linear-gradient(180deg, #9d91ff, var(--color-accent-violet));
+  opacity: 0.55;
+}
+
+.trend-chart__column--selected .trend-chart__spent {
+  opacity: 1;
+}
+
+/* Speso più di quanto è entrato: la barra diventa coral. Non è l'unico
+   segnale — il riepilogo sotto mostra il risparmio col suo segno. */
+.trend-chart__spent--over {
+  background: linear-gradient(180deg, #ff9a96, var(--color-accent-coral));
+}
+
+.trend-chart__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.trend-chart__label--current,
+.trend-chart__column--selected .trend-chart__label {
+  color: var(--color-text-primary);
+  font-weight: 800;
+}
+
+.trend-chart__note {
+  margin-top: 10px;
+  padding: 0 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trend-chart__income,
+  .trend-chart__spent {
+    transition: none;
+  }
+}
