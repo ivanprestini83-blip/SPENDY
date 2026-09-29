@@ -1,14 +1,13 @@
 .home-page {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
-.home-page__secondary {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 6px;
+/* Spendy is standing on the budget card: give its top edge room so her
+   feet land on empty card surface, never on "Disponibile". */
+.home-page--hero-overlap .budget-card {
+  padding-top: 40px;
 }
 
 .home-page__goals-more {
@@ -36,10 +35,14 @@
   animation: page-card-in 0.45s var(--ease-standard) both;
 }
 
-.home-page > *:nth-child(1) { animation-delay: 0.02s; }
-.home-page > *:nth-child(2) { animation-delay: 0.07s; }
-.home-page > *:nth-child(3) { animation-delay: 0.12s; }
-.home-page > *:nth-child(4) { animation-delay: 0.17s; }
+/* The hero runs its own entrance (SpendyHero.css); everything below
+   follows it in, one beat apart. */
+.home-page > .spendy-hero { animation: none; }
+.home-page > *:nth-child(2) { animation-delay: 0.12s; }
+.home-page > *:nth-child(3) { animation-delay: 0.18s; }
+.home-page > *:nth-child(4) { animation-delay: 0.24s; }
+.home-page > *:nth-child(5) { animation-delay: 0.3s; }
+.home-page > *:nth-child(n + 6) { animation-delay: 0.36s; }
 
 @keyframes page-card-in {
   from {

@@ -1,0 +1,464 @@
+/* --- Scene --------------------------------------------------------------
+   Not a card: the hero bleeds to the screen edges (negative margins undo
+   .app-shell__content's 18px padding) and has no box of its own — only a
+   soft glow that fades out to the page background. overflow-x: clip keeps
+   the mascot's bleed from ever causing a horizontal scroll, while still
+   letting her overflow vertically onto the budget card below. */
+.spendy-hero {
+  --spendy-glow-x: 26%;
+  --spendy-warm-x: 82%;
+  --spendy-enter-x: -28px;
+
+  position: relative;
+  z-index: 2;
+  margin: 0 -18px;
+  padding: 2px 18px 6px;
+  overflow-x: clip;
+}
+
+.spendy-hero--right {
+  --spendy-glow-x: 74%;
+  --spendy-warm-x: 18%;
+  --spendy-enter-x: 28px;
+}
+
+.spendy-hero--center {
+  --spendy-glow-x: 50%;
+  --spendy-warm-x: 85%;
+  --spendy-enter-x: 0px;
+}
+
+.spendy-hero__glow {
+  position: absolute;
+  inset: -24px 0 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(42% 58% at var(--spendy-glow-x) 58%, rgba(109, 92, 240, 0.2), transparent 72%),
+    radial-gradient(34% 40% at var(--spendy-warm-x) 22%, rgba(255, 176, 128, 0.22), transparent 70%),
+    radial-gradient(40% 36% at 60% 96%, rgba(18, 184, 134, 0.12), transparent 72%);
+}
+
+/* Three tiny confetti marks — static, just enough to make the space feel
+   like a scene instead of a background color. */
+.spendy-hero__spark {
+  position: absolute;
+  width: 5px;
+  height: 16px;
+  border-radius: 3px;
+  opacity: 0.75;
+}
+
+.spendy-hero__spark--a {
+  top: 34px;
+  left: calc(var(--spendy-glow-x) + 18%);
+  background: var(--color-accent-gold);
+  transform: rotate(32deg);
+}
+
+.spendy-hero__spark--b {
+  top: 62%;
+  left: calc(var(--spendy-glow-x) - 22%);
+  background: var(--color-accent-violet);
+  opacity: 0.35;
+  transform: rotate(-24deg);
+}
+
+.spendy-hero__spark--c {
+  bottom: 20%;
+  right: 7%;
+  width: 4px;
+  height: 12px;
+  background: var(--color-accent-mint);
+  opacity: 0.5;
+  transform: rotate(48deg);
+}
+
+.spendy-hero--right .spendy-hero__spark--c {
+  right: auto;
+  left: 6%;
+}
+
+/* --- Stage: the four compositions --------------------------------------
+   One grid, re-arranged per position. The speech bubble comes AFTER the
+   mascot in the DOM, so wherever the two touch the bubble paints on top:
+   Spendy can lean into the scene but never covers what she's saying. */
+.spendy-hero__stage {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 46fr) minmax(0, 54fr);
+  grid-template-rows: 1fr auto;
+  grid-template-areas:
+    'mascot speech'
+    'mascot cta';
+  column-gap: 4px;
+  row-gap: 12px;
+  align-items: center;
+}
+
+.spendy-hero--right .spendy-hero__stage {
+  grid-template-columns: minmax(0, 54fr) minmax(0, 46fr);
+  grid-template-areas:
+    'speech mascot'
+    'cta mascot';
+}
+
+.spendy-hero--center .spendy-hero__stage {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  grid-template-areas:
+    'mascot'
+    'speech'
+    'cta';
+  row-gap: 12px;
+}
+
+/* --- Mascot --- */
+.spendy-hero__mascot {
+  grid-area: mascot;
+  position: relative;
+  align-self: end;
+  pointer-events: none;
+  animation: spendy-hero-enter 700ms var(--ease-standard) both;
+}
+
+.spendy-hero__float {
+  animation: spendy-hero-bob 6s ease-in-out 900ms infinite;
+}
+
+/* Bigger than its column on purpose: 40% wider, 10% of it stepping out
+   toward the screen edge (never further than the 18px gutter, so no part
+   of her gets cut) and 30% tucked behind the speech bubble. */
+.spendy-hero__img {
+  width: 140%;
+  max-width: none;
+  height: auto;
+  aspect-ratio: 1;
+  margin-left: -10%;
+  object-fit: contain;
+  transform-origin: 50% 100%;
+  transform: translateY(var(--spendy-lift)) rotate(var(--spendy-tilt)) scale(var(--spendy-scale));
+  filter: drop-shadow(0 16px 18px rgba(60, 44, 140, 0.18));
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.spendy-hero--right .spendy-hero__img {
+  margin-left: -30%;
+}
+
+.spendy-hero__ground {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 62%;
+  height: 16px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(40, 30, 90, 0.18), transparent);
+  z-index: -1;
+}
+
+.spendy-hero--center .spendy-hero__mascot {
+  justify-self: center;
+  width: min(62%, 240px);
+  margin-bottom: -30px;
+}
+
+.spendy-hero--center .spendy-hero__img {
+  width: 100%;
+  margin-left: 0;
+}
+
+/* overlap: lower, feet over the top edge of the budget card. The
+   negative margin lets the card rise under her; HomePage gives the card
+   extra top padding in this mode so "Disponibile" stays uncovered. */
+.spendy-hero--overlap .spendy-hero__mascot {
+  margin-bottom: -44px;
+}
+
+/* --- Speech bubble --- */
+.spendy-hero__speech {
+  grid-area: speech;
+  position: relative;
+  padding: 14px 16px 15px;
+  border-radius: 24px;
+  background: var(--color-surface);
+  box-shadow:
+    0 20px 36px -20px rgba(60, 44, 160, 0.32),
+    0 2px 6px rgba(16, 26, 51, 0.04);
+  transform-origin: 0% 55%;
+  animation: spendy-hero-pop 480ms var(--ease-standard) 260ms both;
+}
+
+.spendy-hero--right .spendy-hero__speech {
+  transform-origin: 100% 55%;
+}
+
+.spendy-hero--center .spendy-hero__speech {
+  transform-origin: 50% 0%;
+  text-align: center;
+}
+
+.spendy-hero__speaker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  color: var(--color-accent-violet);
+}
+
+.spendy-hero--center .spendy-hero__speaker {
+  justify-content: center;
+}
+
+.spendy-hero__speaker::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--spendy-tone, var(--color-accent-violet));
+  box-shadow: 0 0 0 3px var(--spendy-tone-soft, var(--color-accent-violet-soft));
+}
+
+.spendy-hero__speech--mint { --spendy-tone: var(--color-accent-mint); --spendy-tone-soft: var(--color-accent-mint-soft); }
+.spendy-hero__speech--gold { --spendy-tone: var(--color-accent-gold); --spendy-tone-soft: var(--color-accent-gold-soft); }
+.spendy-hero__speech--coral { --spendy-tone: var(--color-accent-coral); --spendy-tone-soft: var(--color-accent-coral-soft); }
+.spendy-hero__speech--violet { --spendy-tone: var(--color-accent-violet); --spendy-tone-soft: var(--color-accent-violet-soft); }
+
+.spendy-hero__message {
+  margin-top: 6px;
+  font-size: 16.5px;
+  font-weight: 700;
+  line-height: 1.32;
+  letter-spacing: -0.2px;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.spendy-hero__secondary {
+  margin-top: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.38;
+  color: var(--color-text-secondary);
+}
+
+/* The tail points back at Spendy, wherever she's standing. */
+.spendy-hero__tail {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: var(--color-surface);
+  top: 52%;
+  left: -7px;
+  transform: rotate(45deg);
+  border-radius: 0 0 0 4px;
+}
+
+.spendy-hero--right .spendy-hero__tail {
+  left: auto;
+  right: -7px;
+  border-radius: 0 4px 0 0;
+}
+
+.spendy-hero--center .spendy-hero__tail {
+  top: -7px;
+  left: 50%;
+  margin-left: -8px;
+  border-radius: 4px 0 0 0;
+}
+
+/* --- CTA --- */
+.spendy-hero__cta {
+  grid-area: cta;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px 6px 6px;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(135deg, #8272f6 0%, #6d5cf0 55%, #5a49e2 100%);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 14px 24px -14px rgba(109, 92, 240, 0.8);
+  animation: spendy-hero-rise 420ms var(--ease-standard) 480ms both;
+  transition: transform 0.15s var(--ease-standard), box-shadow 0.15s var(--ease-standard);
+}
+
+.spendy-hero--right .spendy-hero__cta {
+  justify-self: end;
+}
+
+.spendy-hero--center .spendy-hero__cta {
+  justify-self: center;
+}
+
+.spendy-hero__cta:hover {
+  box-shadow: 0 16px 28px -14px rgba(109, 92, 240, 0.95);
+}
+
+.spendy-hero__cta:active {
+  transform: scale(0.96);
+}
+
+.spendy-hero__cta-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.spendy-hero__cta-arrow {
+  transition: transform 0.15s var(--ease-standard);
+}
+
+.spendy-hero__cta:hover .spendy-hero__cta-arrow {
+  transform: translateX(3px);
+}
+
+/* --- Narrow phones (iPhone SE / small Android) --- */
+@media (max-width: 370px) {
+  .spendy-hero__stage {
+    grid-template-columns: minmax(0, 42fr) minmax(0, 58fr);
+  }
+
+  .spendy-hero--right .spendy-hero__stage {
+    grid-template-columns: minmax(0, 58fr) minmax(0, 42fr);
+  }
+
+  .spendy-hero--center .spendy-hero__stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .spendy-hero__speech {
+    padding: 12px 13px 13px;
+  }
+
+  .spendy-hero__message {
+    font-size: 15px;
+  }
+
+  .spendy-hero__cta {
+    gap: 6px;
+    padding: 9px 14px;
+    font-size: 13px;
+  }
+
+  .spendy-hero__cta-icon {
+    display: none;
+  }
+}
+
+/* --- Animation flavours (Spendy AI's `animation`) ---------------------
+   Only the ENTRANCE changes; afterwards it's the same slow breath (or a
+   slower, smaller one when concerned). gentle = the default above. */
+.spendy-hero--anim-playful .spendy-hero__mascot {
+  animation-name: spendy-hero-enter-playful;
+}
+
+.spendy-hero--anim-celebrate .spendy-hero__mascot {
+  animation: spendy-hero-enter-hop 800ms var(--ease-standard) both;
+}
+
+.spendy-hero--anim-concerned .spendy-hero__mascot {
+  animation-duration: 950ms;
+}
+
+.spendy-hero--anim-concerned .spendy-hero__float {
+  animation: spendy-hero-bob-slow 8s ease-in-out 1100ms infinite;
+}
+
+@keyframes spendy-hero-enter-playful {
+  0% {
+    opacity: 0;
+    transform: translate(var(--spendy-enter-x), 18px) scale(0.9) rotate(-7deg);
+  }
+  60% {
+    opacity: 1;
+    transform: rotate(3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes spendy-hero-enter-hop {
+  0% {
+    opacity: 0;
+    transform: translateY(26px) scale(0.86);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-12px) scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes spendy-hero-bob-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* --- Motion: one entrance, then a slow breath. Nothing else moves. --- */
+@keyframes spendy-hero-enter {
+  from {
+    opacity: 0;
+    transform: translate(var(--spendy-enter-x), 18px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes spendy-hero-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes spendy-hero-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes spendy-hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spendy-hero[class*='spendy-hero--anim-'] .spendy-hero__mascot,
+  .spendy-hero[class*='spendy-hero--anim-'] .spendy-hero__float,
+  .spendy-hero__mascot,
+  .spendy-hero__float,
+  .spendy-hero__speech,
+  .spendy-hero__cta {
+    animation: none;
+  }
+}

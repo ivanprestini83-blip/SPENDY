@@ -18,3 +18,14 @@ export const spendyStates = {
   ironic: '/spendy/IRONIC.png',
   advisor: '/spendy/advisor.png',
 }
+
+// One accent tone per coach state, so a bubble hints at the mood before
+// you even read the text. Shared by SpendySpeech and the Home SpendyHero.
+export const spendyToneByState = {
+  happy: 'mint',
+  attentive: 'gold',
+  concerned: 'coral',
+  ironic: 'violet',
+  advisor: 'mint',
+  celebrating: 'gold',
+}

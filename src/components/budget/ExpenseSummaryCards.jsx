@@ -9,12 +9,16 @@ export function ExpenseSummaryCards({ today, month, monthlyBudget, onOpenExpense
   return (
     <div className="expense-summary">
       <button type="button" className="expense-summary__card" onClick={onOpenExpenses}>
+        <span className="expense-summary__icon expense-summary__icon--violet" aria-hidden="true">👛</span>
+        <span className="expense-summary__arrow" aria-hidden="true">→</span>
         <p className="expense-summary__label">Spese di oggi</p>
         <p className="expense-summary__amount">{formatCurrency(today.total)}</p>
         <p className="expense-summary__meta">{today.count} transazioni</p>
       </button>
 
       <button type="button" className="expense-summary__card" onClick={onOpenExpenses}>
+        <span className="expense-summary__icon expense-summary__icon--blue" aria-hidden="true">📊</span>
+        <span className="expense-summary__arrow" aria-hidden="true">→</span>
         <p className="expense-summary__label">Spese di questo mese</p>
         <p className="expense-summary__amount">{formatCurrency(month.total)}</p>
         <p className="expense-summary__meta">su {formatCurrency(monthlyBudget)}</p>

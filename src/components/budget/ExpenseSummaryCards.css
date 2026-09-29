@@ -5,8 +5,9 @@
 }
 
 .expense-summary__card {
+  position: relative;
   text-align: left;
-  padding: 12px 14px;
+  padding: 14px 14px 13px;
   border-radius: var(--radius-md);
   background: var(--color-surface);
   box-shadow: var(--shadow-float);
@@ -41,4 +42,32 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--color-text-tertiary);
+}
+
+.expense-summary__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 10px;
+  border-radius: 50%;
+  font-size: 16px;
+}
+
+.expense-summary__icon--violet { background: var(--color-accent-violet-soft); }
+.expense-summary__icon--blue { background: rgba(66, 133, 244, 0.12); }
+
+.expense-summary__arrow {
+  position: absolute;
+  top: 18px;
+  right: 16px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-accent-violet);
+  transition: transform 0.15s var(--ease-standard);
+}
+
+.expense-summary__card:hover .expense-summary__arrow {
+  transform: translateX(3px);
 }

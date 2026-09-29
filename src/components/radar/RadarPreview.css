@@ -1,0 +1,153 @@
+.radar-preview {
+  padding: 14px 14px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.radar-preview__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 2px 12px;
+}
+
+.radar-preview__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8272f6, #5a49e2);
+  color: #fff;
+  box-shadow: 0 8px 16px -8px rgba(109, 92, 240, 0.8);
+}
+
+.radar-preview__title {
+  flex: 1;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: var(--color-text-primary);
+}
+
+.radar-preview__all {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-accent-violet);
+  transition: opacity 0.15s var(--ease-standard);
+}
+
+.radar-preview__all:hover {
+  opacity: 0.8;
+}
+
+.radar-preview__tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.radar-preview__tiles--1 { grid-template-columns: minmax(0, 1fr); }
+.radar-preview__tiles--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.radar-preview__tile {
+  --tile-color: var(--color-accent-violet);
+  --tile-bg: var(--color-accent-violet-soft);
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: 11px 11px 12px;
+  border-radius: var(--radius-md);
+  background: var(--tile-bg);
+  text-align: left;
+  transition: transform 0.15s var(--ease-standard);
+}
+
+.radar-preview__tile:active {
+  transform: scale(0.96);
+}
+
+.radar-preview__tile--critical { --tile-color: var(--color-accent-coral); --tile-bg: rgba(244, 100, 95, 0.1); }
+.radar-preview__tile--warning { --tile-color: #e8821a; --tile-bg: rgba(240, 171, 31, 0.13); }
+.radar-preview__tile--positive { --tile-color: var(--color-accent-mint); --tile-bg: rgba(18, 184, 134, 0.1); }
+.radar-preview__tile--goal { --tile-color: var(--color-accent-violet); --tile-bg: var(--color-accent-violet-soft); }
+
+.radar-preview__tile-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  font-size: 16px;
+  box-shadow: 0 4px 10px -6px rgba(16, 26, 51, 0.25);
+}
+
+.radar-preview__tile-title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.radar-preview__tile-value {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  color: var(--tile-color);
+}
+
+.radar-preview__tile-label {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--color-text-tertiary);
+}
+
+.radar-preview__empty {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
+/* Three tiles don't fit side by side on the narrowest phones: they turn
+   into a swipeable row instead of squeezing the numbers. */
+@media (max-width: 370px) {
+  .radar-preview__tiles--3 {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    margin: 0 -14px;
+    padding: 0 14px 2px;
+    scrollbar-width: none;
+  }
+
+  .radar-preview__tiles--3::-webkit-scrollbar {
+    display: none;
+  }
+
+  .radar-preview__tiles--3 .radar-preview__tile {
+    flex: 0 0 42%;
+    scroll-snap-align: start;
+  }
+}

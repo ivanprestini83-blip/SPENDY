@@ -1,0 +1,44 @@
+.spendy-voice-debug {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed rgba(109, 92, 240, 0.4);
+  background: rgba(109, 92, 240, 0.06);
+  font-size: 11.5px;
+  color: var(--color-text-secondary);
+}
+
+.spendy-voice-debug summary {
+  cursor: pointer;
+  color: var(--color-accent-violet);
+}
+
+.spendy-voice-debug dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 10px;
+  margin: 8px 0 0;
+}
+
+.spendy-voice-debug dt {
+  font-weight: 700;
+}
+
+.spendy-voice-debug dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.spendy-voice-debug__mono,
+.spendy-voice-debug__context {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+}
+
+.spendy-voice-debug__context {
+  max-height: 220px;
+  overflow: auto;
+  margin: 8px 0 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--color-surface);
+}

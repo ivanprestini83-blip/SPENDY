@@ -85,7 +85,12 @@ export function BudgetCard({ available, spent, monthlyBudget, period, hidden, on
         </div>
       </div>
 
-      <p className="budget-card__status">{statusMessage(spentRatio)}</p>
+      <p className={`budget-card__status budget-card__status--${barState}`}>
+        <span className="budget-card__status-icon" aria-hidden="true">
+          {barState === 'ok' ? '✓' : '!'}
+        </span>
+        {statusMessage(spentRatio)}
+      </p>
     </section>
   )
 }

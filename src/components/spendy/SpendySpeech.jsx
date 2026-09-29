@@ -1,15 +1,5 @@
+import { spendyToneByState as TONE_BY_STATE } from './spendyStates.js'
 import './SpendyCoach.css'
-
-// One border/tail color per coach state, so the bubble itself hints at
-// the mood before you even read the text.
-const TONE_BY_STATE = {
-  happy: 'mint',
-  attentive: 'gold',
-  concerned: 'coral',
-  ironic: 'violet',
-  advisor: 'mint',
-  celebrating: 'gold',
-}
 
 // `tailPosition`: 'top' points up at a mascot sitting above the bubble
 // (SpendyCoach's integrated composition), 'left' at one sitting beside it
