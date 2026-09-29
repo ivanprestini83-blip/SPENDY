@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node src/sync/backup.test.mjs && node src/sync/sync.test.mjs && node src/utils/radar.test.mjs && node src/utils/spendy.test.mjs"
+    "test": "node src/sync/backup.test.mjs && node src/sync/sync.test.mjs && node src/utils/radar.test.mjs && node src/utils/spendy.test.mjs && node src/utils/andamento.test.mjs && node src/utils/categoryDetail.test.mjs && node src/ai/spendyAI.test.mjs && node src/ai/spendyAIRemote.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
