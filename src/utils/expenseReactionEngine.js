@@ -165,10 +165,53 @@ function buildResult({ bucket, state, reason, insightCategoryId = null, rare = f
   }
 }
 
+// "Una nuova spesa = massimo una reaction visibile."
+//
+// getSpendyCoach runs on EVERY render of HomePage/SpendyPage, and the
+// selection below is random — so the same new expense used to be shown
+// with one phrase, then immediately a second one: HomePage records the
+// shown phrase into jokeHistory (recordSpendyJoke), which re-renders the
+// page, and pickFromPool — correctly, for a *new* event — excludes that
+// just-recorded phrase and draws another. Any other re-render (sync
+// pulling the expense back from Supabase, a toggle...) re-rolled it too.
+//
+// So the reaction chosen for one event is remembered and reused: same
+// event (the trigger expense's id, or the day for the standing
+// "budget_exceeded" reaction with no new expense) + same cascade step →
+// same result, however many times the coach re-runs. A new expense is a
+// new event and still gets a fresh, non-repeating pick exactly as before.
+// Only in-memory for this session; jokeHistory recording is unchanged.
+const shownReactionByEvent = new Map()
+const SHOWN_REACTION_MEMORY = 50
+
+function reactionEventKey(expenses, today, reason) {
+  const trigger = findTriggerExpense(expenses, today)
+  const event = trigger
+    ? `expense:${trigger.id ?? `${trigger.date}|${trigger.amount}|${trigger.categoryId}`}`
+    : `standing:${today}`
+  return `${event}|${reason}`
+}
+
 // The one entry point getSpendyCoach calls. `rng` is injectable purely
 // for deterministic testing — production code never passes it, and it
-// defaults to real randomness.
-export function evaluateExpenseReaction({
+// defaults to real randomness. Tests that inject `rng` bypass the
+// one-reaction-per-event memory above, so every call stays deterministic.
+export function evaluateExpenseReaction(args) {
+  const result = selectExpenseReaction(args)
+  if (!result || args.rng) return result
+
+  const key = reactionEventKey(args.expenses ?? [], args.today, result.reason)
+  const alreadyShown = shownReactionByEvent.get(key)
+  if (alreadyShown) return alreadyShown
+
+  shownReactionByEvent.set(key, result)
+  if (shownReactionByEvent.size > SHOWN_REACTION_MEMORY) {
+    shownReactionByEvent.delete(shownReactionByEvent.keys().next().value)
+  }
+  return result
+}
+
+function selectExpenseReaction({
   today,
   expenses = [],
   monthlyBudget = 0,

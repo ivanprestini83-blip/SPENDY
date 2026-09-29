@@ -10,7 +10,7 @@
 //  2. gli importi mostrano i centesimi: 175,50 € non deve diventare 176 €.
 
 import { check, section, report } from '../sync/testkit.mjs'
-import { getSpendyCoach, SPENDY_STATES } from './spendyCoach.js'
+import { getSpendyCoach, getInsightTopicKey, SPENDY_STATES } from './spendyCoach.js'
 import { buildFinancialData } from './budgetCalculations.js'
 import { formatCurrency } from './format.js'
 import { spendyStates } from '../components/spendy/spendyStates.js'
@@ -94,5 +94,40 @@ check('sempre due cifre decimali, mai una o tre',
   [1.005, 0.1, 12, 9999.999].map(formatCurrency).join(' | '))
 check('virgola decimale italiana, non punto', !formatCurrency(1234.5).includes('.5'))
 check('un valore non numerico non rompe la schermata', formatCurrency(undefined) === '0,00 €')
+
+// =====================================================================
+section('4. Una nuova spesa = una sola reaction visibile')
+// =====================================================================
+// Riproduce il ciclo reale di HomePage: render -> la frase mostrata viene
+// registrata in jokeHistory (recordSpendyJoke) -> nuovo render. Prima il
+// secondo render sceglieva un'altra frase per la STESSA spesa: due
+// reaction una dopo l'altra.
+function coachWithHistory(expenses, jokeHistory) {
+  const financialData = buildFinancialData({
+    today: TODAY, monthlyBudget: 5000, expenses, incomes: [], goals: [], cycleStartDay: 1,
+  })
+  return getSpendyCoach(financialData, {
+    expenses, today: TODAY, monthlyBudget: 5000, cycleStartDay: 1, goals: [], jokeHistory, financialData,
+  })
+}
+const record = (history, coach) => [...history, { key: getInsightTopicKey(coach.insight), text: coach.message, shownAt: TODAY }]
+
+const primaSpesa = [expense(TODAY, 150, 'shopping')]
+const primoRender = coachWithHistory(primaSpesa, [])
+check('la spesa > 100 € produce una reaction', primoRender.reason === 'expense_over_100', primoRender.reason)
+
+const storicoDopoPrimo = record([], primoRender)
+const secondoRender = coachWithHistory(primaSpesa, storicoDopoPrimo)
+check('dopo la registrazione della frase la reaction NON cambia', secondoRender.message === primoRender.message,
+  `"${primoRender.message}" -> "${secondoRender.message}"`)
+
+const altriRender = Array.from({ length: 20 }, () => coachWithHistory(primaSpesa, storicoDopoPrimo).message)
+check('e resta la stessa negli altri 20 render (sync, toggle...)', altriRender.every((m) => m === primoRender.message))
+
+// Una spesa NUOVA resta un evento nuovo: frase nuova, non la stessa di prima.
+const secondaSpesa = [expense(TODAY, 180, 'shopping'), ...primaSpesa]
+const renderNuovaSpesa = coachWithHistory(secondaSpesa, storicoDopoPrimo)
+check('una nuova spesa riceve la sua reaction', renderNuovaSpesa.reason === 'expense_over_100', renderNuovaSpesa.reason)
+check('e non ripete la frase appena mostrata', renderNuovaSpesa.message !== primoRender.message)
 
 report('spendy')
