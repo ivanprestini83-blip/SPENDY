@@ -79,3 +79,84 @@ simulato, ma la configurazione reale va provata sul progetto reale.
 Da quel momento l'indirizzo dell'app è **sempre lo stesso** su Mac e
 Samsung, e il problema che ha fatto "sparire" i dati (IP di rete che
 cambia, porta del dev server diversa) non può più ripresentarsi.
+
+## 7. Spendy AI (Edge Function `spendy-ai`)
+
+La vera AI di Spendy passa da una Edge Function: l'app manda solo il
+**contesto sintetico** (budget, evento, categoria, eventuale obiettivo)
+con la sessione dell'utente; la funzione chiama il modello con la
+chiave che sta **solo** tra i secret di Supabase, valida la risposta e
+la rimanda all'app. Se qualcosa va storto, l'app mostra la frase locale.
+
+Codice: [`functions/spendy-ai/`](./functions/spendy-ai/) (collegamento
+in `index.ts`, logica in `handler.js`), regole condivise con l'app in
+[`functions/_shared/spendyAIRules.js`](./functions/_shared/spendyAIRules.js).
+
+### Secret da configurare
+
+**Project Settings → Edge Functions → Secrets** (oppure da terminale,
+sotto). Nessuno di questi va in `.env.local`, su Vercel o in una
+variabile `VITE_*`.
+
+| Nome | Obbligatorio | Valore |
+|---|---|---|
+| `AI_PROVIDER` | sì | `anthropic` (l'unico supportato per ora) |
+| `AI_MODEL` | sì | l'id del modello; consigliato `claude-opus-5` |
+| `AI_API_KEY` | sì | la chiave dell'API Anthropic, creata **dentro un workspace** (es. *Default*): la funzione non invia l'header `anthropic-workspace-id` |
+| `AI_EFFORT` | no | `low` consigliato: frasi brevi, più rapide ed economiche |
+| `AI_TIMEOUT_MS` | no | default `12000` |
+| `AI_MAX_TOKENS` | no | default `2048` |
+| `ALLOWED_ORIGINS` | no | es. `https://spendy.vercel.app` (default: tutti, l'accesso è comunque solo con sessione) |
+
+`SUPABASE_URL` e la chiave pubblica li fornisce Supabase da solo.
+`ANTHROPIC_WORKSPACE_ID` non è più usato: se è ancora tra i secret viene
+ignorato e si può rimuovere con
+`npx supabase secrets unset --project-ref riflsimbbajfvxublovr ANTHROPIC_WORKSPACE_ID`.
+
+### Deploy
+
+Serve Node (già installato). Il progetto è `riflsimbbajfvxublovr`.
+
+```bash
+npx supabase login
+npx supabase secrets set --project-ref riflsimbbajfvxublovr AI_PROVIDER=anthropic AI_MODEL=claude-opus-5 AI_EFFORT=low
+npx supabase secrets set --project-ref riflsimbbajfvxublovr AI_API_KEY=la-tua-chiave
+npx supabase functions deploy spendy-ai --project-ref riflsimbbajfvxublovr
+```
+
+La chiave va digitata solo nel terzo comando, nel tuo terminale: non
+salvarla in nessun file del progetto.
+
+> Se il deploy chiede Docker, aggiungere `--use-api`. Se la funzione
+> rispondesse 401 anche con la sessione valida (progetti con le nuove
+> chiavi di firma JWT), rifare il deploy con `--no-verify-jwt`: la
+> funzione verifica comunque l'utente da sola con Supabase Auth.
+
+### Verifica
+
+1. **La funzione è online e rifiuta chi non è autenticato** (deve
+   rispondere `401` e `{"error":"unauthenticated"}`):
+
+```bash
+curl -i -X POST https://riflsimbbajfvxublovr.supabase.co/functions/v1/spendy-ai -H "Content-Type: application/json" -d '{}'
+```
+
+2. **La vera AI risponde nell'app**: fare login in Impostazioni →
+   Sincronizzazione, poi aprire la Home con
+   `?spendyDebug=1&spendyAI=remote&spendyLimits=off&spendyReset=1`
+   (solo con `npm run dev`). Il pannello sotto Spendy deve dire
+   **fonte: AI · … · AI: remote**.
+3. **Cosa ha ricevuto il modello**: Supabase → Edge Functions →
+   `spendy-ai` → **Logs**. Ogni chiamata registra solo metadati, per
+   esempio `{"outcome":"ok","event":"big_expense","contextFields":[...]}`:
+   mai frasi, importi o nomi.
+
+### Costi e abusi
+
+- L'app chiama la funzione al massimo 3 volte al giorno per dispositivo,
+  a distanza di almeno 30 minuti (tranne gli eventi urgenti), e mai due
+  volte per la stessa situazione.
+- La funzione risponde solo a utenti con una sessione Supabase valida.
+  **Se sul progetto la registrazione è aperta, chiunque crei un account
+  può usarla**: dopo aver creato il proprio account, disattivare
+  *Authentication → Sign In / Providers → Allow new users to sign up*.

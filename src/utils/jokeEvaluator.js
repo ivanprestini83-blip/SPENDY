@@ -49,7 +49,7 @@ function normalize(text) {
 // Word-overlap (Jaccard-ish) similarity — cheap, dependency-free, good
 // enough to catch "praticamente uguale a una battuta già mostrata"
 // without needing exact string equality.
-function similarity(a, b) {
+export function similarity(a, b) {
   const normA = normalize(a)
   const normB = normalize(b)
   if (normA === normB) return 1
