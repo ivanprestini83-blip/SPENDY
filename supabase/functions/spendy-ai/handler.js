@@ -22,6 +22,7 @@ import {
   validateSpendyResponse,
   SPENDY_RESPONSE_SCHEMA,
 } from '../_shared/spendyAIRules.js'
+import { AI_DAILY_LIMIT, AI_DAILY_LIMIT_REACHED, usageDay } from './quota.js'
 
 export const MAX_BODY_BYTES = 8 * 1024
 export const SUPPORTED_PROVIDERS = ['anthropic']
@@ -204,7 +205,19 @@ function bearerToken(request) {
 //   callModel   async ({ system, input, schema }) => { text, stopReason, model }
 //               (lancia ModelError con un code di MODEL_ERROR_STATUS)
 //   log         (entry) => void — riceve solo metadati
-export function createSpendyAIHandler({ config, verifyUser, callModel, log = () => {} }) {
+//   quota       createSupabaseQuota(...) — { reserve, release } (quota.js);
+//               senza, nessuna chiamata AI passa (fail closed)
+//   now         () => ms, l'orologio che decide la giornata UTC della quota
+//   dailyLimit  chiamate AI al giorno per utente
+export function createSpendyAIHandler({
+  config,
+  verifyUser,
+  callModel,
+  quota = null,
+  now = () => Date.now(),
+  dailyLimit = AI_DAILY_LIMIT,
+  log = () => {},
+}) {
   return async function handle(request) {
     const cors = corsHeaders(request, config.allowedOrigins)
     const json = (status, body) => new Response(JSON.stringify(body), {
@@ -221,8 +234,8 @@ export function createSpendyAIHandler({ config, verifyUser, callModel, log = () 
     const user = token ? await verifyUser(token).catch(() => null) : null
     if (!user?.id) return json(401, { error: 'unauthenticated' })
 
-    if (config.missing.length > 0 || typeof callModel !== 'function') {
-      log({ outcome: 'not_configured', missing: config.missing })
+    if (config.missing.length > 0 || typeof callModel !== 'function' || !quota) {
+      log({ outcome: 'not_configured', missing: [...config.missing, ...(quota ? [] : ['quota'])] })
       return json(503, { error: 'not_configured' })
     }
 
@@ -246,13 +259,32 @@ export function createSpendyAIHandler({ config, verifyUser, callModel, log = () 
       return json(200, { response: silentResponse(context), provider: config.provider, model: null })
     }
 
-    // 3. Il modello riceve SOLO il contesto ripulito + le frasi precedenti.
+    // 3. Quota giornaliera (quota.js): prenotazione atomica sul database per
+    //    l'utente VERIFICATO — qualunque user_id nel corpo è ignorato. Se il
+    //    database non risponde, la chiamata non parte (fail closed).
+    const day = usageDay(now())
+    let reservation
+    try {
+      reservation = await quota.reserve({ userId: user.id, day, limit: dailyLimit })
+    } catch {
+      log({ outcome: 'quota_unavailable', event: eventId })
+      return json(503, { error: 'quota_unavailable' })
+    }
+    if (!reservation.allowed) {
+      log({ outcome: 'daily_limit', event: eventId })
+      return json(429, { error: AI_DAILY_LIMIT_REACHED })
+    }
+
+    // 4. Il modello riceve SOLO il contesto ripulito + le frasi precedenti.
     const prompt = buildSpendyPrompt(context, { previous, history })
     const started = Date.now()
     let result
     try {
       result = await callModel({ system: prompt.system, input: prompt.input, schema: SPENDY_RESPONSE_SCHEMA })
     } catch (error) {
+      // Il provider non ha risposto: la chiamata prenotata torna all'utente.
+      // Se anche il rilascio fallisce, resta consumata (mai il contrario).
+      const released = await quota.release({ userId: user.id, day }).then(() => true, () => false)
       const code = error instanceof ModelError ? error.code : 'provider_error'
       // La diagnostica va solo nei log, ripulita un'altra volta anche qui
       // (e con la chiave del server tra i segreti da cancellare).
@@ -260,7 +292,7 @@ export function createSpendyAIHandler({ config, verifyUser, callModel, log = () 
         error instanceof ModelError ? error.diagnostic : { name: error?.name, message: error?.message },
         [config.apiKey],
       )
-      log({ outcome: code, event: eventId, ms: Date.now() - started, ...(diagnostic ? { providerError: diagnostic } : {}) })
+      log({ outcome: code, event: eventId, ms: Date.now() - started, quotaReleased: released, ...(diagnostic ? { providerError: diagnostic } : {}) })
       return json(MODEL_ERROR_STATUS[code] ?? 502, { error: code })
     }
 
@@ -269,7 +301,7 @@ export function createSpendyAIHandler({ config, verifyUser, callModel, log = () 
       return json(200, { response: silentResponse(context), provider: config.provider, model: result.model ?? null })
     }
 
-    // 4. Stesse regole dell'app: se non passa qui, non arriva nemmeno.
+    // 5. Stesse regole dell'app: se non passa qui, non arriva nemmeno.
     const parsed = parseModelJson(result.text)
     if (!parsed) {
       log({ outcome: 'invalid', event: eventId, errors: ['not_json'], stopReason: result.stopReason })

@@ -40,6 +40,10 @@ const STATUS_TO_CODE = {
   504: 'timeout',
 }
 
+// La quota giornaliera del SERVER (supabase/functions/spendy-ai/quota.js):
+// stesso 429 del limite del provider, ma con questo codice nel corpo.
+export const DAILY_LIMIT_ERROR = 'AI_DAILY_LIMIT_REACHED'
+
 export function functionsUrl(supabaseUrl) {
   return supabaseUrl ? `${supabaseUrl.replace(/\/$/, '')}/functions/v1/${SPENDY_AI_FUNCTION}` : null
 }
@@ -80,6 +84,10 @@ export function createRemoteProvider({ url, publicKey, getAccessToken, fetchImpl
       }
 
       if (!response.ok) {
+        if (response.status === 429) {
+          const errorBody = await response.json().catch(() => null)
+          if (errorBody?.error === DAILY_LIMIT_ERROR) throw providerError('daily_limit', `HTTP 429 ${DAILY_LIMIT_ERROR}`)
+        }
         throw providerError(STATUS_TO_CODE[response.status] ?? 'server_error', `HTTP ${response.status}`)
       }
 

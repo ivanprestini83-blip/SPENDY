@@ -43,6 +43,10 @@ const threeCycles = (categoryId, values) => ['06', '07', '08'].map((month, i) =>
 
 const ENV = { AI_PROVIDER: 'anthropic', AI_MODEL: 'modello-configurato', AI_API_KEY: 'sk-segreto-lato-server' }
 
+// La quota giornaliera ha i suoi test (spendyAIQuota.test.mjs): qui
+// resta sempre aperta, così questi test guardano solo il resto del flusso.
+const openQuota = () => ({ reserve: async () => ({ allowed: true, used: 1 }), release: async () => {} })
+
 // Il "modello": di default risponde come l'AI finta della Fase A, ma
 // in JSON testuale, come un modello vero.
 function fakeModel(behavior = 'mock') {
@@ -62,6 +66,7 @@ function makeServer({ model = fakeModel(), env = ENV } = {}) {
     config: readConfig((name) => env[name]),
     verifyUser: async (token) => (token === VALID_TOKEN ? { id: 'utente-1' } : null),
     callModel: model.callModel,
+    quota: openQuota(),
     log: (entry) => logs.push(entry),
   })
   return { handler, logs, model }
@@ -491,6 +496,7 @@ section('Diagnostica degli errori del provider (solo log, mai la chiave)')
       config,
       verifyUser: async () => ({ id: 'u-1' }),
       callModel: createAnthropicCaller({ Anthropic: FakeAnthropic, apiKey: API_KEY, config }),
+      quota: openQuota(),
       log: (entry) => logs.push(entry),
     })
     const context = { ...baseContext, goal: { label: 'Viaggio Giappone', percent: 40, missing: 1800 } }
@@ -589,6 +595,7 @@ section('Nessun header anthropic-workspace-id (la chiave basta)')
     config,
     verifyUser: async () => ({ id: 'u-1' }),
     callModel: createAnthropicCaller({ Anthropic: RecordingAnthropic, apiKey: config.apiKey, config }),
+    quota: openQuota(),
     log: (entry) => logs.push(entry),
   })
   const res = await handler(post({ context: baseContext }))

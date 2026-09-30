@@ -160,3 +160,17 @@ curl -i -X POST https://riflsimbbajfvxublovr.supabase.co/functions/v1/spendy-ai 
   **Se sul progetto la registrazione è aperta, chiunque crei un account
   può usarla**: dopo aver creato il proprio account, disattivare
   *Authentication → Sign In / Providers → Allow new users to sign up*.
+- **Quota sul server (la vera protezione)**: massimo 3 chiamate al modello
+  al giorno (giornata UTC) per utente, contate nella tabella `ai_usage`
+  da [`ai_usage.sql`](./ai_usage.sql). Il limite dell'app resta, ma è solo
+  un primo filtro. Oltre la quota la funzione risponde `429` con
+  `{"error":"AI_DAILY_LIMIT_REACHED"}` senza chiamare il modello; se il
+  provider non risponde (timeout, 5xx, suo rate limit) la chiamata viene
+  restituita. Se il database della quota non risponde, niente AI (503).
+
+  **Ordine obbligatorio**: prima incollare `ai_usage.sql` nell'SQL Editor,
+  POI rifare il deploy della funzione. Al contrario, la funzione nuova
+  troverebbe la tabella mancante e rifiuterebbe tutte le chiamate AI
+  (l'app mostrerebbe le frasi locali). La funzione scrive su `ai_usage`
+  con la service_role che Supabase le fornisce da solo: nessun secret da
+  aggiungere.

@@ -22,7 +22,7 @@ import { validateAIResponse } from './spendyAIGuard.js'
 import { createMockProvider } from './providers/mockProvider.js'
 
 export const DEFAULT_TIMEOUT_MS = 4000
-export const PROVIDER_ERRORS = ['unavailable', 'rate_limited', 'network', 'unauthenticated', 'invalid']
+export const PROVIDER_ERRORS = ['unavailable', 'rate_limited', 'daily_limit', 'network', 'unauthenticated', 'invalid']
 export const SPENDY_PROVIDERS = ['remote', 'mock']
 
 // remote se richiesto (o di default) e se Supabase c'è; altrimenti mock.
