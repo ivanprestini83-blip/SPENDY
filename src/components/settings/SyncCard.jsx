@@ -169,7 +169,19 @@ export function SyncCard() {
             </div>
           )}
 
-          <button type="button" className="sync-card__secondary" disabled={busy} onClick={() => run(syncNow)}>
+          <button
+            type="button"
+            className="sync-card__secondary"
+            disabled={busy}
+            onClick={() =>
+              run(async () => {
+                // syncNow restituisce un oggetto ({ pushed, pulled } o { error }),
+                // non un testo: run() mostra come errore ogni valore "vero".
+                const r = await syncNow()
+                return r?.error ? String(r.error) : null
+              })
+            }
+          >
             Sincronizza ora
           </button>
           <button type="button" className="sync-card__signout" disabled={busy} onClick={() => run(signOut)}>
