@@ -4,6 +4,7 @@ import { bootstrapSync } from './sync/spendySync.js'
 import { mockNavItems } from './data/mockData.js'
 import { Header } from './components/Header/Header.jsx'
 import { BottomNavigation } from './components/BottomNavigation/BottomNavigation.jsx'
+import { ErrorBoundary } from './components/ErrorBoundary/ErrorBoundary.jsx'
 import { AddTransactionTypeModal } from './components/modals/AddTransactionTypeModal.jsx'
 import { QuickAddScreen } from './components/modals/QuickAddScreen.jsx'
 import { EditExpenseModal } from './components/modals/EditExpenseModal.jsx'
@@ -74,8 +75,13 @@ function App() {
         <Header onOpenSettings={() => openModal('settings')} />
       </div>
 
+      {/* Se una pagina va in errore si rompe solo il suo contenuto: intestazione
+          e menu restano fuori dal boundary e quindi utilizzabili. key={activeTab}
+          lo riporta a zero cambiando sezione. */}
       <main className="app-shell__content">
-        <ActivePage />
+        <ErrorBoundary variant="page" key={activeTab}>
+          <ActivePage />
+        </ErrorBoundary>
       </main>
 
       <BottomNavigation

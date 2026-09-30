@@ -1,0 +1,81 @@
+/* Schermata mostrata da ErrorBoundary. Stessi token e stessa grammatica delle
+   altre schermate a tutto schermo: sfondo chiaro, contenuto al centro, pulsante
+   verde come in Sincronizzazione. */
+.error-fallback {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: calc(24px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));
+  text-align: center;
+  background: radial-gradient(120% 80% at 50% -10%, var(--color-bg-glow) 0%, var(--color-bg) 55%);
+  color: var(--color-text-primary);
+}
+
+.error-fallback__mascot {
+  width: 140px;
+  height: auto;
+  margin-bottom: 6px;
+  user-select: none;
+}
+
+.error-fallback__title {
+  margin: 0;
+  max-width: 320px;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.error-fallback__text {
+  margin: 0;
+  max-width: 320px;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.error-fallback__button {
+  margin-top: 18px;
+  min-width: 220px;
+  padding: 14px 24px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-mint);
+  box-shadow: var(--shadow-float);
+  color: #04241a;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.15s var(--ease-standard);
+}
+
+.error-fallback__button:active {
+  transform: scale(0.98);
+}
+
+/* Variante 'page': dentro lo spazio della pagina, sopra il menu in basso. Non
+   occupa tutto lo schermo e non ridisegna lo sfondo. */
+.error-fallback--page {
+  min-height: 0;
+  padding: 36px 8px 16px;
+  background: none;
+}
+
+.error-fallback--page .error-fallback__mascot {
+  width: 104px;
+}
+
+.error-fallback--page .error-fallback__title {
+  font-size: 19px;
+}
+
+.error-fallback--page .error-fallback__button {
+  min-width: 180px;
+}
