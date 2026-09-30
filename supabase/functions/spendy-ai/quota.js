@@ -6,10 +6,18 @@
 //
 // Cosa conta come "chiamata": una richiesta che la funzione autorizza a
 // raggiungere il modello. Non contano le richieste non autenticate, con un
-// corpo non valido o senza nessun evento da raccontare. Se il provider non
-// risponde affatto (timeout, rete, 5xx, suo limite) la chiamata viene
-// restituita; se risponde — anche con un rifiuto o un JSON scartato — conta,
-// perché il costo c'è stato.
+// corpo non valido o senza nessun evento da raccontare.
+//
+// Dopo la prenotazione la chiamata TORNA all'utente solo se è certo che il
+// provider non ha fatturato nulla:
+//   - errore prima dell'invio (la richiesta non è mai partita);
+//   - rifiuto esplicito con HTTP 400, 401, 403, 404, 429 o 529 (400/404 sono
+//     una richiesta o una configurazione sbagliata lato nostro).
+// Resta CONSUMATA in ogni altro caso: risposta valida, risposta rifiutata o
+// scartata, timeout, errore di rete, 5xx, altri errori HTTP (es. 422),
+// errori non classificati. Una richiesta partita può essere fatturata anche se la
+// risposta non è arrivata, quindi nel dubbio conta.
+// La classificazione è in anthropicModel.js (ModelError.refund).
 //
 // Lo stato vive nella tabella `ai_usage` (supabase/ai_usage.sql) e si tocca
 // solo con due funzioni Postgres eseguibili dalla service_role: l'utente è

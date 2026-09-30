@@ -41,11 +41,17 @@ export const MODEL_ERROR_STATUS = {
 // `diagnostic` (facoltativo) finisce SOLO nei log del server, mai nella
 // risposta all'app: { status, type, message, requestId, name } già
 // ripulito con sanitizeDiagnostic.
+//
+// `refund` dice all'handler se la chiamata prenotata torna all'utente:
+// true SOLO quando è certo che il provider non ha fatturato nulla (errore
+// prima dell'invio, oppure rifiuto esplicito 400/401/403/404/429/529). Di default
+// è false: nel dubbio la chiamata resta consumata (vedi quota.js).
 export class ModelError extends Error {
-  constructor(code, message = code, diagnostic = null) {
+  constructor(code, message = code, diagnostic = null, { refund = false } = {}) {
     super(message)
     this.code = code
     this.diagnostic = diagnostic
+    this.refund = refund === true
   }
 }
 
@@ -203,7 +209,8 @@ function bearerToken(request) {
 //   config      readConfig(...)
 //   verifyUser  async (token) => { id } | null
 //   callModel   async ({ system, input, schema }) => { text, stopReason, model }
-//               (lancia ModelError con un code di MODEL_ERROR_STATUS)
+//               (lancia ModelError con un code di MODEL_ERROR_STATUS e, se
+//               la chiamata non è stata fatturata, refund: true)
 //   log         (entry) => void — riceve solo metadati
 //   quota       createSupabaseQuota(...) — { reserve, release } (quota.js);
 //               senza, nessuna chiamata AI passa (fail closed)
@@ -259,7 +266,11 @@ export function createSpendyAIHandler({
       return json(200, { response: silentResponse(context), provider: config.provider, model: null })
     }
 
-    // 3. Quota giornaliera (quota.js): prenotazione atomica sul database per
+    // 3. Il prompt si prepara PRIMA di prenotare la quota: se la preparazione
+    //    fallisse, non c'è nessuna prenotazione da restituire.
+    const prompt = buildSpendyPrompt(context, { previous, history })
+
+    // 4. Quota giornaliera (quota.js): prenotazione atomica sul database per
     //    l'utente VERIFICATO — qualunque user_id nel corpo è ignorato. Se il
     //    database non risponde, la chiamata non parte (fail closed).
     const day = usageDay(now())
@@ -275,16 +286,22 @@ export function createSpendyAIHandler({
       return json(429, { error: AI_DAILY_LIMIT_REACHED })
     }
 
-    // 4. Il modello riceve SOLO il contesto ripulito + le frasi precedenti.
-    const prompt = buildSpendyPrompt(context, { previous, history })
+    // 5. Il modello riceve SOLO il contesto ripulito + le frasi precedenti.
     const started = Date.now()
     let result
     try {
       result = await callModel({ system: prompt.system, input: prompt.input, schema: SPENDY_RESPONSE_SCHEMA })
     } catch (error) {
-      // Il provider non ha risposto: la chiamata prenotata torna all'utente.
-      // Se anche il rilascio fallisce, resta consumata (mai il contrario).
-      const released = await quota.release({ userId: user.id, day }).then(() => true, () => false)
+      // La chiamata prenotata torna all'utente SOLO se l'adattatore ha
+      // dichiarato `refund` (errore prima dell'invio, o rifiuto esplicito
+      // 400/401/403/404/429/529: nessun costo). Timeout, rete, 5xx, errori sconosciuti
+      // e qualunque eccezione non classificata la lasciano consumata: una
+      // richiesta partita può essere stata fatturata anche senza risposta.
+      // Se il rilascio fallisce, resta consumata (mai il contrario).
+      const refundable = error instanceof ModelError && error.refund === true
+      const released = refundable
+        ? await quota.release({ userId: user.id, day }).then(() => true, () => false)
+        : false
       const code = error instanceof ModelError ? error.code : 'provider_error'
       // La diagnostica va solo nei log, ripulita un'altra volta anche qui
       // (e con la chiave del server tra i segreti da cancellare).
@@ -301,7 +318,7 @@ export function createSpendyAIHandler({
       return json(200, { response: silentResponse(context), provider: config.provider, model: result.model ?? null })
     }
 
-    // 5. Stesse regole dell'app: se non passa qui, non arriva nemmeno.
+    // 6. Stesse regole dell'app: se non passa qui, non arriva nemmeno.
     const parsed = parseModelJson(result.text)
     if (!parsed) {
       log({ outcome: 'invalid', event: eventId, errors: ['not_json'], stopReason: result.stopReason })

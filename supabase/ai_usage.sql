@@ -86,9 +86,10 @@ $$;
 
 -- --------------------------------------------------------------- rilascio
 
--- Restituisce la chiamata prenotata quando il provider non ha risposto
--- (timeout, rete, 5xx, limite del provider): un errore temporaneo non deve
--- bruciare una delle 3 frasi del giorno. Mai sotto zero.
+-- Restituisce la chiamata prenotata quando è certo che il provider non ha
+-- fatturato nulla: errore prima dell'invio, oppure rifiuto esplicito con
+-- HTTP 400, 401, 403, 404, 429 o 529 (decide la Edge Function, vedi quota.js). Timeout,
+-- rete e 5xx NON la restituiscono. Mai sotto zero.
 create or replace function public.spendy_ai_release(p_user_id uuid, p_usage_date date)
 returns integer
 language sql

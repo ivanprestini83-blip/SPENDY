@@ -164,9 +164,12 @@ curl -i -X POST https://riflsimbbajfvxublovr.supabase.co/functions/v1/spendy-ai 
   al giorno (giornata UTC) per utente, contate nella tabella `ai_usage`
   da [`ai_usage.sql`](./ai_usage.sql). Il limite dell'app resta, ma è solo
   un primo filtro. Oltre la quota la funzione risponde `429` con
-  `{"error":"AI_DAILY_LIMIT_REACHED"}` senza chiamare il modello; se il
-  provider non risponde (timeout, 5xx, suo rate limit) la chiamata viene
-  restituita. Se il database della quota non risponde, niente AI (503).
+  `{"error":"AI_DAILY_LIMIT_REACHED"}` senza chiamare il modello. La
+  chiamata prenotata torna all'utente solo se è certo che nulla è stato
+  fatturato: errore prima dell'invio, oppure rifiuto esplicito del provider
+  con HTTP 400, 401, 403, 404, 429 o 529. Timeout, errori di rete, 5xx e ogni altro
+  errore dopo l'invio la lasciano consumata. Se il database della quota non
+  risponde, niente AI (503).
 
   **Ordine obbligatorio**: prima incollare `ai_usage.sql` nell'SQL Editor,
   POI rifare il deploy della funzione. Al contrario, la funzione nuova
