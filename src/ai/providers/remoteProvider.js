@@ -40,9 +40,17 @@ const STATUS_TO_CODE = {
   504: 'timeout',
 }
 
-// La quota giornaliera del SERVER (supabase/functions/spendy-ai/quota.js):
-// stesso 429 del limite del provider, ma con questo codice nel corpo.
+// Le quote del SERVER (supabase/functions/spendy-ai/quota.js): stesso 429 del
+// limite del provider, ma con uno di questi codici nel corpo.
 export const DAILY_LIMIT_ERROR = 'AI_DAILY_LIMIT_REACHED'
+// Gli altri due limiti del server: mensile per utente e globale giornaliero.
+export const MONTHLY_LIMIT_ERROR = 'AI_MONTHLY_LIMIT_REACHED'
+export const GLOBAL_LIMIT_ERROR = 'AI_GLOBAL_LIMIT_REACHED'
+const QUOTA_ERROR_CODES = {
+  [DAILY_LIMIT_ERROR]: 'daily_limit',
+  [MONTHLY_LIMIT_ERROR]: 'monthly_limit',
+  [GLOBAL_LIMIT_ERROR]: 'global_limit',
+}
 
 export function functionsUrl(supabaseUrl) {
   return supabaseUrl ? `${supabaseUrl.replace(/\/$/, '')}/functions/v1/${SPENDY_AI_FUNCTION}` : null
@@ -86,7 +94,8 @@ export function createRemoteProvider({ url, publicKey, getAccessToken, fetchImpl
       if (!response.ok) {
         if (response.status === 429) {
           const errorBody = await response.json().catch(() => null)
-          if (errorBody?.error === DAILY_LIMIT_ERROR) throw providerError('daily_limit', `HTTP 429 ${DAILY_LIMIT_ERROR}`)
+          const quotaCode = QUOTA_ERROR_CODES[errorBody?.error]
+          if (quotaCode) throw providerError(quotaCode, `HTTP 429 ${errorBody.error}`)
         }
         throw providerError(STATUS_TO_CODE[response.status] ?? 'server_error', `HTTP ${response.status}`)
       }

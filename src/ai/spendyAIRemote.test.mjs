@@ -64,7 +64,7 @@ function makeServer({ model = fakeModel(), env = ENV } = {}) {
   const logs = []
   const handler = createSpendyAIHandler({
     config: readConfig((name) => env[name]),
-    verifyUser: async (token) => (token === VALID_TOKEN ? { id: 'utente-1' } : null),
+    verifyUser: async (token) => (token === VALID_TOKEN ? { id: 'utente-1', emailConfirmed: true } : null),
     callModel: model.callModel,
     quota: openQuota(),
     log: (entry) => logs.push(entry),
@@ -494,7 +494,7 @@ section('Diagnostica degli errori del provider (solo log, mai la chiave)')
     const logs = []
     const handler = createSpendyAIHandler({
       config,
-      verifyUser: async () => ({ id: 'u-1' }),
+      verifyUser: async () => ({ id: 'u-1', emailConfirmed: true }),
       callModel: createAnthropicCaller({ Anthropic: FakeAnthropic, apiKey: API_KEY, config }),
       quota: openQuota(),
       log: (entry) => logs.push(entry),
@@ -593,7 +593,7 @@ section('Nessun header anthropic-workspace-id (la chiave basta)')
   const logs = []
   const handler = createSpendyAIHandler({
     config,
-    verifyUser: async () => ({ id: 'u-1' }),
+    verifyUser: async () => ({ id: 'u-1', emailConfirmed: true }),
     callModel: createAnthropicCaller({ Anthropic: RecordingAnthropic, apiKey: config.apiKey, config }),
     quota: openQuota(),
     log: (entry) => logs.push(entry),

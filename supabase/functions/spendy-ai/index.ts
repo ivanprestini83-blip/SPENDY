@@ -7,6 +7,8 @@
 //   AI_API_KEY    chiave del provider — SOLO qui, mai nel frontend
 //   AI_EFFORT     facoltativo: low | medium | high | xhigh | max
 //   AI_TIMEOUT_MS, AI_MAX_TOKENS, ALLOWED_ORIGINS  facoltativi
+//   AI_DAILY_LIMIT (3), AI_MONTHLY_LIMIT (30), AI_GLOBAL_DAILY_LIMIT (300)
+//                 facoltativi: limiti della quota, vedi quota.js
 // SUPABASE_URL, la chiave pubblica e la service_role (usata SOLO per la
 // quota giornaliera, tabella ai_usage) sono forniti da Supabase.
 import Anthropic from 'npm:@anthropic-ai/sdk@0.128.0'

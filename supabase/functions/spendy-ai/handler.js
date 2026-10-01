@@ -22,7 +22,7 @@ import {
   validateSpendyResponse,
   SPENDY_RESPONSE_SCHEMA,
 } from '../_shared/spendyAIRules.js'
-import { AI_DAILY_LIMIT, AI_DAILY_LIMIT_REACHED, usageDay } from './quota.js'
+import { AI_DAILY_LIMIT, AI_MONTHLY_LIMIT, AI_GLOBAL_DAILY_LIMIT, AI_DAILY_LIMIT_REACHED, QUOTA_REASONS, usageDay } from './quota.js'
 
 export const MAX_BODY_BYTES = 8 * 1024
 export const SUPPORTED_PROVIDERS = ['anthropic']
@@ -142,6 +142,13 @@ export function readConfig(getEnv) {
     timeoutMs: positive(getEnv('AI_TIMEOUT_MS'), DEFAULT_TIMEOUT_MS),
     maxTokens: positive(getEnv('AI_MAX_TOKENS'), DEFAULT_MAX_TOKENS),
     allowedOrigins: (getEnv('ALLOWED_ORIGINS') ?? '*').split(',').map((o) => o.trim()).filter(Boolean),
+    // Limiti della quota (vedi quota.js): secret AI_DAILY_LIMIT,
+    // AI_MONTHLY_LIMIT, AI_GLOBAL_DAILY_LIMIT. Un valore mancante o non
+    // valido (non un intero positivo) ripiega sul predefinito prudente, mai
+    // su "nessun limite".
+    dailyLimit: positive(getEnv('AI_DAILY_LIMIT'), AI_DAILY_LIMIT),
+    monthlyLimit: positive(getEnv('AI_MONTHLY_LIMIT'), AI_MONTHLY_LIMIT),
+    globalDailyLimit: positive(getEnv('AI_GLOBAL_DAILY_LIMIT'), AI_GLOBAL_DAILY_LIMIT),
     missing,
   }
 }
@@ -199,6 +206,16 @@ export function parseModelJson(text) {
   }
 }
 
+// `usage` come lo restituisce l'adattatore del provider: due interi non
+// negativi, oppure niente. Qualunque altra forma vale "senza usage": meglio
+// non registrare che registrare un numero inventato.
+export function normalizeUsage(usage) {
+  const input = usage?.inputTokens
+  const output = usage?.outputTokens
+  const valid = (n) => Number.isInteger(n) && n >= 0
+  return valid(input) && valid(output) ? { inputTokens: input, outputTokens: output } : null
+}
+
 function bearerToken(request) {
   const header = request.headers.get('authorization') ?? ''
   const match = /^Bearer\s+(.+)$/i.exec(header.trim())
@@ -215,16 +232,26 @@ function bearerToken(request) {
 //   quota       createSupabaseQuota(...) — { reserve, release } (quota.js);
 //               senza, nessuna chiamata AI passa (fail closed)
 //   now         () => ms, l'orologio che decide la giornata UTC della quota
-//   dailyLimit  chiamate AI al giorno per utente
+//   dailyLimit, monthlyLimit, globalDailyLimit
+//               (facoltativi) sostituiscono i limiti letti da config: giornaliero
+//               e mensile per utente, e totale giornaliero di tutti gli utenti
 export function createSpendyAIHandler({
   config,
   verifyUser,
   callModel,
   quota = null,
   now = () => Date.now(),
-  dailyLimit = AI_DAILY_LIMIT,
+  dailyLimit,
+  monthlyLimit,
+  globalDailyLimit,
   log = () => {},
 }) {
+  const limits = {
+    daily: dailyLimit ?? config.dailyLimit ?? AI_DAILY_LIMIT,
+    monthly: monthlyLimit ?? config.monthlyLimit ?? AI_MONTHLY_LIMIT,
+    global: globalDailyLimit ?? config.globalDailyLimit ?? AI_GLOBAL_DAILY_LIMIT,
+  }
+
   return async function handle(request) {
     const cors = corsHeaders(request, config.allowedOrigins)
     const json = (status, body) => new Response(JSON.stringify(body), {
@@ -240,6 +267,14 @@ export function createSpendyAIHandler({
     const token = bearerToken(request)
     const user = token ? await verifyUser(token).catch(() => null) : null
     if (!user?.id) return json(401, { error: 'unauthenticated' })
+
+    // Solo account con l'email confermata: la quota è per utente, e un account
+    // non verificato è il modo più economico per moltiplicare le chiamate.
+    // Succede PRIMA di qualunque prenotazione: non consuma niente.
+    if (user.emailConfirmed !== true) {
+      log({ outcome: 'email_not_confirmed' })
+      return json(403, { error: 'email_not_confirmed' })
+    }
 
     if (config.missing.length > 0 || typeof callModel !== 'function' || !quota) {
       log({ outcome: 'not_configured', missing: [...config.missing, ...(quota ? [] : ['quota'])] })
@@ -276,14 +311,17 @@ export function createSpendyAIHandler({
     const day = usageDay(now())
     let reservation
     try {
-      reservation = await quota.reserve({ userId: user.id, day, limit: dailyLimit })
+      reservation = await quota.reserve({ userId: user.id, day, limits })
     } catch {
       log({ outcome: 'quota_unavailable', event: eventId })
       return json(503, { error: 'quota_unavailable' })
     }
     if (!reservation.allowed) {
-      log({ outcome: 'daily_limit', event: eventId })
-      return json(429, { error: AI_DAILY_LIMIT_REACHED })
+      // Quale limite è scattato: giornaliero (utente), mensile (utente) o
+      // globale (tutti). Il modello non viene raggiunto in nessuno dei tre casi.
+      const reached = QUOTA_REASONS[reservation.reason] ?? QUOTA_REASONS.daily
+      log({ outcome: reached.outcome, event: eventId })
+      return json(429, { error: reached.error ?? AI_DAILY_LIMIT_REACHED })
     }
 
     // 5. Il modello riceve SOLO il contesto ripulito + le frasi precedenti.
@@ -313,20 +351,35 @@ export function createSpendyAIHandler({
       return json(MODEL_ERROR_STATUS[code] ?? 502, { error: code })
     }
 
+    // I token FATTURATI di questa chiamata (quelli di `usage` nella risposta del
+    // provider), per misurare il consumo reale. Solo numeri e l'id del modello.
+    // È una misura: se non si riesce a registrarla la risposta all'utente non
+    // cambia, e la chiamata resta comunque nel conteggio della quota.
+    const usage = normalizeUsage(result.usage)
+    let usageRecorded = false
+    if (usage && typeof quota.recordUsage === 'function') {
+      usageRecorded = await quota
+        .recordUsage({ userId: user.id, day, model: result.model ?? config.model ?? null, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens })
+        .then(() => true, () => false)
+    }
+    const usageLog = usage
+      ? { tokensIn: usage.inputTokens, tokensOut: usage.outputTokens, usageRecorded }
+      : { usageRecorded: false, noUsage: true }
+
     if (result.stopReason === 'refusal') {
-      log({ outcome: 'refusal', event: eventId, ms: Date.now() - started })
+      log({ outcome: 'refusal', event: eventId, ms: Date.now() - started, model: result.model ?? config.model, ...usageLog })
       return json(200, { response: silentResponse(context), provider: config.provider, model: result.model ?? null })
     }
 
     // 6. Stesse regole dell'app: se non passa qui, non arriva nemmeno.
     const parsed = parseModelJson(result.text)
     if (!parsed) {
-      log({ outcome: 'invalid', event: eventId, errors: ['not_json'], stopReason: result.stopReason })
+      log({ outcome: 'invalid', event: eventId, errors: ['not_json'], stopReason: result.stopReason, model: result.model ?? config.model, ...usageLog })
       return json(422, { error: 'invalid', details: ['not_json'] })
     }
     const checked = validateSpendyResponse(parsed, context, { history, previous })
     if (!checked.valid) {
-      log({ outcome: 'invalid', event: eventId, errors: checked.errors })
+      log({ outcome: 'invalid', event: eventId, errors: checked.errors, model: result.model ?? config.model, ...usageLog })
       return json(422, { error: 'invalid', details: checked.errors })
     }
 
@@ -337,6 +390,7 @@ export function createSpendyAIHandler({
       shouldShow: checked.response.shouldShow,
       ms: Date.now() - started,
       model: result.model ?? config.model,
+      ...usageLog,
     })
     return json(200, { response: checked.response, provider: config.provider, model: result.model ?? config.model })
   }

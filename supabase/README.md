@@ -107,6 +107,9 @@ variabile `VITE_*`.
 | `AI_TIMEOUT_MS` | no | default `12000` |
 | `AI_MAX_TOKENS` | no | default `2048` |
 | `ALLOWED_ORIGINS` | no | es. `https://spendy.vercel.app` (default: tutti, l'accesso è comunque solo con sessione) |
+| `AI_DAILY_LIMIT` | no | chiamate AI al giorno per utente (giornata UTC). Default `3` |
+| `AI_MONTHLY_LIMIT` | no | chiamate AI al mese per utente (mese di calendario UTC). Default `30` |
+| `AI_GLOBAL_DAILY_LIMIT` | no | chiamate AI al giorno di TUTTI gli utenti: una valvola di sicurezza, non un budget. Default `300`, volutamente prudente: va regolato quando si conosce il costo reale per chiamata |
 
 `SUPABASE_URL` e la chiave pubblica li fornisce Supabase da solo.
 `ANTHROPIC_WORKSPACE_ID` non è più usato: se è ancora tra i secret viene

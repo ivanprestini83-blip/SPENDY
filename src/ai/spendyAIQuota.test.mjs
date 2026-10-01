@@ -19,9 +19,10 @@ import { check, section, report } from '../sync/testkit.mjs'
 import { createSpendyAIHandler, readConfig, ModelError } from '../../supabase/functions/spendy-ai/handler.js'
 import { createAnthropicCaller } from '../../supabase/functions/spendy-ai/anthropicModel.js'
 import {
-  AI_DAILY_LIMIT, AI_DAILY_LIMIT_REACHED, usageDay, createSupabaseQuota, supabaseServiceKey,
+  AI_DAILY_LIMIT, AI_MONTHLY_LIMIT, AI_GLOBAL_DAILY_LIMIT, AI_DAILY_LIMIT_REACHED, AI_MONTHLY_LIMIT_REACHED,
+  AI_GLOBAL_LIMIT_REACHED, QUOTA_REASONS, usageDay, createSupabaseQuota, supabaseServiceKey,
 } from '../../supabase/functions/spendy-ai/quota.js'
-import { createRemoteProvider, functionsUrl, DAILY_LIMIT_ERROR } from './providers/remoteProvider.js'
+import { createRemoteProvider, functionsUrl, DAILY_LIMIT_ERROR, MONTHLY_LIMIT_ERROR, GLOBAL_LIMIT_ERROR } from './providers/remoteProvider.js'
 import { createSpendyAI } from './spendyAI.js'
 import { requestSpendyVoice } from './spendyVoicePolicy.js'
 import { emptyVoiceCache } from './spendyVoiceCache.js'
@@ -29,6 +30,8 @@ import { emptyVoiceCache } from './spendyVoiceCache.js'
 const URL_FN = functionsUrl('https://progetto.supabase.co')
 const ENV = { AI_PROVIDER: 'anthropic', AI_MODEL: 'modello-configurato', AI_API_KEY: 'sk-segreto-lato-server' }
 const TOKENS = { 'token-a': 'utente-a', 'token-b': 'utente-b' }
+// Utenti con l'email confermata: tutti, tranne quelli elencati qui.
+const UNCONFIRMED = new Set(['utente-non-confermato'])
 const DAY1 = Date.parse('2026-09-29T10:00:00Z')
 const DAY2 = Date.parse('2026-09-30T10:00:00Z')
 
@@ -46,27 +49,58 @@ const okAnswer = { message: 'Ristorante a 160 €, la tua media è 55 €. Ciclo
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 // ai_usage in memoria. reserve/release sono atomiche come le funzioni SQL:
-// controllo e incremento avvengono nello stesso passo, dopo la "rete".
+// la valutazione dei tre limiti e l'incremento avvengono nello stesso passo,
+// dopo la "rete". Rispecchia spendy_ai_reserve_v2 (supabase/ai_usage.sql):
+// giornaliero, poi mensile (mese di calendario UTC), poi globale del giorno;
+// il mese e il totale sono SEMPRE derivati dalle righe, come nell'SQL.
 function memoryQuota() {
-  const rows = new Map()
+  const rows = new Map() // `${utente}|${giorno}` → { calls, usageCalls, input, output, models }
   const key = (userId, day) => `${userId}|${day}`
   const ops = []
+  const usageRows = []
+  const monthOf = (day) => day.slice(0, 7)
+  const calls = (userId, day) => rows.get(key(userId, day))?.calls ?? 0
+  const monthTotal = (userId, day) => [...rows.entries()]
+    .filter(([k]) => k.startsWith(`${userId}|`) && monthOf(k.split('|')[1]) === monthOf(day))
+    .reduce((sum, [, row]) => sum + row.calls, 0)
+  const dayTotal = (day) => [...rows.entries()].filter(([k]) => k.split('|')[1] === day).reduce((sum, [, row]) => sum + row.calls, 0)
   return {
     rows,
     ops,
-    count: (userId, day) => rows.get(key(userId, day)) ?? 0,
-    async reserve({ userId, day, limit }) {
-      ops.push({ op: 'reserve', userId, day, limit })
+    usageRows,
+    count: calls,
+    monthCount: monthTotal,
+    globalCount: dayTotal,
+    async reserve({ userId, day, limits }) {
+      ops.push({ op: 'reserve', userId, day, limits })
       await tick()
-      const current = rows.get(key(userId, day)) ?? 0
-      if (current >= limit) return { allowed: false, used: current }
-      rows.set(key(userId, day), current + 1)
-      return { allowed: true, used: current + 1 }
+      const daily = calls(userId, day)
+      if (daily >= limits.daily) return { allowed: false, reason: 'daily', used: daily }
+      if (monthTotal(userId, day) >= limits.monthly) return { allowed: false, reason: 'monthly', used: daily }
+      if (dayTotal(day) >= limits.global) return { allowed: false, reason: 'global', used: daily }
+      const row = rows.get(key(userId, day)) ?? { calls: 0, usageCalls: 0, input: 0, output: 0, models: {} }
+      rows.set(key(userId, day), { ...row, calls: row.calls + 1 })
+      return { allowed: true, reason: null, used: daily + 1 }
     },
     async release({ userId, day }) {
       ops.push({ op: 'release', userId, day })
       await tick()
-      rows.set(key(userId, day), Math.max((rows.get(key(userId, day)) ?? 0) - 1, 0))
+      const row = rows.get(key(userId, day))
+      if (row) rows.set(key(userId, day), { ...row, calls: Math.max(row.calls - 1, 0) })
+    },
+    async recordUsage({ userId, day, model, inputTokens, outputTokens }) {
+      ops.push({ op: 'recordUsage', userId, day })
+      usageRows.push({ userId, day, model, inputTokens, outputTokens })
+      await tick()
+      const row = rows.get(key(userId, day)) ?? { calls: 0, usageCalls: 0, input: 0, output: 0, models: {} }
+      const m = row.models[model] ?? { calls: 0, input_tokens: 0, output_tokens: 0 }
+      rows.set(key(userId, day), {
+        ...row,
+        usageCalls: row.usageCalls + 1,
+        input: row.input + inputTokens,
+        output: row.output + outputTokens,
+        models: { ...row.models, [model]: { calls: m.calls + 1, input_tokens: m.input_tokens + inputTokens, output_tokens: m.output_tokens + outputTokens } },
+      })
     },
   }
 }
@@ -77,12 +111,15 @@ function memoryQuota() {
 function naiveQuota() {
   const rows = new Map()
   return {
-    async reserve({ userId, day, limit }) {
+    async reserve({ userId, day, limits }) {
+      // Legge e conta il totale del giorno, poi scrive DOPO la "rete".
       const current = rows.get(`${userId}|${day}`) ?? 0
+      const total = [...rows.entries()].filter(([k]) => k.endsWith(`|${day}`)).reduce((sum, [, n]) => sum + n, 0)
       await tick()
-      if (current >= limit) return { allowed: false, used: current }
+      if (current >= limits.daily) return { allowed: false, reason: 'daily', used: current }
+      if (total >= limits.global) return { allowed: false, reason: 'global', used: current }
       rows.set(`${userId}|${day}`, current + 1)
-      return { allowed: true, used: current + 1 }
+      return { allowed: true, reason: null, used: current + 1 }
     },
     async release() {},
   }
@@ -99,11 +136,11 @@ function fakeModel(behavior = null) {
   return { callModel, calls }
 }
 
-function makeServer({ quota = memoryQuota(), model = fakeModel(), clock = { now: DAY1 } } = {}) {
+function makeServer({ quota = memoryQuota(), model = fakeModel(), clock = { now: DAY1 }, env = {}, tokens = TOKENS } = {}) {
   const logs = []
   const handler = createSpendyAIHandler({
-    config: readConfig((name) => ENV[name]),
-    verifyUser: async (token) => (TOKENS[token] ? { id: TOKENS[token] } : null),
+    config: readConfig((name) => ({ ...ENV, ...env })[name]),
+    verifyUser: async (token) => (tokens[token] ? { id: tokens[token], emailConfirmed: !UNCONFIRMED.has(tokens[token]) } : null),
     callModel: model.callModel,
     quota,
     now: () => clock.now,
@@ -263,7 +300,7 @@ section('Quota: rimborso, classificazione degli errori del provider')
     const logs = []
     const handler = createSpendyAIHandler({
       config,
-      verifyUser: async (token) => (TOKENS[token] ? { id: TOKENS[token] } : null),
+      verifyUser: async (token) => (TOKENS[token] ? { id: TOKENS[token], emailConfirmed: true } : null),
       callModel: createAnthropicCaller({ Anthropic: FakeAnthropic, apiKey: config.apiKey, config }),
       quota,
       now: () => DAY1,
@@ -407,7 +444,11 @@ section('Quota: adattatore Supabase (RPC con service_role)')
 // =====================================================================
 {
   const sent = []
-  const responses = [[{ allowed: true, used: 1 }], [{ allowed: false, used: 3 }], null]
+  const responses = [
+    [{ allowed: true, reason: null, daily_used: 1, monthly_used: 1, global_used: 1 }],
+    [{ allowed: false, reason: 'monthly', daily_used: 1, monthly_used: 30, global_used: 40 }],
+    null,
+  ]
   const quota = createSupabaseQuota({
     supabaseUrl: 'https://progetto.supabase.co/',
     serviceKey: 'eyJservice.role.jwt',
@@ -416,12 +457,13 @@ section('Quota: adattatore Supabase (RPC con service_role)')
       return new Response(JSON.stringify(responses.shift()), { status: 200 })
     },
   })
-  const r1 = await quota.reserve({ userId: 'utente-a', day: '2026-09-29', limit: 3 })
-  const r2 = await quota.reserve({ userId: 'utente-a', day: '2026-09-29', limit: 3 })
+  const limitsArg = { daily: 3, monthly: 30, global: 300 }
+  const r1 = await quota.reserve({ userId: 'utente-a', day: '2026-09-29', limits: limitsArg })
+  const r2 = await quota.reserve({ userId: 'utente-a', day: '2026-09-29', limits: limitsArg })
   await quota.release({ userId: 'utente-a', day: '2026-09-29' })
-  check('prenotazione → /rest/v1/rpc/spendy_ai_reserve', sent[0].url === 'https://progetto.supabase.co/rest/v1/rpc/spendy_ai_reserve')
-  check('   argomenti: utente verificato, giorno, limite', JSON.stringify(sent[0].body) === '{"p_user_id":"utente-a","p_usage_date":"2026-09-29","p_limit":3}')
-  check('   esito letto dalla risposta', r1.allowed === true && r1.used === 1 && r2.allowed === false && r2.used === 3)
+  check('prenotazione → /rest/v1/rpc/spendy_ai_reserve_v2 (la funzione vecchia non viene più chiamata)', sent[0].url === 'https://progetto.supabase.co/rest/v1/rpc/spendy_ai_reserve_v2')
+  check('   argomenti: utente verificato, giorno, i tre limiti', JSON.stringify(sent[0].body) === '{"p_user_id":"utente-a","p_usage_date":"2026-09-29","p_daily_limit":3,"p_monthly_limit":30,"p_global_daily_limit":300}')
+  check('   esito e motivo del rifiuto letti dalla risposta', r1.allowed === true && r1.reason === null && r1.used === 1 && r2.allowed === false && r2.reason === 'monthly')
   check('rilascio → /rest/v1/rpc/spendy_ai_release', sent[2].url.endsWith('/rest/v1/rpc/spendy_ai_release'))
   check('si presenta con la service_role, non con il token dell\'utente',
     sent.every((s) => s.headers.apikey === 'eyJservice.role.jwt' && s.headers.Authorization === 'Bearer eyJservice.role.jwt'))
@@ -430,15 +472,15 @@ section('Quota: adattatore Supabase (RPC con service_role)')
   const newKeys = createSupabaseQuota({
     supabaseUrl: 'https://progetto.supabase.co',
     serviceKey: 'sb_secret_test',
-    fetchImpl: async (url, init) => { secret.push(init.headers); return new Response('[{"allowed":true,"used":1}]', { status: 200 }) },
+    fetchImpl: async (url, init) => { secret.push(init.headers); return new Response('[{"allowed":true,"daily_used":1}]', { status: 200 }) },
   })
-  await newKeys.reserve({ userId: 'u', day: '2026-09-29', limit: 3 })
+  await newKeys.reserve({ userId: 'u', day: '2026-09-29', limits: limitsArg })
   check('nuove chiavi segrete: solo apikey, nessun Bearer', secret[0].apikey === 'sb_secret_test' && !('Authorization' in secret[0]))
 
   const failing = createSupabaseQuota({ supabaseUrl: 'https://x.supabase.co', serviceKey: 'k', fetchImpl: async () => new Response('{}', { status: 500 }) })
-  check('database in errore → l\'adattatore lancia (fail closed)', await failing.reserve({ userId: 'u', day: 'd', limit: 3 }).then(() => false, () => true))
+  check('database in errore → l\'adattatore lancia (fail closed)', await failing.reserve({ userId: 'u', day: 'd', limits: limitsArg }).then(() => false, () => true))
   const weird = createSupabaseQuota({ supabaseUrl: 'https://x.supabase.co', serviceKey: 'k', fetchImpl: async () => new Response('[]', { status: 200 }) })
-  check('risposta senza esito → lancia, non consente', await weird.reserve({ userId: 'u', day: 'd', limit: 3 }).then(() => false, () => true))
+  check('risposta senza esito → lancia, non consente', await weird.reserve({ userId: 'u', day: 'd', limits: limitsArg }).then(() => false, () => true))
 
   check('service key: legacy SUPABASE_SERVICE_ROLE_KEY', supabaseServiceKey((n) => ({ SUPABASE_SERVICE_ROLE_KEY: 'legacy' })[n]) === 'legacy')
   check('service key: nuove SUPABASE_SECRET_KEYS (JSON)', supabaseServiceKey((n) => ({ SUPABASE_SECRET_KEYS: '{"default":"sb_secret_x"}' })[n]) === 'sb_secret_x')
@@ -493,6 +535,337 @@ section('Quota: l\'app distingue quota, provider e autenticazione')
   const { cache, result } = await requestSpendyVoice({ ai, context, meta, cache: emptyVoiceCache(), today: '2026-09-29', now: DAY1 })
   check('app: quota del server esaurita → nessuna chiamata contata in locale', result.error === 'daily_limit' && (cache.calls?.count ?? 0) === 0)
   check('app: la situazione resta sulla frase locale', cache.failure?.error === 'daily_limit' && cache.failure?.fingerprint === 'f-1')
+}
+
+
+// =====================================================================
+section('Limiti configurabili (secret), non scolpiti nella funzione')
+// =====================================================================
+{
+  const defaults = readConfig((name) => ENV[name])
+  check('predefiniti: 3 al giorno, 30 al mese, 300 globali', defaults.dailyLimit === 3 && defaults.monthlyLimit === 30 && defaults.globalDailyLimit === 300
+    && AI_DAILY_LIMIT === 3 && AI_MONTHLY_LIMIT === 30 && AI_GLOBAL_DAILY_LIMIT === 300)
+  const custom = readConfig((name) => ({ ...ENV, AI_DAILY_LIMIT: '2', AI_MONTHLY_LIMIT: '10', AI_GLOBAL_DAILY_LIMIT: '1000' })[name])
+  check('AI_DAILY_LIMIT / AI_MONTHLY_LIMIT / AI_GLOBAL_DAILY_LIMIT letti dai secret', custom.dailyLimit === 2 && custom.monthlyLimit === 10 && custom.globalDailyLimit === 1000)
+  for (const bad of ['', 'abc', '0', '-5', 'NaN', undefined]) {
+    const c = readConfig((name) => ({ ...ENV, AI_DAILY_LIMIT: bad, AI_MONTHLY_LIMIT: bad, AI_GLOBAL_DAILY_LIMIT: bad })[name])
+    check(`valore non valido (${JSON.stringify(bad)}) → predefinito prudente, mai "nessun limite"`, c.dailyLimit === 3 && c.monthlyLimit === 30 && c.globalDailyLimit === 300)
+  }
+  const server = makeServer({ env: { AI_DAILY_LIMIT: '2', AI_MONTHLY_LIMIT: '10', AI_GLOBAL_DAILY_LIMIT: '1000' } })
+  await call(server)
+  check('i limiti dei secret arrivano alla prenotazione', JSON.stringify(server.quota.ops[0].limits) === '{"daily":2,"monthly":10,"global":1000}')
+  await call(server); const third = await call(server)
+  check('AI_DAILY_LIMIT=2: la terza chiamata del giorno è rifiutata', third.status === 429 && third.body.error === AI_DAILY_LIMIT_REACHED && server.model.calls.length === 2)
+  const handlerSource = readFileSync(new URL('../../supabase/functions/spendy-ai/handler.js', import.meta.url), 'utf8')
+  check('la funzione legge i tre secret e i predefiniti vengono da quota.js (nessun numero scolpito)',
+    ["getEnv('AI_DAILY_LIMIT')", "getEnv('AI_MONTHLY_LIMIT')", "getEnv('AI_GLOBAL_DAILY_LIMIT')"].every((c) => handlerSource.includes(c))
+    && !/(daily|monthly|global)\w*\s*[:=]\s*\d+\s*[,;\n]/i.test(handlerSource))
+}
+
+// =====================================================================
+section('Quota mensile: 30 chiamate per mese di calendario UTC')
+// =====================================================================
+{
+  const server = makeServer()
+  const dayOf = (n) => Date.parse(`2026-09-${String(n).padStart(2, '0')}T10:00:00Z`)
+  let allowed = 0
+  for (let d = 1; d <= 10; d += 1) {
+    server.clock.now = dayOf(d)
+    for (let i = 0; i < 3; i += 1) if ((await call(server)).status === 200) allowed += 1
+  }
+  check('10 giorni x 3 chiamate = 30 chiamate consentite', allowed === 30 && server.quota.monthCount('utente-a', '2026-09-10') === 30)
+  server.clock.now = dayOf(11)
+  const over = await call(server)
+  check('la 31ª chiamata del mese → 429 AI_MONTHLY_LIMIT_REACHED', over.status === 429 && over.body.error === AI_MONTHLY_LIMIT_REACHED && AI_MONTHLY_LIMIT_REACHED === 'AI_MONTHLY_LIMIT_REACHED')
+  check('   il modello NON viene chiamato e il contatore non sale', server.model.calls.length === 30 && server.quota.count('utente-a', '2026-09-11') === 0)
+  check('   risposta senza dettagli interni; nei log solo esito ed evento', JSON.stringify(Object.keys(over.body)) === '["error"]'
+    && JSON.stringify(Object.keys(server.logs.find((e) => e.outcome === 'monthly_limit')).sort()) === '["event","outcome"]')
+  const other = await call(server, { token: 'token-b' })
+  check('un altro utente non è toccato dal mensile di A', other.status === 200)
+
+  server.clock.now = Date.parse('2026-10-01T00:05:00Z')
+  const nextMonth = await call(server)
+  check('cambio mese (1 ottobre UTC) → la quota mensile riparte', nextMonth.status === 200 && server.quota.monthCount('utente-a', '2026-10-01') === 1)
+  check('   il mese prima resta com\'era', server.quota.monthCount('utente-a', '2026-09-30') === 30)
+  server.clock.now = Date.parse('2026-09-30T23:59:00Z')
+  check('   30 settembre 23:59 UTC è ancora settembre', usageDay(server.clock.now) === '2026-09-30' && (await call(server)).body.error === AI_MONTHLY_LIMIT_REACHED)
+
+  // Il rimborso riporta indietro ANCHE il mensile (è derivato dalle righe).
+  const refunding = makeServer({ model: fakeModel(() => { throw new ModelError('rate_limited', 'rate_limited', null, { refund: true }) }) })
+  for (let d = 1; d <= 10; d += 1) { refunding.clock.now = dayOf(d); for (let i = 0; i < 3; i += 1) await call(refunding) }
+  check('rimborsi: 30 chiamate rifiutate dal provider non consumano né giorno né mese', refunding.quota.monthCount('utente-a', '2026-09-10') === 0)
+  const consumed = makeServer()
+  for (let d = 1; d <= 10; d += 1) { consumed.clock.now = dayOf(d); for (let i = 0; i < 3; i += 1) await call(consumed) }
+  consumed.clock.now = dayOf(11)
+  check('31ª rifiutata prima del rimborso…', (await call(consumed)).status === 429)
+  await consumed.quota.release({ userId: 'utente-a', day: '2026-09-10' })
+  check('…dopo un rimborso la mensile si libera di UNA chiamata e la successiva passa', consumed.quota.monthCount('utente-a', '2026-09-11') === 29 && (await call(consumed)).status === 200 && (await call(consumed)).status === 429)
+
+  // timeout e risposte scartate restano consumate anche nel mese
+  const timeouts = makeServer({ model: fakeModel(() => { throw new ModelError('timeout') }) })
+  await call(timeouts)
+  check('un timeout consuma anche il conteggio mensile', timeouts.quota.monthCount('utente-a', day1) === 1)
+}
+
+// =====================================================================
+section('Tetto globale giornaliero (tutti gli utenti)')
+// =====================================================================
+{
+  const tokens = { 'token-a': 'utente-a', 'token-b': 'utente-b', 'token-c': 'utente-c', 'token-d': 'utente-d' }
+  const server = makeServer({ tokens, env: { AI_GLOBAL_DAILY_LIMIT: '5' } })
+  const outcomes = []
+  for (const token of ['token-a', 'token-a', 'token-b', 'token-b', 'token-c']) outcomes.push((await call(server, { token })).status)
+  check('5 chiamate di utenti diversi: tutte consentite (nessun utente oltre il suo limite)', outcomes.every((s) => s === 200) && server.quota.globalCount(day1) === 5)
+  const blocked = await call(server, { token: 'token-d' })
+  check('la 6ª della giornata, di un utente che non ha usato niente → 429 AI_GLOBAL_LIMIT_REACHED', blocked.status === 429 && blocked.body.error === AI_GLOBAL_LIMIT_REACHED && AI_GLOBAL_LIMIT_REACHED === 'AI_GLOBAL_LIMIT_REACHED')
+  check('   il modello NON viene chiamato; nei log solo esito ed evento', server.model.calls.length === 5
+    && JSON.stringify(Object.keys(server.logs.find((e) => e.outcome === 'global_limit')).sort()) === '["event","outcome"]')
+  server.clock.now = DAY2
+  check('giorno nuovo → il tetto globale riparte', (await call(server, { token: 'token-d' })).status === 200)
+
+  // utenti diversi in concorrenza sullo stesso tetto
+  const many = Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`t${i}`, `u${i}`]))
+  const race = makeServer({ tokens: many, env: { AI_GLOBAL_DAILY_LIMIT: '4' } })
+  const results = await Promise.all(Object.keys(many).map((token) => call(race, { token })))
+  const ok = results.filter((r) => r.status === 200).length
+  check('12 utenti diversi contemporaneamente su un tetto di 4 → esattamente 4 passano', ok === 4 && results.filter((r) => r.body.error === AI_GLOBAL_LIMIT_REACHED).length === 8 && race.model.calls.length === 4)
+  const naive = makeServer({ quota: naiveQuota(), tokens: many, env: { AI_GLOBAL_DAILY_LIMIT: '4' } })
+  await Promise.all(Object.keys(many).map((token) => call(naive, { token })))
+  check('controllo: una prenotazione "leggi e poi scrivi" sforerebbe il tetto globale', naive.model.calls.length > 4)
+
+  // Richieste concorrenti dello stesso utente sul mensile
+  const monthly = makeServer({ env: { AI_DAILY_LIMIT: '100', AI_MONTHLY_LIMIT: '5' } })
+  const burst = await Promise.all(Array.from({ length: 15 }, () => call(monthly)))
+  check('15 richieste contemporanee con mensile 5 → esattamente 5', burst.filter((r) => r.status === 200).length === 5 && burst.filter((r) => r.body.error === AI_MONTHLY_LIMIT_REACHED).length === 10)
+
+  // Ordine dei motivi: se ne scattano più d'uno, prima l'utente, poi il globale.
+  const both = makeServer({ env: { AI_DAILY_LIMIT: '1', AI_MONTHLY_LIMIT: '1', AI_GLOBAL_DAILY_LIMIT: '1' } })
+  await call(both)
+  check('daily, monthly e global scattano insieme → il motivo è "daily"', (await call(both)).body.error === AI_DAILY_LIMIT_REACHED)
+  const monthlyFirst = makeServer({ env: { AI_DAILY_LIMIT: '9', AI_MONTHLY_LIMIT: '1', AI_GLOBAL_DAILY_LIMIT: '1' } })
+  await call(monthlyFirst)
+  check('monthly e global insieme → il motivo è "monthly"', (await call(monthlyFirst)).body.error === AI_MONTHLY_LIMIT_REACHED)
+  check('i tre codici sono distinti e stabili', new Set(Object.values(QUOTA_REASONS).map((r) => r.error)).size === 3)
+}
+
+// =====================================================================
+section('Email non confermata, guest')
+// =====================================================================
+{
+  const tokens = { ...TOKENS, 'token-nc': 'utente-non-confermato' }
+  const server = makeServer({ tokens })
+  const nc = await call(server, { token: 'token-nc' })
+  check('email non confermata → 403 email_not_confirmed', nc.status === 403 && nc.body.error === 'email_not_confirmed')
+  check('   nessuna prenotazione (non consuma quota) e nessuna chiamata al modello', server.quota.ops.length === 0 && server.model.calls.length === 0)
+  check('   nei log solo l\'esito', JSON.stringify(server.logs.at(-1)) === '{"outcome":"email_not_confirmed"}')
+  const missingField = createSpendyAIHandler({
+    config: readConfig((name) => ENV[name]), verifyUser: async () => ({ id: 'utente-a' }), callModel: fakeModel().callModel, quota: memoryQuota(),
+  })
+  check('un verificatore che non dice se l\'email è confermata → rifiutato (mai "nel dubbio sì")', (await missingField(post({ context }))).status === 403)
+  const confirmed = await call(server)
+  check('email confermata → consentito', confirmed.status === 200)
+  const guest = await call(server, { token: null })
+  check('guest (nessun token) → 401, niente quota, niente modello', guest.status === 401 && server.quota.ops.length === 1 && server.model.calls.length === 1)
+  const anon = await call(server, { token: 'token-anonimo-della-chiave-pubblica' })
+  check('token che non è di nessun utente → 401', anon.status === 401)
+
+  // L'adattatore reale di Auth legge email_confirmed_at.
+  const { createSupabaseUserVerifier } = await import('../../supabase/functions/spendy-ai/auth.js')
+  const verifier = (body, ok = true) => createSupabaseUserVerifier({
+    supabaseUrl: 'https://progetto.supabase.co', publicKey: 'pk',
+    fetchImpl: async () => new Response(JSON.stringify(body), { status: ok ? 200 : 401 }),
+  })
+  check('Auth: email_confirmed_at valorizzato → emailConfirmed true', (await verifier({ id: 'u1', email_confirmed_at: '2026-09-01T10:00:00Z' })('t')).emailConfirmed === true)
+  check('Auth: email_confirmed_at assente o null → emailConfirmed false', (await verifier({ id: 'u1' })('t')).emailConfirmed === false && (await verifier({ id: 'u1', email_confirmed_at: null })('t')).emailConfirmed === false)
+  check('Auth: sessione non valida → nessun utente', (await verifier({}, false)('t')) === null)
+  check('Auth: dell\'utente passa solo id e conferma (niente email)', JSON.stringify(Object.keys(await verifier({ id: 'u1', email: 'a@b.it', email_confirmed_at: 'x' })('t'))) === '["id","emailConfirmed"]')
+}
+
+// =====================================================================
+section('Token usage: registrati, con il modello che ha risposto')
+// =====================================================================
+{
+  // L'adattatore Anthropic vero con un SDK finto che restituisce `usage`.
+  const makeAnthropic = (respond) => {
+    class FakeAnthropic {
+      constructor() {
+        const create = async () => respond()
+        this.messages = { create }
+        this.beta = { messages: { create } }
+      }
+    }
+    Object.assign(FakeAnthropic, { APIError: class extends Error {}, APIConnectionTimeoutError: class extends Error {} })
+    return FakeAnthropic
+  }
+  const answer = (extra = {}) => ({ content: [{ type: 'text', text: JSON.stringify(okAnswer) }], stop_reason: 'end_turn', model: 'modello-che-ha-risposto', usage: { input_tokens: 1234, output_tokens: 56 }, ...extra })
+  const build = (respond, env = {}) => {
+    const config = readConfig((name) => ({ ...ENV, ...env })[name])
+    const quota = memoryQuota()
+    const logs = []
+    const handler = createSpendyAIHandler({
+      config,
+      verifyUser: async (token) => (TOKENS[token] ? { id: TOKENS[token], emailConfirmed: true } : null),
+      callModel: createAnthropicCaller({ Anthropic: makeAnthropic(respond), apiKey: config.apiKey, config }),
+      quota, now: () => DAY1, log: (entry) => logs.push(entry),
+    })
+    return { handler, quota, logs }
+  }
+  const run = async (server) => ({ status: (await server.handler(post({ context }))).status })
+
+  const server = build(() => answer())
+  const res = await run(server)
+  check('risposta valida → 200', res.status === 200)
+  check('usage registrato: input_tokens e output_tokens fatturati', server.quota.usageRows.length === 1 && server.quota.usageRows[0].inputTokens === 1234 && server.quota.usageRows[0].outputTokens === 56)
+  check('   registrato il modello che ha DAVVERO risposto, non quello configurato', server.quota.usageRows[0].model === 'modello-che-ha-risposto' && server.quota.usageRows[0].model !== ENV.AI_MODEL)
+  check('   per l\'utente verificato e per la giornata UTC', server.quota.usageRows[0].userId === 'utente-a' && server.quota.usageRows[0].day === day1)
+  const row = server.quota.rows.get(`utente-a|${day1}`)
+  check('   righe: call_count 1, usage_calls 1, token e modello aggregati', row.calls === 1 && row.usageCalls === 1 && row.input === 1234 && row.output === 56
+    && row.models['modello-che-ha-risposto']?.calls === 1 && row.models['modello-che-ha-risposto'].input_tokens === 1234)
+
+  await run(server)
+  const row2 = server.quota.rows.get(`utente-a|${day1}`)
+  check('seconda chiamata: i token si sommano e le chiamate con usage sono 2', row2.usageCalls === 2 && row2.input === 2468 && row2.output === 112 && row2.models['modello-che-ha-risposto'].calls === 2)
+
+  const okLog = server.logs.find((e) => e.outcome === 'ok')
+  check('log: solo numeri (tokensIn, tokensOut) e id del modello', okLog.tokensIn === 1234 && okLog.tokensOut === 56 && okLog.model === 'modello-che-ha-risposto' && okLog.usageRecorded === true)
+
+  // Chiamata SENZA usage: la risposta arriva, niente numeri inventati.
+  const noUsage = build(() => answer({ usage: undefined }))
+  const nu = await run(noUsage)
+  check('chiamata senza usage → risposta 200, quota consumata', nu.status === 200 && noUsage.quota.count('utente-a', day1) === 1)
+  check('   NESSUN token inventato: niente registrazione', noUsage.quota.usageRows.length === 0 && noUsage.logs.find((e) => e.outcome === 'ok').noUsage === true)
+  const r3 = noUsage.quota.rows.get(`utente-a|${day1}`)
+  check('   si distingue: call_count 1, usage_calls 0 (chiamata da stimare, non fatturata nei numeri)', r3.calls === 1 && (r3.usageCalls ?? 0) === 0)
+  for (const [label, usage] of [['negativo', { input_tokens: -1, output_tokens: 5 }], ['testo', { input_tokens: '12', output_tokens: 5 }], ['mancante', { input_tokens: 12 }], ['frazione', { input_tokens: 1.5, output_tokens: 5 }]]) {
+    const odd = build(() => answer({ usage }))
+    await run(odd)
+    check(`usage non valido (${label}) → trattato come "senza usage"`, odd.quota.usageRows.length === 0)
+  }
+
+  // La misura non deve mai rompere la risposta.
+  const broken = build(() => answer())
+  broken.quota.recordUsage = async () => { throw new Error('db giù') }
+  const bres = await run(broken)
+  check('registrazione fallita → la risposta all\'utente è la stessa (200)', bres.status === 200)
+  check('   la chiamata resta nella quota e il log dice usageRecorded false', broken.quota.count('utente-a', day1) === 1 && broken.logs.find((e) => e.outcome === 'ok').usageRecorded === false)
+  const noRecorder = createSpendyAIHandler({ config: readConfig((n) => ENV[n]), verifyUser: async () => ({ id: 'utente-a', emailConfirmed: true }), callModel: async () => ({ text: JSON.stringify(okAnswer), stopReason: 'end_turn', model: 'm', usage: { inputTokens: 1, outputTokens: 1 } }), quota: { reserve: async () => ({ allowed: true, reason: null }), release: async () => {} }, now: () => DAY1 })
+  check('una quota senza recordUsage (versione vecchia dell\'adattatore) non rompe niente', (await noRecorder(post({ context }))).status === 200)
+
+  // Il modello ha risposto ma la risposta non serve: i token sono stati fatturati.
+  const refusal = build(() => answer({ stop_reason: 'refusal', content: [] }))
+  await run(refusal)
+  check('rifiuto del modello: i token fatturati vengono comunque registrati', refusal.quota.usageRows.length === 1 && refusal.quota.count('utente-a', day1) === 1)
+  const garbage = build(() => answer({ content: [{ type: 'text', text: 'non è json' }] }))
+  const g = await run(garbage)
+  check('risposta scartata (422): i token fatturati vengono comunque registrati', g.status === 422 && garbage.quota.usageRows.length === 1)
+
+  // Errori del provider: nessuna risposta, nessun usage.
+  const failing = build(() => { throw Object.assign(new Error('x'), { status: 500 }) })
+  await run(failing)
+  check('5xx → nessun usage registrato, quota consumata', failing.quota.usageRows.length === 0 && failing.quota.count('utente-a', day1) === 1)
+  const refunded = build(() => { throw Object.assign(new Error('x'), { status: 429 }) })
+  await run(refunded)
+  check('429 del provider → nessun usage, quota restituita (comportamento invariato)', refunded.quota.usageRows.length === 0 && refunded.quota.count('utente-a', day1) === 0)
+
+  // Niente di sensibile nei log né nei dati registrati.
+  const sensitive = build(() => answer())
+  await run(sensitive)
+  const dump = JSON.stringify([sensitive.logs, sensitive.quota.usageRows])
+  check('nei log e nei dati registrati: niente testo, importi, utente, chiave', !/Ristorante|160|1840|ironic|Ciclo speciale|utente-a|sk-segreto/.test(JSON.stringify(sensitive.logs)))
+  check('   i dati registrati sono solo numeri e l\'id del modello', sensitive.quota.usageRows.every((r) => Object.keys(r).sort().join() === 'day,inputTokens,model,outputTokens,userId' && Number.isInteger(r.inputTokens) && Number.isInteger(r.outputTokens)))
+  void dump
+
+  // Database non disponibile: nessuna chiamata al modello, anche con i nuovi limiti.
+  let modelCalled = 0
+  const down = createSpendyAIHandler({
+    config: readConfig((n) => ENV[n]), verifyUser: async () => ({ id: 'utente-a', emailConfirmed: true }),
+    callModel: async () => { modelCalled += 1; return { text: '{}', stopReason: 'end_turn', model: 'm' } },
+    quota: { reserve: async () => { throw new Error('quota_rpc_500') }, release: async () => {}, recordUsage: async () => {} },
+  })
+  const downRes = await down(post({ context }))
+  check('database non disponibile (nuova prenotazione) → 503 e nessuna chiamata al modello', downRes.status === 503 && modelCalled === 0)
+
+  // Adattatore Supabase: record usage
+  const sent = []
+  const quota = createSupabaseQuota({
+    supabaseUrl: 'https://progetto.supabase.co', serviceKey: 'eyJservice.role.jwt',
+    fetchImpl: async (url, init) => { sent.push({ url, body: JSON.parse(init.body) }); return new Response(null, { status: 204 }) },
+  })
+  await quota.recordUsage({ userId: 'utente-a', day: '2026-09-29', model: 'modello-x', inputTokens: 10, outputTokens: 2 })
+  check('record usage → /rest/v1/rpc/spendy_ai_record_usage', sent[0].url === 'https://progetto.supabase.co/rest/v1/rpc/spendy_ai_record_usage')
+  check('   argomenti: utente, giorno, modello, token (solo numeri)', JSON.stringify(sent[0].body) === '{"p_user_id":"utente-a","p_usage_date":"2026-09-29","p_model":"modello-x","p_input_tokens":10,"p_output_tokens":2}')
+  const unknownReason = createSupabaseQuota({ supabaseUrl: 'https://x.supabase.co', serviceKey: 'k', fetchImpl: async () => new Response('[{"allowed":false,"reason":"boh","daily_used":1}]', { status: 200 }) })
+  const ur = await unknownReason.reserve({ userId: 'u', day: '2026-09-29', limits: { daily: 3, monthly: 30, global: 300 } })
+  check('rifiuto con motivo sconosciuto → resta un rifiuto', ur.allowed === false && ur.reason === 'daily')
+}
+
+// =====================================================================
+section('SQL: versione 2 (supabase/ai_usage.sql)')
+// =====================================================================
+{
+  const raw = readFileSync(new URL('../../supabase/ai_usage.sql', import.meta.url), 'utf8')
+  const code = raw.toLowerCase().split('\n').filter((line) => !line.trim().startsWith('--')).join('\n')
+  check('la funzione precedente è ancora intatta (compatibilità e rollback)',
+    code.includes('create or replace function public.spendy_ai_reserve(p_user_id uuid, p_usage_date date, p_limit integer)')
+    && code.includes('where u.call_count < p_limit') && code.includes('create or replace function public.spendy_ai_release(p_user_id uuid, p_usage_date date)'))
+  check('   e i suoi permessi non sono cambiati', code.includes('grant execute on function public.spendy_ai_reserve(uuid, date, integer) to service_role'))
+  check('spendy_ai_reserve_v2 esiste con i tre limiti', /create or replace function public\.spendy_ai_reserve_v2\(\s*p_user_id uuid,\s*p_usage_date date,\s*p_daily_limit integer,\s*p_monthly_limit integer,\s*p_global_daily_limit integer\s*\)/.test(code))
+  check('   restituisce allowed e il motivo del rifiuto', /returns table \(allowed boolean, reason text,/.test(code) && ['\'daily\'', '\'monthly\'', '\'global\''].every((r) => code.includes(`${r}::text`)))
+  check('   serializza le prenotazioni con un lock di transazione (concorrenza)', code.includes('pg_advisory_xact_lock('))
+  check('   il lock viene preso PRIMA di leggere i contatori', code.indexOf('pg_advisory_xact_lock(') < code.indexOf('select coalesce(sum(u.call_count), 0)::integer into v_global'))
+  check('   il mese deriva dalle righe di ai_usage (somma per utente nel mese di calendario)', /select coalesce\(sum\(u\.call_count\), 0\)::integer into v_monthly[\s\S]*?u\.usage_date >= v_first and u\.usage_date < v_next/.test(code))
+  check('   il globale è la somma di TUTTI gli utenti nella giornata', /into v_global\s+from public\.ai_usage u\s+where u\.usage_date = p_usage_date/.test(code))
+  check('   il mese è in aritmetica di date, senza fusi orari (niente date_trunc su date)', !code.includes('date_trunc(') && code.includes('extract(day from p_usage_date)'))
+  check('   i tre controlli rifiutano, ciascuno con il suo motivo e senza toccare niente',
+    /if v_daily >= p_daily_limit then\s+return query select false, 'daily'::text[^;]*;\s+return;/.test(code)
+    && /if v_monthly >= p_monthly_limit then\s+return query select false, 'monthly'::text[^;]*;\s+return;/.test(code)
+    && /if v_global >= p_global_daily_limit then\s+return query select false, 'global'::text[^;]*;\s+return;/.test(code))
+  check('   l\'incremento è dopo i tre controlli', code.indexOf('v_monthly >= p_monthly_limit') < code.indexOf('on conflict (user_id, usage_date) do update\n    set call_count = u.call_count + 1,\n        updated_at = now();'))
+  check('   argomenti non validi → eccezione (limiti < 1, nulli)', /p_daily_limit < 1/.test(code) && /p_monthly_limit < 1/.test(code) && /p_global_daily_limit < 1/.test(code))
+  check('colonne nuove aggiunte in modo idempotente', ['input_tokens  bigint', 'output_tokens bigint', 'usage_calls   integer', 'models        jsonb'].every((c) => code.includes(`add column if not exists ${c}`)))
+  check('   mai negativi (vincolo, creato solo se manca)', code.includes('ai_usage_usage_nonnegative') && code.includes('input_tokens >= 0 and output_tokens >= 0 and usage_calls >= 0'))
+  check('   indice sulla giornata, idempotente', code.includes('create index if not exists ai_usage_usage_date_idx on public.ai_usage (usage_date)'))
+  check('nessuna colonna per testo, prompt, risposte, email o importi: solo numeri e id del modello',
+    !/\b(prompt|response|message|email|amount|description)\b/.test(code.slice(code.indexOf('add column if not exists input_tokens'), code.indexOf('revoke all on function public.spendy_ai_reserve_v2'))
+      .replace(/p_user_id|user_id/g, '')))
+  check('spendy_ai_record_usage: solo numeri e modello, ripulito e accorciato, con tetto sui valori',
+    code.includes('create or replace function public.spendy_ai_record_usage(') && code.includes("[^a-za-z0-9._:/-]") && code.includes('left(') && code.includes('p_input_tokens > 100000000'))
+  check('   aggiorna token, usage_calls e il dettaglio per modello', code.includes('usage_calls   = u.usage_calls + 1') && code.includes('jsonb_set('))
+  check('nessuna funzione security definer (nemmeno le nuove)', !code.includes('security definer'))
+  check('le funzioni nuove non sono eseguibili dall\'app', code.includes('revoke all on function public.spendy_ai_reserve_v2(uuid, date, integer, integer, integer) from public, anon, authenticated')
+    && code.includes('revoke all on function public.spendy_ai_record_usage(uuid, date, text, bigint, bigint) from public, anon, authenticated'))
+  check('   solo la service_role può eseguirle', code.includes('grant execute on function public.spendy_ai_reserve_v2(uuid, date, integer, integer, integer) to service_role')
+    && code.includes('grant execute on function public.spendy_ai_record_usage(uuid, date, text, bigint, bigint) to service_role'))
+  check('la tabella resta protetta (RLS, nessuna scrittura per l\'app)', code.includes('enable row level security') && code.includes('revoke insert, update, delete, truncate on public.ai_usage from anon, authenticated'))
+  check('la funzione Edge chiama la v2 e la funzione di registrazione, non la vecchia prenotazione', (() => {
+    const quotaJs = readFileSync(new URL('../../supabase/functions/spendy-ai/quota.js', import.meta.url), 'utf8')
+    return quotaJs.includes("rpc('spendy_ai_reserve_v2'") && quotaJs.includes("rpc('spendy_ai_record_usage'") && !quotaJs.includes("rpc('spendy_ai_reserve',")
+  })())
+}
+
+// =====================================================================
+section('App: i tre limiti del server, senza consumare niente in locale')
+// =====================================================================
+{
+  const provider = (status, body) => createRemoteProvider({
+    url: URL_FN, publicKey: 'pk', getAccessToken: async () => 'token-a',
+    fetchImpl: async () => new Response(JSON.stringify(body), { status }),
+  })
+  const run = (status, body) => createSpendyAI({ provider: provider(status, body) }).generate(context)
+  check('stessi codici di app e server', MONTHLY_LIMIT_ERROR === AI_MONTHLY_LIMIT_REACHED && GLOBAL_LIMIT_ERROR === AI_GLOBAL_LIMIT_REACHED)
+  check('429 AI_MONTHLY_LIMIT_REACHED → monthly_limit', (await run(429, { error: AI_MONTHLY_LIMIT_REACHED })).error === 'monthly_limit')
+  check('429 AI_GLOBAL_LIMIT_REACHED → global_limit', (await run(429, { error: AI_GLOBAL_LIMIT_REACHED })).error === 'global_limit')
+  check('429 AI_DAILY_LIMIT_REACHED → daily_limit (invariato)', (await run(429, { error: AI_DAILY_LIMIT_REACHED })).error === 'daily_limit')
+  check('429 del provider → rate_limited (invariato)', (await run(429, { error: 'rate_limited' })).error === 'rate_limited')
+  check('403 email_not_confirmed → trattato come non autenticato (nessun costo, frase locale)', (await run(403, { error: 'email_not_confirmed' })).error === 'unauthenticated')
+
+  for (const [name, code] of [['mensile', AI_MONTHLY_LIMIT_REACHED], ['globale', AI_GLOBAL_LIMIT_REACHED]]) {
+    const ai = createSpendyAI({ provider: provider(429, { error: code }) })
+    const meta = { fingerprint: 'f-2', eventKey: 'category_above_usual:ristoranti', importance: 60 }
+    const { cache, result } = await requestSpendyVoice({ ai, context, meta, cache: emptyVoiceCache(), today: '2026-09-29', now: DAY1 })
+    check(`limite ${name} del server: nessuna chiamata contata in locale`, result.error === (name === 'mensile' ? 'monthly_limit' : 'global_limit') && (cache.calls?.count ?? 0) === 0)
+    check('   la situazione resta sulla frase locale', cache.failure?.error === result.error && cache.failure?.fingerprint === 'f-2')
+  }
 }
 
 report('Spendy AI (quota server)')

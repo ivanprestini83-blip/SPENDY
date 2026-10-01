@@ -3,9 +3,10 @@
 // Riceve la classe dell'SDK ufficiale da fuori (index.ts la importa da
 // npm), così i test possono passarne una finta. Restituisce la funzione
 // `callModel` che handler.js si aspetta:
-//   ({ system, input, schema }) → { text, stopReason, model }
-// e traduce gli errori dell'SDK nei codici di handler.js, dicendo anche se
-// la chiamata prenotata sulla quota va restituita (`refund`, vedi quota.js).
+//   ({ system, input, schema }) → { text, stopReason, model, usage }
+// (`usage` = i token fatturati, per misurare il consumo) e traduce gli
+// errori dell'SDK nei codici di handler.js, dicendo anche se la chiamata
+// prenotata sulla quota va restituita (`refund`, vedi quota.js).
 //
 // - Output strutturati (output_config.format = json_schema): la risposta
 //   è JSON conforme allo schema, non testo da interpretare.
@@ -114,6 +115,13 @@ export function createAnthropicCaller({ Anthropic, apiKey, config }) {
       .filter((block) => block.type === 'text')
       .map((block) => block.text)
       .join('')
-    return { text, stopReason: response.stop_reason, model: response.model }
+    // `usage` della risposta: i token fatturati. Solo due numeri; se il provider
+    // non li restituisce (o in forma inattesa) resta null e la chiamata è
+    // "senza usage", mai stimata qui.
+    const reported = response.usage
+    const usage = Number.isInteger(reported?.input_tokens) && Number.isInteger(reported?.output_tokens)
+      ? { inputTokens: reported.input_tokens, outputTokens: reported.output_tokens }
+      : null
+    return { text, stopReason: response.stop_reason, model: response.model, usage }
   }
 }

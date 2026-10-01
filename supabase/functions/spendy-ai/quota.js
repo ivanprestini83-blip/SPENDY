@@ -23,8 +23,32 @@
 // solo con due funzioni Postgres eseguibili dalla service_role: l'utente è
 // sempre quello verificato dal token, mai un valore del corpo.
 
+// Limiti predefiniti. Non sono scolpiti nella funzione: readConfig (handler.js)
+// li legge dai secret AI_DAILY_LIMIT, AI_MONTHLY_LIMIT e AI_GLOBAL_DAILY_LIMIT
+// e usa questi valori solo se mancano o non sono numeri positivi.
+//   daily    chiamate al giorno per utente (giornata UTC)
+//   monthly  chiamate al mese per utente (mese di calendario UTC)
+//   global   chiamate al giorno di TUTTI gli utenti insieme: una valvola di
+//            sicurezza contro costi imprevisti, NON un budget. Il valore
+//            predefinito è volutamente basso e prudente (circa 100 utenti al
+//            massimo giornaliero): chi gestisce il progetto lo alza o lo
+//            abbassa con il secret quando conosce il costo reale per chiamata.
 export const AI_DAILY_LIMIT = 3
+export const AI_MONTHLY_LIMIT = 30
+export const AI_GLOBAL_DAILY_LIMIT = 300
+
+// Il codice che l'app riceve (HTTP 429) per ciascun limite.
 export const AI_DAILY_LIMIT_REACHED = 'AI_DAILY_LIMIT_REACHED'
+export const AI_MONTHLY_LIMIT_REACHED = 'AI_MONTHLY_LIMIT_REACHED'
+export const AI_GLOBAL_LIMIT_REACHED = 'AI_GLOBAL_LIMIT_REACHED'
+
+// Il motivo del rifiuto, com'è restituito da spendy_ai_reserve_v2, e come lo
+// raccontano risposta e log.
+export const QUOTA_REASONS = {
+  daily: { error: AI_DAILY_LIMIT_REACHED, outcome: 'daily_limit' },
+  monthly: { error: AI_MONTHLY_LIMIT_REACHED, outcome: 'monthly_limit' },
+  global: { error: AI_GLOBAL_LIMIT_REACHED, outcome: 'global_limit' },
+}
 
 // Giornata = data UTC ("2026-09-29"). Vedi supabase/ai_usage.sql.
 export const usageDay = (nowMs) => new Date(nowMs).toISOString().slice(0, 10)
@@ -43,9 +67,14 @@ export function supabaseServiceKey(getEnv) {
   }
 }
 
-// → { reserve({ userId, day, limit }) → { allowed, used }, release({ userId, day }) }
-// Lancia se il database non risponde: chi chiama deve rifiutare la
-// richiesta AI (fail closed), non lasciarla passare senza quota.
+// → { reserve({ userId, day, limits }) → { allowed, reason, ... },
+//     release({ userId, day }),
+//     recordUsage({ userId, day, model, inputTokens, outputTokens }) }
+//   limits = { daily, monthly, global }
+// reserve e release lanciano se il database non risponde: chi chiama deve
+// rifiutare la richiesta AI (fail closed), non lasciarla passare senza quota.
+// recordUsage invece è solo misura: chi chiama non deve mai farne dipendere
+// la risposta all'utente.
 export function createSupabaseQuota({ supabaseUrl, serviceKey, fetchImpl = fetch }) {
   const base = supabaseUrl.replace(/\/$/, '')
   const headers = {
@@ -63,18 +92,36 @@ export function createSupabaseQuota({ supabaseUrl, serviceKey, fetchImpl = fetch
       body: JSON.stringify(args),
     })
     if (!response.ok) throw new Error(`quota_rpc_${response.status}`)
-    return response.json()
+    // spendy_ai_record_usage non restituisce niente (corpo vuoto).
+    return response.json().catch(() => null)
   }
 
   return {
-    async reserve({ userId, day, limit }) {
-      const rows = await rpc('spendy_ai_reserve', { p_user_id: userId, p_usage_date: day, p_limit: limit })
+    async reserve({ userId, day, limits }) {
+      const rows = await rpc('spendy_ai_reserve_v2', {
+        p_user_id: userId,
+        p_usage_date: day,
+        p_daily_limit: limits.daily,
+        p_monthly_limit: limits.monthly,
+        p_global_daily_limit: limits.global,
+      })
       const row = Array.isArray(rows) ? rows[0] : rows
       if (!row || typeof row.allowed !== 'boolean') throw new Error('quota_bad_response')
-      return { allowed: row.allowed, used: Number(row.used ?? 0) }
+      if (row.allowed) return { allowed: true, reason: null, used: Number(row.daily_used ?? 0) }
+      // Un rifiuto resta un rifiuto anche se il motivo non è riconosciuto.
+      return { allowed: false, reason: Object.hasOwn(QUOTA_REASONS, row.reason) ? row.reason : 'daily', used: Number(row.daily_used ?? 0) }
     },
     async release({ userId, day }) {
       await rpc('spendy_ai_release', { p_user_id: userId, p_usage_date: day })
+    },
+    async recordUsage({ userId, day, model, inputTokens, outputTokens }) {
+      await rpc('spendy_ai_record_usage', {
+        p_user_id: userId,
+        p_usage_date: day,
+        p_model: model,
+        p_input_tokens: inputTokens,
+        p_output_tokens: outputTokens,
+      })
     },
   }
 }

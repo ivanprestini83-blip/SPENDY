@@ -74,9 +74,10 @@ export function decideSpendyVoice({ coach, meta, today, cache, now = Date.now(),
   return decision('ai', 'new_event')
 }
 
-// 'daily_limit': il server ha rifiutato PRIMA del modello (quota esaurita),
-// quindi nessun costo e nessuna chiamata da contare qui.
-const NOT_REACHED = new Set(['unavailable', 'unauthenticated', 'network', 'daily_limit'])
+// 'daily_limit' / 'monthly_limit' / 'global_limit': il server ha rifiutato
+// PRIMA del modello (quota esaurita), quindi nessun costo e nessuna chiamata
+// da contare qui.
+const NOT_REACHED = new Set(['unavailable', 'unauthenticated', 'network', 'daily_limit', 'monthly_limit', 'global_limit'])
 
 // Una chiamata all'AI e il suo effetto sulla memoria. Non tocca lo
 // storage: restituisce la cache nuova e il risultato, chi chiama salva.
