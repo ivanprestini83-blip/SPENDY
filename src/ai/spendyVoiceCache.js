@@ -1,14 +1,21 @@
 // La memoria locale di Spendy AI: l'ultima frase generata, quelle già
 // dette, e quante chiamate sono state fatte oggi.
 //
-// Vive in una chiave localStorage TUTTA SUA ('spendy-ai-voice'): non entra
-// in 'spendy-storage', nel backup JSON o nella sincronizzazione Supabase.
-// È per dispositivo, come spendyJokeHistory. Se si perde, Spendy torna a
-// parlare con le frasi locali e ricomincia: nessun dato finanziario è qui.
+// Vive in una chiave localStorage TUTTA SUA, una per ambito
+// ('spendy-ai-voice:guest', 'spendy-ai-voice:u:<userId>': vedi
+// store/scope.js): non entra nello stato dell'app, nel backup JSON o nella
+// sincronizzazione Supabase, e le frasi e i conteggi di un account non
+// raggiungono mai un altro. Se si perde, Spendy torna a parlare con le frasi
+// locali e ricomincia: nessun dato finanziario è qui.
 //
 // Tutte le funzioni che la modificano sono pure (vecchia cache → nuova
-// cache): solo load/save toccano lo storage, ed entrambe non lanciano mai.
+// cache): solo load/save/clear toccano lo storage, e non lanciano mai.
+// `scope` è l'ambito della cache: chi salva una risposta arrivata in ritardo
+// deve passare quello con cui la richiesta era partita, non quello attivo.
+import { GUEST, voiceKey } from '../store/scope.js'
+
 export const VOICE_CACHE_KEY = 'spendy-ai-voice'
+export const voiceCacheKey = voiceKey
 export const VOICE_CACHE_VERSION = 1
 export const VOICE_HISTORY_LIMIT = 30
 
@@ -31,9 +38,9 @@ function defaultStorage() {
   }
 }
 
-export function loadVoiceCache(storage = defaultStorage()) {
+export function loadVoiceCache(storage = defaultStorage(), scope = GUEST) {
   try {
-    const raw = storage?.getItem(VOICE_CACHE_KEY)
+    const raw = storage?.getItem(voiceKey(scope))
     if (!raw) return emptyVoiceCache()
     const parsed = JSON.parse(raw)
     if (parsed?.version !== VOICE_CACHE_VERSION) return emptyVoiceCache()
@@ -43,19 +50,19 @@ export function loadVoiceCache(storage = defaultStorage()) {
   }
 }
 
-export function saveVoiceCache(cache, storage = defaultStorage()) {
+export function saveVoiceCache(cache, storage = defaultStorage(), scope = GUEST) {
   try {
-    storage?.setItem(VOICE_CACHE_KEY, JSON.stringify(cache))
+    storage?.setItem(voiceKey(scope), JSON.stringify(cache))
     return true
   } catch {
     return false
   }
 }
 
-// Solo la chiave di Spendy AI — mai 'spendy-storage'.
-export function clearVoiceCache(storage = defaultStorage()) {
+// Solo la chiave di Spendy AI di quell'ambito — mai lo stato dell'app.
+export function clearVoiceCache(storage = defaultStorage(), scope = GUEST) {
   try {
-    storage?.removeItem(VOICE_CACHE_KEY)
+    storage?.removeItem(voiceKey(scope))
   } catch {
     // niente da fare: senza storage non c'è niente da cancellare
   }

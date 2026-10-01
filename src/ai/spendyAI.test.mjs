@@ -358,7 +358,8 @@ section('15. Cache')
   const store = new Map([['spendy-storage', '{"intoccabile":true}']])
   const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v), removeItem: (k) => store.delete(k) }
   saveVoiceCache(first.cache, storage)
-  check('salvata sotto la sua chiave', store.has(VOICE_CACHE_KEY))
+  // La chiave ora è una per ambito ('spendy-ai-voice:guest' senza account).
+  check('salvata sotto la sua chiave', store.has(`${VOICE_CACHE_KEY}:guest`) && !store.has(VOICE_CACHE_KEY))
   check("'spendy-storage' intatto", store.get('spendy-storage') === '{"intoccabile":true}')
   check('ricaricata identica', JSON.stringify(loadVoiceCache(storage)) === JSON.stringify(first.cache))
   check('storage rotto → cache vuota, nessun errore',

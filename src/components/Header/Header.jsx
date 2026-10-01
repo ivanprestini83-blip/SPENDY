@@ -1,11 +1,14 @@
 import { APP_TAGLINE } from '../../brand.js'
+import { badgeText, bellLabel } from '../../notifications/notificationState.js'
 import './Header.css'
 
 // onOpenNotifications/onOpenSettings default to no-ops so Header renders
 // standalone in isolation; App.jsx wires onOpenSettings to the real
-// SettingsScreen. onOpenNotifications stays a no-op until a
-// notifications screen exists.
-export function Header({ onOpenNotifications = () => {}, onOpenSettings = () => {} }) {
+// SettingsScreen, onOpenNotifications to the notification center.
+// `unreadCount` is the number of unread notifications: the badge exists
+// only when it is above zero.
+export function Header({ onOpenNotifications = () => {}, onOpenSettings = () => {}, unreadCount = 0 }) {
+  const badge = badgeText(unreadCount)
   return (
     <header className="header">
       <div className="header__brand">
@@ -19,11 +22,11 @@ export function Header({ onOpenNotifications = () => {}, onOpenSettings = () => 
         <button
           type="button"
           className="header__icon-button"
-          aria-label="Notifiche"
+          aria-label={bellLabel(unreadCount)}
           onClick={onOpenNotifications}
         >
           <BellIcon />
-          <span className="header__badge" aria-hidden="true" />
+          {badge && <span className="header__badge" aria-hidden="true">{badge}</span>}
         </button>
         <button
           type="button"

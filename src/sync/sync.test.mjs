@@ -9,6 +9,7 @@ import { createMemoryDatabase, createMemoryRemote } from './memoryRemote.mjs'
 import { createSyncEngine, cursorFrom, EPOCH } from './syncEngine.js'
 import { migrationStatus, migrateLocalToCloud, MIGRATION_STAMP } from './migrateLocal.js'
 import { totalForMonth, buildFinancialData } from '../utils/budgetCalculations.js'
+import { scopeFor, stateKey } from '../store/scope.js'
 
 const USER = 'utente-test-0001'
 const ALTRO_USER = 'utente-estraneo-9999'
@@ -22,7 +23,9 @@ async function createDevice(name, { userId = USER, online = true } = {}) {
   const { useAppStore } = await import(`../store/useAppStore.js?device=${name}`)
   const remote = createMemoryRemote(db, userId, { online })
   const engine = createSyncEngine({ store: useAppStore, remote, autoFlushMs: 10_000 })
-  useAppStore.getState().setSyncUser(userId)
+  // Un account vive nel SUO contenitore locale (store/scope.js): si entra nell'ambito
+  // dell'account prima di avviare qualunque motore.
+  useAppStore.getState().switchScope(scopeFor(userId))
   return { name, store: useAppStore, remote, engine, state: () => useAppStore.getState() }
 }
 
@@ -112,7 +115,7 @@ check('il Mac riceve le spese fatte offline dal Samsung', mac.state().expenses.f
 // La coda sopravvive a un riavvio? È persistita nel blob dello store.
 samsung.remote.setOnline(false)
 samsung.state().addExpense({ amount: 3, categoryId: 'bar', description: 'Prima di chiudere', date: '2026-09-20' })
-const blobSalvato = JSON.parse(globalThis.localStorage.getItem('spendy-storage'))
+const blobSalvato = JSON.parse(globalThis.localStorage.getItem(stateKey(scopeFor(USER))))
 check('la coda è dentro lo stato persistito (sopravvive al riavvio)', blobSalvato.state.sync.outbox.length === 1)
 check('status/error NON sono persistiti (sono transienti)', blobSalvato.state.sync.status === undefined)
 samsung.remote.setOnline(true)
@@ -384,11 +387,23 @@ condiviso.state().addExpense({ amount: 55, categoryId: 'casa', description: 'Del
 check('una modifica del primo utente resta in coda', condiviso.state().sync.outbox.length === 1)
 
 const esitoCambio = await condiviso.engine.start(ALTRO_USER)
-check('il sync NON parte con un altro account', esitoCambio.skipped === 'coda-di-un-altro-utente')
-check('e lo dice chiaramente', condiviso.state().sync.status === 'error' && condiviso.state().sync.error.includes('account precedente'))
+check('il sync NON parte con un altro account: i dati locali sono di un altro ambito', esitoCambio.skipped === 'scope-diverso')
+check('nessun cambio di identità nello stato', condiviso.state().sync.userId === USER && condiviso.state().scopeId === scopeFor(USER))
 check('la coda resta intatta, niente e\' andato perso', condiviso.state().sync.outbox.length === 1)
 check('e NON e\' finita nell\'account dell\'altro utente',
   !db.rows('expenses').some((r) => r.user_id === ALTRO_USER && r.description === 'Del primo utente'))
+
+// Difesa in più: anche se uno stato arrivasse con l'identità di un altro (non
+// dovrebbe più succedere: i contenitori sono separati), il motore non parte e
+// non spedisce la coda altrui.
+const incoerente = await createDevice('stato-incoerente', { userId: ALTRO_USER })
+incoerente.state().setSyncUser(USER)
+incoerente.state().addExpense({ amount: 7, categoryId: 'bar', description: 'Identita\' sbagliata', date: '2026-09-20' })
+const esitoIncoerente = await incoerente.engine.start(ALTRO_USER)
+check('stato con identità diversa dal suo ambito: il sync non parte', esitoIncoerente.skipped === 'coda-di-un-altro-utente')
+check('e lo dice chiaramente', incoerente.state().sync.status === 'error' && incoerente.state().sync.error.includes('account precedente'))
+check('niente di quella spesa e\' finito in nessun account', !db.rows('expenses').some((r) => r.description === 'Identita\' sbagliata'))
+incoerente.engine.stop()
 
 // Rientrando con l'account giusto la coda si svuota regolarmente.
 await condiviso.engine.start(USER)

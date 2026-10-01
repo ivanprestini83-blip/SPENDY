@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAppStore } from '../../store/useAppStore.js'
 import { supabase } from '../../lib/supabase.js'
 import { getMigrationStatus, isSupabaseConfigured, runMigration, signIn, signOut, signUp, syncNow } from '../../sync/spendySync.js'
+import { ForgotPasswordForm } from './ForgotPasswordForm.jsx'
 import './SyncCard.css'
 
 const STATUS_LABELS = {
@@ -28,6 +29,7 @@ export function SyncCard() {
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState(null)
+  const [forgot, setForgot] = useState(false)
 
   useEffect(() => {
     if (!supabase) return undefined
@@ -83,7 +85,9 @@ export function SyncCard() {
     <div className="settings-screen__card">
       <p className="settings-screen__label">☁️ Sincronizzazione</p>
 
-      {!session ? (
+      {!session && forgot ? (
+        <ForgotPasswordForm initialEmail={email} onBack={() => setForgot(false)} />
+      ) : !session ? (
         <>
           <p className="settings-screen__hint">
             Accedi per ritrovare le stesse spese su telefono e computer. I dati già presenti su questo
@@ -105,6 +109,9 @@ export function SyncCard() {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
+            <button type="button" className="sync-card__link" disabled={busy} onClick={() => setForgot(true)}>
+              Password dimenticata?
+            </button>
           </div>
           <button
             type="button"
@@ -187,7 +194,7 @@ export function SyncCard() {
           <button type="button" className="sync-card__signout" disabled={busy} onClick={() => run(signOut)}>
             Esci dall&apos;account
           </button>
-          <p className="sync-card__note">Uscendo non viene cancellato nessun dato da questo dispositivo.</p>
+          <p className="sync-card__note">Uscendo, i tuoi dati restano salvati sul cloud e per questo account su questo dispositivo: li ritrovi rientrando.</p>
         </>
       )}
 

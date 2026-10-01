@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { prepareSpendyVoice } from './spendyVoice.js'
-import { decideSpendyVoice, requestSpendyVoice, resolveSpendyVoice } from './spendyVoicePolicy.js'
+import { decideSpendyVoice, resolveSpendyVoice } from './spendyVoicePolicy.js'
 import { loadVoiceCache, recordShown, saveVoiceCache } from './spendyVoiceCache.js'
+import { requestAndStoreVoice } from './spendyVoiceRequest.js'
 import { getSpendyVoiceDevConfig } from './devTools.js'
+import { useAppStore } from '../store/useAppStore.js'
+import { aiNotification } from '../notifications/notificationRules.js'
 
 // Il ponte tra il flusso di Spendy AI e la Home.
 //
@@ -15,7 +18,9 @@ import { getSpendyVoiceDevConfig } from './devTools.js'
 // torna, la cache si aggiorna e la voce passa a quella generata.
 export function useSpendyVoice({ coach, financialData, expenses, today, monthlyBudget, cycleStartDay, goals }) {
   const [dev] = useState(getSpendyVoiceDevConfig)
-  const [cache, setCache] = useState(() => loadVoiceCache())
+  // La memoria di Spendy AI è dell'ambito (guest o account) in uso.
+  const scopeId = useAppStore((state) => state.scopeId)
+  const [cache, setCache] = useState(() => loadVoiceCache(undefined, scopeId))
   const cacheRef = useRef(cache)
   cacheRef.current = cache
   const inFlight = useRef(null)
@@ -32,15 +37,22 @@ export function useSpendyVoice({ coach, financialData, expenses, today, monthlyB
   useEffect(() => {
     if (!shouldCallAI || inFlight.current === fingerprint) return
     inFlight.current = fingerprint
-    requestSpendyVoice({ ai: dev.ai, context, meta, cache: cacheRef.current, today }).then(({ cache: next }) => {
-      saveVoiceCache(next)
-      setCache(next)
+    // L'ambito della richiesta si fissa ORA: la risposta arriva dopo secondi e
+    // nel frattempo si può cambiare account. requestAndStoreVoice la salva nel
+    // contenitore di chi l'ha richiesta; lo schermo si aggiorna solo se è ancora lui.
+    const requestScope = scopeId
+    requestAndStoreVoice({ ai: dev.ai, context, meta, cache: cacheRef.current, today, scope: requestScope }).then(({ cache: next, result }) => {
+      if (useAppStore.getState().scopeId === requestScope) setCache(next)
+      // Una risposta importante resta ritrovabile nel centro notifiche. Lo store
+      // la scarta se nel frattempo l'ambito attivo non è più quello della richiesta.
+      const notification = aiNotification({ result, meta, today })
+      if (notification) useAppStore.getState().addNotification(requestScope, notification)
       inFlight.current = null
     })
     // `context`/`meta` sono ricalcolati a ogni render: l'impronta è ciò
     // che dice se sono cambiati davvero.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shouldCallAI, fingerprint, today, dev])
+  }, [shouldCallAI, fingerprint, today, dev, scopeId])
 
   // Ricorda la frase rimasta sullo schermo (non quella di passaggio mentre
   // l'AI sta rispondendo): sarà la "frase precedente" della prossima volta.
@@ -48,9 +60,9 @@ export function useSpendyVoice({ coach, financialData, expenses, today, monthlyB
     if (shouldCallAI) return
     const next = recordShown(cacheRef.current, { message: voice.message, day: today })
     if (next === cacheRef.current) return
-    saveVoiceCache(next)
+    saveVoiceCache(next, undefined, scopeId)
     setCache(next)
-  }, [shouldCallAI, voice.message, today])
+  }, [shouldCallAI, voice.message, today, scopeId])
 
   return {
     voice,

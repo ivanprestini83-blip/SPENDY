@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { todayStr } from '../utils/date.js'
 import { registerCustomCategories } from '../data/categories.js'
 import { buildImportPatch } from '../sync/backup.js'
@@ -7,6 +7,8 @@ import { newId, nowIso } from '../lib/ids.js'
 import { SETTINGS_KEY, ackOps as ackOutboxOps, enqueueOp, hasPending, pendingIds } from '../sync/outbox.js'
 import { mergeRemoteRows } from '../sync/syncEngine.js'
 import { settingsToLocal } from '../sync/mappers.js'
+import { addToState, markAllReadInState, markReadInState, removeFromState, sanitizeNotificationState } from '../notifications/notificationState.js'
+import { STATE_BASE, createScopeManager, isUserScope, isValidScope, ownerOf } from './scope.js'
 
 const sumAmounts = (list) => list.reduce((total, entry) => total + entry.amount, 0)
 
@@ -77,6 +79,34 @@ const INITIAL_SYNC = {
   error: null,
 }
 
+// Tutto ciò che appartiene a UN ambito (guest o un account, vedi scope.js) e
+// che quindi va svuotato quando si cambia ambito: sono esattamente i campi di
+// `partialize` qui sotto, ai loro valori iniziali. Un test verifica che le due
+// liste non divergano.
+export const emptyScopeState = () => ({
+  monthlyBudget: 0,
+  currency: '€',
+  cycleStartDay: null,
+  amountHidden: false,
+  expenses: [],
+  incomes: [],
+  customCategories: [],
+  goals: [],
+  goalContributions: [],
+  emergencyFundSaved: 0,
+  emergencyFundContributions: [],
+  spendyJokeHistory: [],
+  notifications: [],
+  notificationKeys: {},
+  sync: { ...INITIAL_SYNC, outbox: [], cursors: {} },
+})
+
+// Un gestore degli ambiti per ogni istanza dello store: legge l'ambito attivo,
+// esegue la migrazione dal vecchio storage e fa da archivio a persist.
+const scopes = createScopeManager({
+  getStorage: () => (typeof window === 'undefined' ? null : window.localStorage),
+})
+
 // Single store for everything the app needs. Persisted to localStorage
 // (see the `persist` wrapper below) — a real backend would later replace
 // the persisted blob with a fetch/sync, but nothing that reads from this
@@ -89,7 +119,34 @@ const INITIAL_SYNC = {
 // resetting to a demo snapshot on every reload.
 export const useAppStore = create(
   persist(
-    (set, get) => ({
+    (set, get, api) => ({
+      // L'ambito dei dati locali in uso: 'guest' oppure 'u:<userId>'. Non è
+      // persistito (vedi partialize): all'avvio lo decide scope.js.
+      scopeId: scopes.getActive(),
+      // Cambia ambito (logout → guest, login → u:<userId>). È il SOLO modo in
+      // cui i dati visibili cambiano proprietario, e lo fa davvero: svuota lo
+      // stato in memoria (zustand, da solo, fonderebbe il contenitore nuovo
+      // sopra i dati del vecchio) e poi rilegge quello del nuovo ambito. Le
+      // scritture sono bloccate per tutto il passaggio, così niente di
+      // intermedio finisce in un contenitore. Non cancella nulla da nessuna parte.
+      switchScope: (scope) => {
+        if (!isValidScope(scope)) return false
+        if (scope === get().scopeId && scope === scopes.getActive()) return false
+
+        scopes.withWritesFrozen(() => {
+          if (isUserScope(scope)) scopes.enterUserScope(ownerOf(scope))
+          scopes.setActive(scope)
+          registerCustomCategories([])
+          set({ ...emptyScopeState(), scopeId: scope, activeTab: 'home', modal: null, modalPayload: null })
+          api.persist.rehydrate()
+        })
+
+        // Il contenitore di un account appartiene a quell'account, e il
+        // guest a nessuno: lo dichiara lo stato stesso.
+        set((state) => ({ sync: { ...state.sync, userId: ownerOf(scope) } }))
+        return true
+      },
+
       activeTab: 'home',
       setActiveTab: (tab) => set({ activeTab: tab }),
 
@@ -387,6 +444,35 @@ export const useAppStore = create(
       // engine (BehaviorEngine, HumorEngine, Radar, Coach) non sanno
       // nemmeno che il cloud esiste.
       // ----------------------------------------------------------------
+      // Centro notifiche (vedi notifications/). Locale all'ambito: vive nel suo
+      // contenitore, non entra nella coda di invio e non è nei backup.
+      notifications: [],
+      // eventKey → createdAt di tutto ciò che è già stato mostrato (anche se poi
+      // eliminato): impedisce di ricreare la stessa notifica.
+      notificationKeys: {},
+      // `scope` è l'ambito per cui la notifica è stata generata: se nel frattempo
+      // l'ambito attivo è cambiato la notifica si scarta, non finisce in quello nuovo.
+      addNotification: (scope, notification) => {
+        const state = get()
+        if (scope !== state.scopeId) return false
+        const patch = addToState(state, notification)
+        if (!patch) return false
+        set(patch)
+        return true
+      },
+      markNotificationRead: (id) => {
+        const notifications = markReadInState(get().notifications, id)
+        if (notifications) set({ notifications })
+      },
+      markAllNotificationsRead: () => {
+        const notifications = markAllReadInState(get().notifications)
+        if (notifications) set({ notifications })
+      },
+      deleteNotification: (id) => {
+        const notifications = removeFromState(get().notifications, id)
+        if (notifications) set({ notifications })
+      },
+
       sync: INITIAL_SYNC,
 
       setSyncUser: (userId) => set((state) => ({ sync: { ...state.sync, userId } })),
@@ -499,7 +585,10 @@ export const useAppStore = create(
       },
     }),
     {
-      name: 'spendy-storage',
+      // Il contenitore è scelto dall'ambito attivo (scope.js); il vecchio
+      // 'spendy-storage' non viene più letto né scritto da qui.
+      name: STATE_BASE,
+      storage: createJSONStorage(() => scopes.storage),
       // `today`, `activeTab`, `modal`/`modalPayload` are deliberately
       // excluded: `today` must always be re-derived from the real clock
       // on load (persisting it would freeze the app on whatever date it
@@ -518,6 +607,8 @@ export const useAppStore = create(
         emergencyFundSaved: state.emergencyFundSaved,
         emergencyFundContributions: state.emergencyFundContributions,
         spendyJokeHistory: state.spendyJokeHistory,
+        notifications: state.notifications,
+        notificationKeys: state.notificationKeys,
         // La coda di invio DEVE sopravvivere a un reload, alla chiusura
         // del browser e al riavvio del Mac: è ciò che garantisce che una
         // spesa inserita offline non si perda se l'app viene chiusa prima
@@ -539,6 +630,9 @@ export const useAppStore = create(
       onRehydrateStorage: () => (state) => {
         if (!state) return
         if (state.customCategories) registerCustomCategories(state.customCategories)
+
+        // Contenitori salvati prima delle notifiche, o con dati non validi.
+        Object.assign(state, sanitizeNotificationState(state.notifications, state.notificationKeys))
 
         // Il blob salvato non contiene `status`/`error` (vedi partialize)
         // e, se arriva da una versione precedente al sync, non contiene

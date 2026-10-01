@@ -198,3 +198,13 @@
     animation: none;
   }
 }
+
+.sync-card__link {
+  margin-top: 10px;
+  align-self: flex-end;
+  background: transparent;
+  color: var(--color-accent-mint);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 4px 0;
+}

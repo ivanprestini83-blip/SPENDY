@@ -276,6 +276,32 @@ try {
     const pressed = runtime.slots.find((value) => typeof value === 'boolean')
     check('   dopo la sincronizzazione il pulsante non resta bloccato (busy = false)', pressed === false)
   }
+
+  // =====================================================================
+  section('4. Accesso: "Password dimenticata?"')
+  // =====================================================================
+  {
+    const runtime = createCardRuntime({ syncNowResult: {} })
+    runtime.supabase.auth.getSession = async () => ({ data: { session: null } })
+    globalThis.__card = runtime
+    runtime.render(SyncCard)
+    runtime.runEffects()
+    await tick()
+    const login = runtime.render(SyncCard)
+    const link = findButton(login, 'Password dimenticata?')
+    check('senza sessione il link è nella schermata di accesso', Boolean(link))
+    check('   accanto restano "Accedi" e "Crea un account"', Boolean(findButton(login, 'Accedi')) && Boolean(findButton(login, 'Crea un account')))
+    check('   il campo password dell\'accesso è ancora type="password"', findAll(login, (n) => n.type === 'input' && n.props.type === 'password').length === 1)
+    link.props.onClick()
+    const forgot = runtime.render(SyncCard)
+    check('premendolo compare il modulo di recupero al posto dell\'accesso', findAll(forgot, (n) => typeof n.type === 'function' && n.type.name === 'ForgotPasswordForm').length === 1 && !findButton(forgot, 'Accedi'))
+    const back = findAll(forgot, (n) => typeof n.type === 'function' && n.type.name === 'ForgotPasswordForm')[0]
+    back.props.onBack()
+    check('"Torna all\'accesso" riporta al modulo di accesso', Boolean(findButton(runtime.render(SyncCard), 'Password dimenticata?')))
+    // con sessione attiva il link non c'è
+    const { before } = await pressSyncNow(SyncCard, {})
+    check('con la sessione attiva il link non compare', !findButton(before, 'Password dimenticata?'))
+  }
 } finally {
   await server.close()
 }

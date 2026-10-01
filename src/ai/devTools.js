@@ -15,6 +15,7 @@ import { createMockProvider, MOCK_MODES } from './providers/mockProvider.js'
 import { appSpendyAI, createConfiguredSpendyAI } from './spendyAIConfig.js'
 import { VOICE_LIMITS, NO_LIMITS } from './spendyVoicePolicy.js'
 import { clearVoiceCache } from './spendyVoiceCache.js'
+import { useAppStore } from '../store/useAppStore.js'
 
 function devParams() {
   if (!import.meta.env?.DEV || typeof window === 'undefined') return null
@@ -41,7 +42,7 @@ export function getSpendyVoiceDevConfig() {
   if (!params) return { ai: appSpendyAI, limits: VOICE_LIMITS, debug: false, mode: appSpendyAI.providerName }
 
   if (params.get('spendyReset') === '1' && !resetDone) {
-    clearVoiceCache()
+    clearVoiceCache(undefined, useAppStore.getState().scopeId)
     resetDone = true
   }
 

@@ -13,9 +13,10 @@ import { todayStr } from '../utils/date.js'
 // nuova) ed è la rete di sicurezza di ogni fase successiva: si esporta
 // prima di migrare, sempre.
 //
-// Regola non negoziabile di questo modulo: NON scrive mai su
-// 'spendy-storage' e non cancella mai niente. Gli unici write che fa
-// sono su chiavi nuove, con un prefisso tutto suo.
+// Regola non negoziabile di questo modulo: NON scrive mai sullo stato
+// dell'app (né sul vecchio 'spendy-storage', né sui contenitori per ambito
+// 'spendy-storage-v2:…': ci pensa zustand persist) e non cancella mai niente.
+// Gli unici write che fa sono su chiavi nuove, con un prefisso tutto suo.
 
 export const BACKUP_VERSION = 1
 export const STORAGE_KEY = 'spendy-storage'
@@ -112,13 +113,16 @@ export function downloadBackup(state) {
 }
 
 // Copia di sicurezza dello stato corrente su una chiave NUOVA, presa
-// appena prima di applicare un import. Non tocca 'spendy-storage': se
-// l'import si rivelasse sbagliato, lo stato di partenza è ancora lì,
-// recuperabile dalla console con
+// appena prima di applicare un import o una migrazione. Non tocca lo stato
+// dell'app: se l'operazione si rivelasse sbagliata, lo stato di partenza è
+// ancora lì, recuperabile dalla console con
 //   JSON.parse(localStorage.getItem('<chiave>'))
-// e reimportabile da questa stessa schermata.
+// e reimportabile da questa stessa schermata. Il nome della chiave contiene
+// l'ambito (guest o account, vedi store/scope.js): la copia di un account non
+// si confonde con quella di un altro.
 export function saveAutoBackup(state) {
-  const key = `${AUTO_BACKUP_PREFIX}${new Date().toISOString().replace(/[:.]/g, '-')}`
+  const scope = String(state.scopeId ?? 'guest').replace(/[^A-Za-z0-9_-]+/g, '-')
+  const key = `${AUTO_BACKUP_PREFIX}${scope}-${new Date().toISOString().replace(/[:.]/g, '-')}`
   try {
     window.localStorage.setItem(key, serializeBackup(buildBackup(state)))
     return key

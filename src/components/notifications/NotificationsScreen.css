@@ -1,0 +1,204 @@
+.notifications-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  animation: notifications-screen-in 0.2s var(--ease-standard);
+}
+
+@keyframes notifications-screen-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.notifications-screen__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(16px + env(safe-area-inset-top)) 18px 12px;
+  flex-shrink: 0;
+}
+
+.notifications-screen__back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: 16px;
+  color: var(--color-text-primary);
+}
+
+.notifications-screen__title {
+  flex: 1;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.notifications-screen__mark-all {
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.notifications-screen__mark-all:disabled {
+  opacity: 0.4;
+}
+
+.notifications-screen__back:focus-visible,
+.notifications-screen__mark-all:focus-visible,
+.notifications-screen__main:focus-visible,
+.notifications-screen__delete:focus-visible {
+  outline: 2px solid var(--color-accent-mint);
+  outline-offset: 2px;
+}
+
+.notifications-screen__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 20px 32px;
+}
+
+.notifications-screen__empty {
+  margin-top: 48px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.notifications-screen__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notifications-screen__item {
+  display: flex;
+  align-items: flex-start;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+}
+
+.notifications-screen__item--unread {
+  border-color: var(--color-accent-mint);
+}
+
+.notifications-screen__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 12px;
+  padding: 14px 4px 14px 14px;
+  text-align: left;
+  background: transparent;
+  color: inherit;
+  border-radius: var(--radius-lg);
+}
+
+.notifications-screen__icon {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.notifications-screen__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.notifications-screen__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.notifications-screen__dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent-mint);
+}
+
+.notifications-screen__item-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.notifications-screen__item--unread .notifications-screen__item-title {
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.notifications-screen__time {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+.notifications-screen__message {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.notifications-screen__category {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.notifications-screen__action {
+  margin-top: 2px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--color-accent-mint);
+}
+
+.notifications-screen__delete {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  margin: 6px 6px 0 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font-size: 14px;
+}
+
+.notifications-screen__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notifications-screen { animation: none; }
+}

@@ -1,5 +1,6 @@
 import { COLLECTION_KEYS, SETTINGS_TABLE, SYNC_COLLECTIONS, collectionForTable, settingsToRemote, toLocalRow, toRemoteRow } from './mappers.js'
 import { SETTINGS_KEY, groupByCollection, pendingIds } from './outbox.js'
+import { isUserScope, ownerOf, scopeFor } from '../store/scope.js'
 
 // Il motore: spinge la coda locale verso il cloud (push), riporta a casa
 // quello che hanno scritto gli altri dispositivi (pull incrementale),
@@ -75,34 +76,60 @@ export function mergeRemoteRows(collection, localRows, remoteRows, pending = new
 
 const isOnline = () => (typeof navigator === 'undefined' ? true : navigator.onLine !== false)
 
+// Ogni operazione asincrona ricorda l'AMBITO dei dati locali in cui è partita
+// (guest o account, vedi store/scope.js) e, prima di scrivere QUALUNQUE cosa
+// nello store, controlla di essere ancora lì. Se nel frattempo si è cambiato
+// account, il risultato arrivato in ritardo viene scartato: non si applica,
+// non conferma la coda, non sposta cursori né stato. Le operazioni già accettate
+// dal server ma non confermate in locale verranno semplicemente rimandate al
+// rientro di quell'account (l'upsert è idempotente).
+const SCOPE_CHANGED = 'scope-cambiato'
+
 export function createSyncEngine({ store, remote, autoFlushMs = 1200, onStatus = null }) {
   let unsubscribeStore = null
   let unsubscribeRealtime = null
   let flushTimer = null
   let running = false
-  let inFlight = null
+  let startedScope = null
+  let onOnline = null
+  let onOffline = null
+  // Una sincronizzazione per volta PER AMBITO.
+  const flights = new Map()
 
   const state = () => store.getState()
+  const sameScope = (scope) => state().scopeId === scope
 
-  const setStatus = (patch) => {
+  const setStatus = (patch, scope = state().scopeId) => {
+    if (!sameScope(scope)) return
     state().setSyncStatus(patch)
     onStatus?.(state().sync)
   }
 
+  // Lo userId dello stato deve essere quello dell'ambito: un contenitore
+  // account non può mai inviare con l'identità di un altro.
+  const identityError = (scope, userId) => (isUserScope(scope) && ownerOf(scope) !== userId ? 'ambito non coerente con l\'account' : null)
+
   // ------------------------------------------------------------- push
 
-  async function pushPending() {
+  async function pushPending(scope = state().scopeId) {
+    if (!sameScope(scope)) return { pushed: 0, aborted: SCOPE_CHANGED }
+
     const { outbox } = state().sync
     if (outbox.length === 0) return { pushed: 0 }
 
     const userId = state().sync.userId
     if (!userId) return { pushed: 0, error: 'nessun utente' }
+    const mismatch = identityError(scope, userId)
+    if (mismatch) return { pushed: 0, error: mismatch }
 
     let pushed = 0
     for (const [collection, ops] of groupByCollection(outbox)) {
+      if (!sameScope(scope)) return { pushed, aborted: SCOPE_CHANGED }
+
       if (collection === SETTINGS_KEY) {
         const op = ops[ops.length - 1]
         const { error } = await remote.upsert(SETTINGS_TABLE, [settingsToRemote(op.row, userId)])
+        if (!sameScope(scope)) return { pushed, aborted: SCOPE_CHANGED }
         if (error) return { pushed, error }
         state().ackOps(ops)
         pushed += 1
@@ -112,6 +139,7 @@ export function createSyncEngine({ store, remote, autoFlushMs = 1200, onStatus =
       const table = SYNC_COLLECTIONS[collection].table
       const rows = ops.map((op) => toRemoteRow(collection, op.row, userId))
       const { error } = await remote.upsert(table, rows)
+      if (!sameScope(scope)) return { pushed, aborted: SCOPE_CHANGED }
       if (error) return { pushed, error }
       // Le operazioni escono dalla coda SOLO ora, dopo la conferma del
       // server. Se la rete cade a metà, restano dove sono e ripartono.
@@ -124,15 +152,20 @@ export function createSyncEngine({ store, remote, autoFlushMs = 1200, onStatus =
 
   // ------------------------------------------------------------- pull
 
-  async function pullAll() {
+  async function pullAll(scope = state().scopeId) {
+    if (!sameScope(scope)) return { pulled: 0, aborted: SCOPE_CHANGED }
+
     const userId = state().sync.userId
     if (!userId) return { pulled: 0, error: 'nessun utente' }
+    const mismatch = identityError(scope, userId)
+    if (mismatch) return { pulled: 0, error: mismatch }
 
     let pulled = 0
     for (const collection of COLLECTION_KEYS) {
       const table = SYNC_COLLECTIONS[collection].table
       const since = state().sync.cursors[table] ?? EPOCH
       const { rows, error } = await remote.pull(table, since)
+      if (!sameScope(scope)) return { pulled, aborted: SCOPE_CHANGED }
       if (error) return { pulled, error }
       if (rows.length > 0) {
         state().applyRemote(collection, rows)
@@ -142,6 +175,7 @@ export function createSyncEngine({ store, remote, autoFlushMs = 1200, onStatus =
     }
 
     const { rows, error } = await remote.pull(SETTINGS_TABLE, state().sync.cursors[SETTINGS_TABLE] ?? EPOCH)
+    if (!sameScope(scope)) return { pulled, aborted: SCOPE_CHANGED }
     if (error) return { pulled, error }
     if (rows.length > 0) {
       state().applyRemoteSettings(rows[0])
@@ -155,40 +189,44 @@ export function createSyncEngine({ store, remote, autoFlushMs = 1200, onStatus =
   // ---------------------------------------------------------- syncNow
 
   async function syncNow() {
+    const scope = state().scopeId
     if (!state().sync.userId) return { skipped: 'nessun utente' }
     if (!isOnline()) {
-      setStatus({ status: 'offline', error: null })
+      setStatus({ status: 'offline', error: null }, scope)
       return { skipped: 'offline' }
     }
-    // Una sola sincronizzazione per volta: due push concorrenti
+    // Una sola sincronizzazione per volta (per ambito): due push concorrenti
     // toglierebbero dalla coda operazioni che l'altro sta ancora inviando.
-    if (inFlight) return inFlight
+    if (flights.has(scope)) return flights.get(scope)
 
-    inFlight = (async () => {
-      setStatus({ status: 'syncing', error: null })
+    const flight = (async () => {
+      setStatus({ status: 'syncing', error: null }, scope)
       try {
         // Prima si spinge, poi si tira: così le modifiche locali sono già
         // sul server quando si chiede cosa c'è di nuovo, e il pull non
         // torna indietro con una versione vecchia della riga appena
         // toccata qui.
-        const push = await pushPending()
+        const push = await pushPending(scope)
+        if (push.aborted) return { skipped: SCOPE_CHANGED }
         if (push.error) {
-          setStatus({ status: 'error', error: String(push.error) })
+          setStatus({ status: 'error', error: String(push.error) }, scope)
           return push
         }
-        const pull = await pullAll()
+        const pull = await pullAll(scope)
+        if (pull.aborted) return { skipped: SCOPE_CHANGED }
         if (pull.error) {
-          setStatus({ status: 'error', error: String(pull.error) })
+          setStatus({ status: 'error', error: String(pull.error) }, scope)
           return pull
         }
-        setStatus({ status: 'synced', error: null, lastSyncAt: new Date().toISOString() })
+        setStatus({ status: 'synced', error: null, lastSyncAt: new Date().toISOString() }, scope)
         return { ...push, ...pull }
       } finally {
-        inFlight = null
+        flights.delete(scope)
       }
     })()
 
-    return inFlight
+    flights.set(scope, flight)
+    return flight
   }
 
   // ------------------------------------------------------- avvio/stop
@@ -197,21 +235,22 @@ export function createSyncEngine({ store, remote, autoFlushMs = 1200, onStatus =
     if (flushTimer) return
     flushTimer = setTimeout(() => {
       flushTimer = null
-      syncNow()
+      if (startedScope !== null && sameScope(startedScope)) syncNow()
     }, autoFlushMs)
   }
 
   function start(userId) {
     if (running) stop()
 
+    // Il motore di un account parte solo dentro il contenitore di quell'account.
+    // Con un ambito diverso (per esempio i dati di A mentre entra B) non si
+    // parte: niente di A può essere inviato come B.
+    if (state().scopeId !== scopeFor(userId)) return Promise.resolve({ skipped: 'scope-diverso' })
+
     const previous = state().sync.userId
     if (previous && previous !== userId) {
-      // Cambio di account sullo stesso dispositivo. Se ci sono ancora
-      // modifiche in coda, sono dell'utente PRECEDENTE: spingerle adesso
-      // le scriverebbe nell'account di chi ha appena fatto accesso — i
-      // dati di una persona finirebbero addosso a un'altra. Meglio non
-      // partire e dirlo, lasciando la coda intatta: basta rientrare con
-      // l'account di prima per svuotarla.
+      // Difesa in più: con i contenitori separati non dovrebbe più succedere
+      // che lo stato di un account porti l'identità di un altro.
       if (state().sync.outbox.length > 0) {
         setStatus({
           status: 'error',
@@ -226,6 +265,7 @@ export function createSyncEngine({ store, remote, autoFlushMs = 1200, onStatus =
     }
 
     running = true
+    startedScope = state().scopeId
     state().setSyncUser(userId)
 
     // Ogni volta che la coda si allunga (cioè a ogni spesa inserita) si
@@ -233,12 +273,14 @@ export function createSyncEngine({ store, remote, autoFlushMs = 1200, onStatus =
     // fare una richiesta per tasto premuto.
     let lastOutboxLength = state().sync.outbox.length
     unsubscribeStore = store.subscribe((next) => {
+      if (next.scopeId !== startedScope) return
       const length = next.sync.outbox.length
       if (length > lastOutboxLength) scheduleFlush()
       lastOutboxLength = length
     })
 
     unsubscribeRealtime = remote.subscribe?.(userId, ({ table, row }) => {
+      if (startedScope === null || !sameScope(startedScope)) return
       const collection = collectionForTable(table)
       if (collection) {
         state().applyRemote(collection, [row])
@@ -248,8 +290,13 @@ export function createSyncEngine({ store, remote, autoFlushMs = 1200, onStatus =
     })
 
     if (typeof window !== 'undefined') {
-      window.addEventListener('online', syncNow)
-      window.addEventListener('offline', () => setStatus({ status: 'offline' }))
+      const scope = startedScope
+      onOnline = () => {
+        if (sameScope(scope)) syncNow()
+      }
+      onOffline = () => setStatus({ status: 'offline' }, scope)
+      window.addEventListener('online', onOnline)
+      window.addEventListener('offline', onOffline)
     }
 
     return syncNow()
@@ -257,13 +304,19 @@ export function createSyncEngine({ store, remote, autoFlushMs = 1200, onStatus =
 
   function stop() {
     running = false
+    startedScope = null
     unsubscribeStore?.()
     unsubscribeRealtime?.()
     unsubscribeStore = null
     unsubscribeRealtime = null
     if (flushTimer) clearTimeout(flushTimer)
     flushTimer = null
-    if (typeof window !== 'undefined') window.removeEventListener('online', syncNow)
+    if (typeof window !== 'undefined') {
+      if (onOnline) window.removeEventListener('online', onOnline)
+      if (onOffline) window.removeEventListener('offline', onOffline)
+    }
+    onOnline = null
+    onOffline = null
   }
 
   return { start, stop, syncNow, pushPending, pullAll }

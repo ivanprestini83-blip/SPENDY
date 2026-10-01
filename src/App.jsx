@@ -16,6 +16,10 @@ import { AndamentoScreen } from './components/andamento/AndamentoScreen.jsx'
 import { AffordabilityScreen } from './components/affordability/AffordabilityScreen.jsx'
 import { EmergencyFundScreen } from './components/goals/EmergencyFundScreen.jsx'
 import { SettingsScreen } from './components/modals/SettingsScreen.jsx'
+import { NotificationsScreen } from './components/notifications/NotificationsScreen.jsx'
+import { startNotificationWatcher } from './notifications/notificationWatcher.js'
+import { unreadCount } from './notifications/notificationState.js'
+import { PasswordRecoveryScreen } from './components/settings/PasswordRecoveryScreen.jsx'
 import { HomePage } from './pages/HomePage.jsx'
 import { ExpensesPage } from './pages/ExpensesPage.jsx'
 import { IncomesPage } from './pages/IncomesPage.jsx'
@@ -45,6 +49,12 @@ function App() {
   const openModal = useAppStore((state) => state.openModal)
   const closeModal = useAppStore((state) => state.closeModal)
   const refreshToday = useAppStore((state) => state.refreshToday)
+  // L'ambito dei dati locali (guest o account). Cambiandolo ogni schermata
+  // viene ricreata da zero: nessuno stato di componente (campi di un form,
+  // messaggi, cache di una pagina) può sopravvivere da un account all'altro.
+  const scopeId = useAppStore((state) => state.scopeId)
+  // Un numero (primitivo): il badge si aggiorna solo quando cambia davvero.
+  const unread = useAppStore((state) => unreadCount(state.notifications))
 
   // `today` is set once when the store is created — refresh it on mount
   // so a tab reopened days later (or left open across midnight) reads
@@ -60,6 +70,9 @@ function App() {
   // alle spese, nessun blocco all'avvio.
   useEffect(() => bootstrapSync(), [])
 
+  // Centro notifiche: un solo watcher dello store, fermato allo smontaggio.
+  useEffect(() => startNotificationWatcher(useAppStore), [])
+
   const ActivePage = PAGES[activeTab] ?? HomePage
 
   // The only bottom-nav "action" item today is the central "+" — opens
@@ -70,9 +83,10 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <>
+    <div className="app-shell" key={scopeId}>
       <div className="app-shell__header">
-        <Header onOpenSettings={() => openModal('settings')} />
+        <Header onOpenSettings={() => openModal('settings')} onOpenNotifications={() => openModal('notifications')} unreadCount={unread} />
       </div>
 
       {/* Se una pagina va in errore si rompe solo il suo contenuto: intestazione
@@ -110,7 +124,11 @@ function App() {
       {modal === 'affordability' && <AffordabilityScreen onClose={closeModal} />}
       {modal === 'emergencyFund' && <EmergencyFundScreen onClose={closeModal} />}
       {modal === 'settings' && <SettingsScreen onClose={closeModal} />}
+      {modal === 'notifications' && <NotificationsScreen onClose={closeModal} />}
     </div>
+    {/* Fuori dalla schermata a chiave: sopravvive al cambio di ambito. */}
+    <PasswordRecoveryScreen />
+    </>
   )
 }
 

@@ -62,8 +62,8 @@ export function BackupCard() {
 
   const applyImport = (mode) => {
     // Copia di sicurezza dello stato attuale PRIMA di toccarlo, su una
-    // chiave sua ('spendy-backup-auto-…'). 'spendy-storage' non viene
-    // mai né cancellato né riscritto a mano: ci pensa zustand persist,
+    // chiave sua ('spendy-backup-auto-<ambito>-…'). Lo stato dell'app non
+    // viene mai né cancellato né riscritto a mano: ci pensa zustand persist,
     // come sempre.
     const autoBackupKey = saveAutoBackup(useAppStore.getState())
     const report = importBackup(pending.snapshot, mode)
