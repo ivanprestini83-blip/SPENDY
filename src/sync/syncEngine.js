@@ -29,6 +29,8 @@ export function cursorFrom(rows, previous = EPOCH) {
   return new Date(new Date(max).getTime() - 1000).toISOString()
 }
 
+const hasLocalRows = (snapshot) => COLLECTION_KEYS.some((key) => (snapshot[key]?.length ?? 0) > 0)
+
 const byDateDesc = (a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)
 const pinnedFirst = (a, b) => (a.pinned === b.pinned ? 0 : a.pinned ? -1 : 1)
 
@@ -262,6 +264,16 @@ export function createSyncEngine({ store, remote, autoFlushMs = 1200, onStatus =
       // altro utente, e riusarli nasconderebbe tutte le righe piu'
       // vecchie di quel timestamp. I dati locali non si toccano.
       state().setSyncStatus({ cursors: {}, migratedAt: null })
+    }
+
+    // Contenitore senza nemmeno una riga locale ma con cursori già avanzati
+    // (per esempio dati locali persi o mai arrivati, o cursori ereditati):
+    // il pull incrementale chiederebbe solo le righe più nuove del cursore e
+    // l'account resterebbe a 0 pur avendo i suoi dati sul cloud, con il sync
+    // dato per riuscito. Senza righe locali non c'è niente che un pull
+    // completo possa duplicare: si riparte dall'inizio. La coda non si tocca.
+    if (!hasLocalRows(state()) && Object.keys(state().sync.cursors ?? {}).length > 0) {
+      state().setSyncStatus({ cursors: {} })
     }
 
     running = true

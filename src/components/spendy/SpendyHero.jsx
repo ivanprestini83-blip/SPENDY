@@ -94,7 +94,7 @@ export function SpendyHero({
           <span className="spendy-hero__cta-icon" aria-hidden="true">
             <ChatIcon />
           </span>
-          Parla con {MASCOT_NAME}
+          Radar
           <span className="spendy-hero__cta-arrow" aria-hidden="true">→</span>
         </button>
       </div>

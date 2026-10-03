@@ -461,6 +461,31 @@ section('Primo login: adozione dei dati guest (una sola volta)')
   check('   e B non adotta i dati guest creati dopo', !store.getState().expenses.some((e) => e.description === 'GUEST-TARDI'))
 }
 
+{
+  // Il guest adottato porta con sé dei cursori: non devono finire nell'account,
+  // o il primo sync salterebbe tutte le righe più vecchie di quei timestamp.
+  const map = new Map()
+  const store = await bootDevice(map)
+  const s = store.getState
+  const db = createMemoryDatabase()
+  db.upsert('expenses', [toRemoteRow('expenses', { id: 'e-cloud-a-1', amount: 70, categoryId: 'casa', description: 'CLOUD-A-VECCHIA', date: '2026-09-01', updatedAt: '2026-09-01T10:00:00.000Z' }, A)], A)
+  const futuro = new Date(Date.now() + 3_600_000).toISOString()
+  s().addExpense({ amount: 4, categoryId: 'bar', description: 'GUEST-CON-CURSORI', date: s().today })
+  s().setSyncStatus({ cursors: { expenses: futuro, profiles: futuro } })
+  const guestPrima = map.get(stateKey(GUEST))
+
+  s().switchScope(scopeFor(A))
+  check('adozione: i dati guest arrivano nell\'account', s().expenses.some((e) => e.description === 'GUEST-CON-CURSORI') && s().sync.outbox.length === 1)
+  check('   ma i cursori del guest NO', Object.keys(s().sync.cursors).length === 0)
+  check('   l\'archivio del guest resta identico (cursori compresi)', map.get([...map.keys()].find((k) => k.startsWith(`${stateKey(GUEST)}:adopted:`))) === guestPrima)
+
+  const engine = createSyncEngine({ store, remote: createMemoryRemote(db, A), autoFlushMs: 10_000 })
+  await engine.start(A)
+  check('   il primo sync recupera anche le righe vecchie dell\'account', s().expenses.some((e) => e.description === 'CLOUD-A-VECCHIA'))
+  check('   e la coda guest parte regolarmente', s().sync.outbox.length === 0 && db.rows('expenses').some((r) => r.user_id === A && r.description === 'GUEST-CON-CURSORI'))
+  engine.stop()
+}
+
 // =====================================================================
 section('Migrazione dal vecchio spendy-storage')
 // =====================================================================

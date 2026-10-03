@@ -412,4 +412,97 @@ check('e la spesa arriva nell\'account giusto',
   db.rows('expenses').some((r) => r.user_id === USER && r.description === 'Del primo utente'))
 condiviso.engine.stop()
 
+// =====================================================================
+section('16. Contenitore vuoto con cursori avanzati — recupero completo')
+// =====================================================================
+// Lo scenario di Production: l'account entra, il sync risulta riuscito, la
+// coda è vuota, ma le liste locali sono vuote e i cursori sono già oltre
+// tutte le righe del cloud. Il pull incrementale non restituirebbe nulla.
+{
+  const TABELLE = ['expenses', 'incomes', 'goals', 'goal_contributions', 'emergency_fund_contributions', 'custom_categories', 'profiles']
+  const oltreIlCloud = new Date(Date.now() + 3_600_000).toISOString()
+  const cursoriAvanzati = () => Object.fromEntries(TABELLE.map((t) => [t, oltreIlCloud]))
+  const vive = (table, userId) => db.rows(table).filter((r) => r.user_id === userId && !r.deleted_at)
+
+  // B ha i suoi dati sul cloud
+  const bOrigine = await createDevice('b-origine', { userId: ALTRO_USER })
+  bOrigine.state().addExpense({ amount: 33, categoryId: 'bar', description: 'Solo di B', date: '2026-09-21' })
+  await bOrigine.engine.syncNow()
+  const speseA = vive('expenses', USER).length
+  const categorieA = vive('custom_categories', USER).length
+  check('premessa: A ha spese e categorie sul cloud', speseA > 0 && categorieA > 0)
+
+  // 1. A: store vuoto + cursori avanzati
+  const a = await createDevice('a-cursori-avanzati')
+  a.state().setSyncUser(USER)
+  a.state().setSyncStatus({ cursors: cursoriAvanzati() })
+  const senzaCorrezione = await a.engine.pullAll()
+  check('premessa: con quei cursori il pull incrementale non porta niente', senzaCorrezione.pulled === 0 && a.state().expenses.length === 0)
+
+  await a.engine.start(USER)
+  check('A recupera TUTTE le spese dal cloud', a.state().expenses.length === speseA, `${a.state().expenses.length}/${speseA}`)
+  check('   e tutte le categorie personalizzate', a.state().customCategories.length === categorieA)
+  check('   e lo stipendio', a.state().monthlyBudget === 1800)
+  check('   sync riuscito, nessun errore, coda vuota', a.state().sync.status === 'synced' && !a.state().sync.error && a.state().sync.outbox.length === 0)
+  check('   i cursori ripartono dalle righe vere, non dal futuro', Object.values(a.state().sync.cursors).every((c) => c < oltreIlCloud))
+  check('   nessun dato di B', !a.state().expenses.some((e) => e.description === 'Solo di B'))
+  check('   nessuna scrittura sul cloud', vive('expenses', USER).length === speseA)
+  a.engine.stop()
+
+  // 2. B, stesso stato di partenza: vede solo i propri dati
+  const b = await createDevice('b-cursori-avanzati', { userId: ALTRO_USER })
+  b.state().setSyncUser(ALTRO_USER)
+  b.state().setSyncStatus({ cursors: cursoriAvanzati() })
+  await b.engine.start(ALTRO_USER)
+  check('B recupera i propri dati', b.state().expenses.some((e) => e.description === 'Solo di B'))
+  check('   ed esclusivamente quelli', b.state().expenses.length === vive('expenses', ALTRO_USER).length && b.state().customCategories.length === 0)
+  b.engine.stop()
+
+  // 3. logout / login: niente si perde
+  a.state().switchScope('guest')
+  check('logout: il guest non mostra i dati di A', a.state().expenses.length === 0)
+  a.state().switchScope(scopeFor(USER))
+  check('login: A ritrova tutte le spese senza rete', a.state().expenses.length === speseA)
+  const cursoriPrima = JSON.stringify(a.state().sync.cursors)
+  await a.engine.start(USER)
+  check('   dopo il sync ancora tutte, nessun duplicato', a.state().expenses.length === speseA && new Set(a.state().expenses.map((e) => e.id)).size === speseA)
+  check('   con dati presenti i cursori NON vengono azzerati', cursoriPrima !== '{}' && Object.keys(a.state().sync.cursors).length > 0)
+  a.engine.stop()
+
+  // 4. La coda funziona come prima
+  const conCoda = await createDevice('a-con-coda')
+  conCoda.remote.setOnline(false)
+  conCoda.state().setSyncUser(USER)
+  conCoda.state().setSyncStatus({ cursors: cursoriAvanzati() })
+  conCoda.state().addExpense({ amount: 9, categoryId: 'bar', description: 'In coda offline', date: '2026-09-22' })
+  await conCoda.engine.start(USER)
+  check('offline: la modifica resta in coda', conCoda.state().sync.outbox.length === 1)
+  check('   con righe locali i cursori restano quelli che erano', conCoda.state().sync.cursors.expenses === oltreIlCloud)
+  conCoda.remote.setOnline(true)
+  await conCoda.engine.syncNow()
+  check('   tornata la rete la coda parte e si svuota', conCoda.state().sync.outbox.length === 0 && db.rows('expenses').some((r) => r.user_id === USER && r.description === 'In coda offline'))
+  conCoda.engine.stop()
+
+  const soloImpostazioni = await createDevice('a-coda-impostazioni')
+  soloImpostazioni.state().setSyncUser(USER)
+  soloImpostazioni.state().setSyncStatus({ cursors: cursoriAvanzati() })
+  soloImpostazioni.state().setCycleStartDay(5)
+  check('store vuoto con una modifica impostazioni in coda', soloImpostazioni.state().expenses.length === 0 && soloImpostazioni.state().sync.outbox.length === 1)
+  await soloImpostazioni.engine.start(USER)
+  check('   la modifica in coda viene inviata', soloImpostazioni.state().sync.outbox.length === 0 && db.rows('profiles').some((r) => r.id === USER && r.cycle_start_day === 5))
+  check('   e le righe del cloud arrivano comunque tutte', soloImpostazioni.state().expenses.length === vive('expenses', USER).length)
+  soloImpostazioni.engine.stop()
+
+  // 5. Un account davvero senza dati resta a 0
+  const VUOTO = 'utente-vuoto-0005'
+  const vuoto = await createDevice('account-vuoto', { userId: VUOTO })
+  vuoto.state().setSyncUser(VUOTO)
+  vuoto.state().setSyncStatus({ cursors: cursoriAvanzati() })
+  await vuoto.engine.start(VUOTO)
+  check('account senza dati: 0 spese, 0 entrate, 0 categorie', vuoto.state().expenses.length === 0 && vuoto.state().incomes.length === 0 && vuoto.state().customCategories.length === 0)
+  check('   sync riuscito, nessun errore', vuoto.state().sync.status === 'synced' && !vuoto.state().sync.error)
+  check('   niente scritto sul cloud', !db.rows('expenses').some((r) => r.user_id === VUOTO))
+  vuoto.engine.stop()
+}
+
 report('sync')

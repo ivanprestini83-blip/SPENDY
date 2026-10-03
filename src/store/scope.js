@@ -201,9 +201,12 @@ export function createScopeManager({ getStorage, now = () => new Date() }) {
       try {
         const parsed = JSON.parse(guestRaw)
         if (hasUserData(parsed?.state)) {
+          // I cursori NON si adottano: segnano fin dove un ALTRO contesto
+          // aveva già letto, e trascinati qui farebbero saltare all'account
+          // tutte le sue righe più vecchie. Il primo sync parte dall'inizio.
           const adoptedRaw = JSON.stringify({
             ...parsed,
-            state: { ...parsed.state, sync: { ...(parsed.state.sync ?? {}), userId } },
+            state: { ...parsed.state, sync: { ...(parsed.state.sync ?? {}), userId, cursors: {} } },
           })
           if (!write(target, adoptedRaw)) {
             if (read(target) !== null) remove(target)

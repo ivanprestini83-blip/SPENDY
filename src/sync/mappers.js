@@ -8,13 +8,17 @@
 
 // La mappa che tiene insieme le due metà: chiave = nome della collezione
 // nello store, `table` = nome della tabella su Supabase.
+// L'ordine conta: è quello in cui pullAll scarica le tabelle. Le categorie
+// personalizzate vengono PRIMA delle spese/entrate che le usano, altrimenti
+// per un istante una spesa arriva con un categoryId ancora sconosciuto e
+// getCategory() la risolve come "Altro".
 export const SYNC_COLLECTIONS = {
+  customCategories: { table: 'custom_categories' },
   expenses: { table: 'expenses' },
   incomes: { table: 'incomes' },
   goals: { table: 'goals' },
   goalContributions: { table: 'goal_contributions' },
   emergencyFundContributions: { table: 'emergency_fund_contributions' },
-  customCategories: { table: 'custom_categories' },
 }
 
 export const COLLECTION_KEYS = Object.keys(SYNC_COLLECTIONS)
