@@ -166,6 +166,9 @@ export const settingsToRemote = (settings, userId) => ({
   currency: settings.currency ?? '€',
   cycle_start_day: settings.cycleStartDay ?? null,
   amount_hidden: settings.amountHidden === true,
+  // Solo se nota: le impostazioni scritte da backup, migrazione o versioni
+  // precedenti non la conoscono, e non devono spegnere (o accendere) l'AI.
+  ...(typeof settings.spendyAIEnabled === 'boolean' ? { spendy_ai_enabled: settings.spendyAIEnabled } : {}),
   client_updated_at: settings.updatedAt,
 })
 
@@ -178,5 +181,8 @@ export const settingsToLocal = (row) => ({
   // pubblico, non sul Mac di casa). Viaggia nella tabella per completezza
   // ma chi applica le impostazioni lo ignora — vedi syncEngine.
   amountHidden: row.amount_hidden === true,
+  // Scelta dell'account (non del dispositivo): segue l'utente ovunque.
+  // undefined se la colonna non c'è ancora (migration non eseguita).
+  spendyAIEnabled: typeof row.spendy_ai_enabled === 'boolean' ? row.spendy_ai_enabled : undefined,
   updatedAt: row.client_updated_at,
 })

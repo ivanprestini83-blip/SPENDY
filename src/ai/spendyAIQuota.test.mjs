@@ -27,6 +27,10 @@ import { createSpendyAI } from './spendyAI.js'
 import { requestSpendyVoice } from './spendyVoicePolicy.js'
 import { emptyVoiceCache } from './spendyVoiceCache.js'
 
+// L'utente di questi test ha attivato Spendy AI (profiles.spendy_ai_enabled):
+// senza, la funzione rifiuta ogni chiamata (vedi spendyAIConsent.test).
+const AI_ENABLED = async () => true
+
 const URL_FN = functionsUrl('https://progetto.supabase.co')
 const ENV = { AI_PROVIDER: 'anthropic', AI_MODEL: 'modello-configurato', AI_API_KEY: 'sk-segreto-lato-server' }
 const TOKENS = { 'token-a': 'utente-a', 'token-b': 'utente-b' }
@@ -138,7 +142,7 @@ function fakeModel(behavior = null) {
 
 function makeServer({ quota = memoryQuota(), model = fakeModel(), clock = { now: DAY1 }, env = {}, tokens = TOKENS } = {}) {
   const logs = []
-  const handler = createSpendyAIHandler({
+  const handler = createSpendyAIHandler({ aiPreference: AI_ENABLED,
     config: readConfig((name) => ({ ...ENV, ...env })[name]),
     verifyUser: async (token) => (tokens[token] ? { id: tokens[token], emailConfirmed: !UNCONFIRMED.has(tokens[token]) } : null),
     callModel: model.callModel,
@@ -298,7 +302,7 @@ section('Quota: rimborso, classificazione degli errori del provider')
     const config = readConfig((name) => ({ ...ENV, AI_MODEL: 'claude-opus-5' })[name])
     const quota = memoryQuota()
     const logs = []
-    const handler = createSpendyAIHandler({
+    const handler = createSpendyAIHandler({ aiPreference: AI_ENABLED,
       config,
       verifyUser: async (token) => (TOKENS[token] ? { id: TOKENS[token], emailConfirmed: true } : null),
       callModel: createAnthropicCaller({ Anthropic: FakeAnthropic, apiKey: config.apiKey, config }),
@@ -658,7 +662,7 @@ section('Email non confermata, guest')
   check('email non confermata → 403 email_not_confirmed', nc.status === 403 && nc.body.error === 'email_not_confirmed')
   check('   nessuna prenotazione (non consuma quota) e nessuna chiamata al modello', server.quota.ops.length === 0 && server.model.calls.length === 0)
   check('   nei log solo l\'esito', JSON.stringify(server.logs.at(-1)) === '{"outcome":"email_not_confirmed"}')
-  const missingField = createSpendyAIHandler({
+  const missingField = createSpendyAIHandler({ aiPreference: AI_ENABLED,
     config: readConfig((name) => ENV[name]), verifyUser: async () => ({ id: 'utente-a' }), callModel: fakeModel().callModel, quota: memoryQuota(),
   })
   check('un verificatore che non dice se l\'email è confermata → rifiutato (mai "nel dubbio sì")', (await missingField(post({ context }))).status === 403)
@@ -702,7 +706,7 @@ section('Token usage: registrati, con il modello che ha risposto')
     const config = readConfig((name) => ({ ...ENV, ...env })[name])
     const quota = memoryQuota()
     const logs = []
-    const handler = createSpendyAIHandler({
+    const handler = createSpendyAIHandler({ aiPreference: AI_ENABLED,
       config,
       verifyUser: async (token) => (TOKENS[token] ? { id: TOKENS[token], emailConfirmed: true } : null),
       callModel: createAnthropicCaller({ Anthropic: makeAnthropic(respond), apiKey: config.apiKey, config }),
@@ -748,7 +752,7 @@ section('Token usage: registrati, con il modello che ha risposto')
   const bres = await run(broken)
   check('registrazione fallita → la risposta all\'utente è la stessa (200)', bres.status === 200)
   check('   la chiamata resta nella quota e il log dice usageRecorded false', broken.quota.count('utente-a', day1) === 1 && broken.logs.find((e) => e.outcome === 'ok').usageRecorded === false)
-  const noRecorder = createSpendyAIHandler({ config: readConfig((n) => ENV[n]), verifyUser: async () => ({ id: 'utente-a', emailConfirmed: true }), callModel: async () => ({ text: JSON.stringify(okAnswer), stopReason: 'end_turn', model: 'm', usage: { inputTokens: 1, outputTokens: 1 } }), quota: { reserve: async () => ({ allowed: true, reason: null }), release: async () => {} }, now: () => DAY1 })
+  const noRecorder = createSpendyAIHandler({ aiPreference: AI_ENABLED, config: readConfig((n) => ENV[n]), verifyUser: async () => ({ id: 'utente-a', emailConfirmed: true }), callModel: async () => ({ text: JSON.stringify(okAnswer), stopReason: 'end_turn', model: 'm', usage: { inputTokens: 1, outputTokens: 1 } }), quota: { reserve: async () => ({ allowed: true, reason: null }), release: async () => {} }, now: () => DAY1 })
   check('una quota senza recordUsage (versione vecchia dell\'adattatore) non rompe niente', (await noRecorder(post({ context }))).status === 200)
 
   // Il modello ha risposto ma la risposta non serve: i token sono stati fatturati.
@@ -777,7 +781,7 @@ section('Token usage: registrati, con il modello che ha risposto')
 
   // Database non disponibile: nessuna chiamata al modello, anche con i nuovi limiti.
   let modelCalled = 0
-  const down = createSpendyAIHandler({
+  const down = createSpendyAIHandler({ aiPreference: AI_ENABLED,
     config: readConfig((n) => ENV[n]), verifyUser: async () => ({ id: 'utente-a', emailConfirmed: true }),
     callModel: async () => { modelCalled += 1; return { text: '{}', stopReason: 'end_turn', model: 'm' } },
     quota: { reserve: async () => { throw new Error('quota_rpc_500') }, release: async () => {}, recordUsage: async () => {} },

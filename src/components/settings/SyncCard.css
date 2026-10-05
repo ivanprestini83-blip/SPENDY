@@ -208,3 +208,43 @@
   font-weight: 700;
   padding: 4px 0;
 }
+
+/* Termini e Privacy Policy prima di "Crea un account" */
+.sync-card__legal {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sync-card__legal-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.sync-card__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.4;
+}
+
+.sync-card__check input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  accent-color: var(--color-accent-mint);
+}
+
+.sync-card__check a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

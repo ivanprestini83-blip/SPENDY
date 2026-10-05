@@ -81,6 +81,14 @@ export function decideSpendyVoice({ coach, meta, today, cache, now = Date.now(),
   return decision('ai', 'new_event')
 }
 
+// La scelta dell'utente viene prima di tutte le regole: con Spendy AI spenta
+// (default) la decisione è sempre locale e nessuna chiamata parte. Accesa,
+// è esattamente decideSpendyVoice, regole e limiti invariati.
+export function decideSpendyVoiceFor({ aiEnabled, ...input }) {
+  if (aiEnabled !== true) return decision('local', 'ai_disabled')
+  return decideSpendyVoice(input)
+}
+
 // 'daily_limit' / 'monthly_limit' / 'global_limit': il server ha rifiutato
 // PRIMA del modello (quota esaurita), quindi nessun costo e nessuna chiamata
 // da contare qui.

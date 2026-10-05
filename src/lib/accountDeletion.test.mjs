@@ -132,17 +132,18 @@ section('Cancellazione via API admin di Supabase Auth')
 section('5–6. Database: ogni tabella di un utente si elimina a cascata (ai_usage compresa)')
 // =====================================================================
 {
-  const sql = ['supabase/schema.sql', 'supabase/ai_usage.sql'].map((f) => readFileSync(join(ROOT, f), 'utf8')).join('\n')
+  const sql = ['supabase/schema.sql', 'supabase/ai_usage.sql', 'supabase/privacy_consent.sql'].map((f) => readFileSync(join(ROOT, f), 'utf8')).join('\n')
   const tables = {}
   for (const match of sql.matchAll(/create table if not exists public\.(\w+)\s*\(([\s\S]*?)\n\);/g)) tables[match[1]] = match[2]
-  const expected = [...Object.values(SYNC_COLLECTIONS).map((c) => c.table), SETTINGS_TABLE, 'ai_usage'].sort()
+  const expected = [...Object.values(SYNC_COLLECTIONS).map((c) => c.table), SETTINGS_TABLE, 'ai_usage', 'legal_acceptances'].sort()
   check('lo schema dichiara tutte e sole le tabelle note', JSON.stringify(Object.keys(tables).sort()) === JSON.stringify(expected), Object.keys(tables).sort().join(','))
   for (const name of expected) {
     const body = tables[name] ?? ''
     check(`   ${name}: references auth.users ... on delete cascade`, /references auth\.users\(id\) on delete cascade/.test(body))
   }
   check('ai_usage è inclusa', /references auth\.users\(id\) on delete cascade/.test(tables.ai_usage ?? ''))
-  check('nessuna altra tabella pubblica con dati (niente orfani)', !/create table (if not exists )?public\.(?!(expenses|incomes|goals|goal_contributions|emergency_fund_contributions|custom_categories|profiles|ai_usage)\b)/.test(sql))
+  check('legal_acceptances (Termini e Privacy accettati) è inclusa', /references auth\.users\(id\) on delete cascade/.test(tables.legal_acceptances ?? ''))
+  check('nessuna altra tabella pubblica con dati (niente orfani)', !/create table (if not exists )?public\.(?!(expenses|incomes|goals|goal_contributions|emergency_fund_contributions|custom_categories|profiles|ai_usage|legal_acceptances)\b)/.test(sql))
 }
 
 // =====================================================================

@@ -53,6 +53,7 @@ const withSettingsOp = (state, patch) => {
     currency: patch.currency ?? state.currency,
     cycleStartDay: 'cycleStartDay' in patch ? patch.cycleStartDay : state.cycleStartDay,
     amountHidden: state.amountHidden,
+    spendyAIEnabled: 'spendyAIEnabled' in patch ? patch.spendyAIEnabled === true : state.spendyAIEnabled === true,
     updatedAt: nowIso(),
   }
   return {
@@ -88,6 +89,7 @@ export const emptyScopeState = () => ({
   currency: '€',
   cycleStartDay: null,
   amountHidden: false,
+  spendyAIEnabled: false,
   expenses: [],
   incomes: [],
   customCategories: [],
@@ -203,6 +205,13 @@ export const useAppStore = create(
 
       amountHidden: false,
       toggleAmountHidden: () => set((state) => ({ amountHidden: !state.amountHidden })),
+
+      // Spendy AI: spenta finché l'utente non la attiva da Impostazioni.
+      // È una scelta dell'account: viaggia con le impostazioni (profiles.
+      // spendy_ai_enabled) e la ritrova su ogni dispositivo. Spenta, nessuna
+      // chiamata all'AI (vedi ai/useSpendyVoice.js).
+      spendyAIEnabled: false,
+      setSpendyAIEnabled: (enabled) => set((state) => withSettingsOp(state, { spendyAIEnabled: enabled === true })),
 
       expenses: [],
       addExpense: (expense) =>
@@ -533,6 +542,7 @@ export const useAppStore = create(
             monthlyBudget: incoming.monthlyBudget,
             currency: incoming.currency,
             cycleStartDay: incoming.cycleStartDay,
+            ...(typeof incoming.spendyAIEnabled === 'boolean' ? { spendyAIEnabled: incoming.spendyAIEnabled } : {}),
           }
         }),
 
@@ -610,6 +620,7 @@ export const useAppStore = create(
         currency: state.currency,
         cycleStartDay: state.cycleStartDay,
         amountHidden: state.amountHidden,
+        spendyAIEnabled: state.spendyAIEnabled,
         expenses: state.expenses,
         incomes: state.incomes,
         customCategories: state.customCategories,

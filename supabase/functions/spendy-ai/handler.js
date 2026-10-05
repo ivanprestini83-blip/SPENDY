@@ -231,6 +231,9 @@ function bearerToken(request) {
 //   log         (entry) => void — riceve solo metadati
 //   quota       createSupabaseQuota(...) — { reserve, release } (quota.js);
 //               senza, nessuna chiamata AI passa (fail closed)
+//   aiPreference async (userId) => boolean (preference.js): l'utente ha
+//               attivato Spendy AI? Letta dal database; senza, o se non è
+//               esattamente true, nessuna chiamata AI passa (fail closed)
 //   now         () => ms, l'orologio che decide la giornata UTC della quota
 //   dailyLimit, monthlyLimit, globalDailyLimit
 //               (facoltativi) sostituiscono i limiti letti da config: giornaliero
@@ -240,6 +243,7 @@ export function createSpendyAIHandler({
   verifyUser,
   callModel,
   quota = null,
+  aiPreference = null,
   now = () => Date.now(),
   dailyLimit,
   monthlyLimit,
@@ -279,6 +283,24 @@ export function createSpendyAIHandler({
     if (config.missing.length > 0 || typeof callModel !== 'function' || !quota) {
       log({ outcome: 'not_configured', missing: [...config.missing, ...(quota ? [] : ['quota'])] })
       return json(503, { error: 'not_configured' })
+    }
+
+    // Spendy AI solo se l'UTENTE l'ha attivata (profiles.spendy_ai_enabled,
+    // default false). Letta dal database per l'utente verificato: niente di
+    // ciò che manda il client conta, e il corpo non è ancora stato letto.
+    // Spenta, senza riga o senza lettore: nessuna quota, nessun modello.
+    let aiEnabled = false
+    if (typeof aiPreference === 'function') {
+      try {
+        aiEnabled = (await aiPreference(user.id)) === true
+      } catch {
+        log({ outcome: 'preference_unavailable' })
+        return json(503, { ok: false, error: 'preference_unavailable' })
+      }
+    }
+    if (!aiEnabled) {
+      log({ outcome: 'ai_disabled' })
+      return json(403, { ok: false, code: 'AI_DISABLED', error: 'ai_disabled' })
     }
 
     // 2. Il corpo: piccolo, JSON, con un contesto riconoscibile.

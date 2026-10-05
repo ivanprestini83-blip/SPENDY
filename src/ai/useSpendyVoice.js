@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { prepareSpendyVoice } from './spendyVoice.js'
-import { decideSpendyVoice, resolveSpendyVoice } from './spendyVoicePolicy.js'
+import { decideSpendyVoiceFor, resolveSpendyVoice } from './spendyVoicePolicy.js'
 import { loadVoiceCache, recordShown, saveVoiceCache } from './spendyVoiceCache.js'
 import { requestAndStoreVoice } from './spendyVoiceRequest.js'
 import { getSpendyVoiceDevConfig } from './devTools.js'
@@ -28,7 +28,9 @@ export function useSpendyVoice({ coach, financialData, expenses, today, monthlyB
   const { events, context, meta } = prepareSpendyVoice({
     coach, financialData, expenses, today, monthlyBudget, cycleStartDay, goals,
   })
-  const decision = decideSpendyVoice({ coach, meta, today, cache, limits: dev.limits })
+  // Spendy AI spenta (scelta dell'utente, default): solo frasi locali.
+  const aiEnabled = useAppStore((state) => state.spendyAIEnabled === true)
+  const decision = decideSpendyVoiceFor({ aiEnabled, coach, meta, today, cache, limits: dev.limits })
   const voice = resolveSpendyVoice({ decision, coach, cache })
 
   const shouldCallAI = decision.action === 'ai'

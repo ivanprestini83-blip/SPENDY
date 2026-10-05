@@ -16,6 +16,7 @@ import { createSpendyAIHandler, readConfig, supabasePublicKey } from './handler.
 import { createAnthropicCaller } from './anthropicModel.js'
 import { createSupabaseUserVerifier } from './auth.js'
 import { createSupabaseQuota, supabaseServiceKey } from './quota.js'
+import { createSupabaseAIPreference } from './preference.js'
 
 const getEnv = (name: string) => Deno.env.get(name) ?? undefined
 const config = readConfig(getEnv)
@@ -34,6 +35,9 @@ const handler = createSpendyAIHandler({
   // Senza URL o service_role la quota non c'è e l'handler rifiuta ogni
   // chiamata AI (503 not_configured): mai modello senza limite.
   quota: supabaseUrl && serviceKey ? createSupabaseQuota({ supabaseUrl, serviceKey }) : null,
+  // La scelta dell'utente su Spendy AI, letta dal database. Senza, nessuna
+  // chiamata passa (fail closed).
+  aiPreference: supabaseUrl && serviceKey ? createSupabaseAIPreference({ supabaseUrl, serviceKey }) : null,
   log: (entry: Record<string, unknown>) => console.log(JSON.stringify({ fn: 'spendy-ai', ...entry })),
 })
 

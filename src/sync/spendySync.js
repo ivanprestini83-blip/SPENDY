@@ -5,6 +5,7 @@ import { createSyncEngine } from './syncEngine.js'
 import { migrateLocalToCloud, migrationStatus } from './migrateLocal.js'
 import { GUEST, retireScope, scopeFor } from '../store/scope.js'
 import { DELETE_ACCOUNT_MESSAGES, requestAccountDeletion } from '../lib/accountDeletion.js'
+import { SIGNUP_ACCEPTANCE_REQUIRED, buildSignUpMetadata } from '../legal/legal.js'
 
 // Il punto unico in cui l'app accende la sincronizzazione. Un solo
 // motore per tutta la sessione, avviato da App.jsx e comandato dalla
@@ -68,8 +69,13 @@ export async function signIn(email, password) {
   return error?.message ?? null
 }
 
-export async function signUp(email, password) {
-  const { error } = await supabase.auth.signUp({ email, password })
+// La registrazione parte solo con Termini accettati e Privacy Policy presa
+// visione (due scelte distinte, vedi legal/legal.js): la UI disabilita il
+// pulsante, e qui lo si rifiuta comunque, senza nessuna chiamata.
+export async function signUp(email, password, acceptance) {
+  const metadata = buildSignUpMetadata(acceptance)
+  if (!metadata) return SIGNUP_ACCEPTANCE_REQUIRED
+  const { error } = await supabase.auth.signUp({ email, password, options: { data: metadata } })
   return error?.message ?? null
 }
 

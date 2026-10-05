@@ -3,6 +3,7 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { supabase } from '../../lib/supabase.js'
 import { getMigrationStatus, isSupabaseConfigured, runMigration, signIn, signOut, signUp, syncNow } from '../../sync/spendySync.js'
 import { ForgotPasswordForm } from './ForgotPasswordForm.jsx'
+import { LEGAL_DOCUMENTS, canSignUp } from '../../legal/legal.js'
 import './SyncCard.css'
 
 const STATUS_LABELS = {
@@ -30,6 +31,10 @@ export function SyncCard() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState(null)
   const [forgot, setForgot] = useState(false)
+  // Solo per "Crea un account": due scelte distinte, mai preselezionate.
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false)
+  const acceptance = { termsAccepted, privacyAcknowledged }
 
   useEffect(() => {
     if (!supabase) return undefined
@@ -121,13 +126,38 @@ export function SyncCard() {
           >
             {busy ? 'Attendi…' : 'Accedi'}
           </button>
+          <div className="sync-card__legal">
+            <p className="sync-card__legal-title">Per creare un nuovo account:</p>
+            <label className="sync-card__check">
+              <input
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={(event) => setTermsAccepted(event.target.checked)}
+              />
+              <span>
+                Ho letto e accetto i{' '}
+                <a href={LEGAL_DOCUMENTS.terms.url} target="_blank" rel="noopener noreferrer">Termini di utilizzo</a>.
+              </span>
+            </label>
+            <label className="sync-card__check">
+              <input
+                type="checkbox"
+                checked={privacyAcknowledged}
+                onChange={(event) => setPrivacyAcknowledged(event.target.checked)}
+              />
+              <span>
+                Ho preso visione della{' '}
+                <a href={LEGAL_DOCUMENTS.privacy.url} target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+              </span>
+            </label>
+          </div>
           <button
             type="button"
             className="sync-card__secondary"
-            disabled={busy || !email || password.length < 6}
+            disabled={busy || !email || password.length < 6 || !canSignUp(acceptance)}
             onClick={() =>
               run(async () => {
-                const error = await signUp(email, password)
+                const error = await signUp(email, password, acceptance)
                 if (!error) setMessage({ tone: 'ok', text: 'Account creato. Se richiesto, conferma l\'email e poi accedi.' })
                 return error
               })

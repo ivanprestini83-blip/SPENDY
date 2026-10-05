@@ -130,7 +130,16 @@ export function createSyncEngine({ store, remote, autoFlushMs = 1200, onStatus =
 
       if (collection === SETTINGS_KEY) {
         const op = ops[ops.length - 1]
-        const { error } = await remote.upsert(SETTINGS_TABLE, [settingsToRemote(op.row, userId)])
+        const remoteRow = settingsToRemote(op.row, userId)
+        let { error } = await remote.upsert(SETTINGS_TABLE, [remoteRow])
+        // La colonna spendy_ai_enabled non esiste ancora (migration
+        // privacy_consent.sql non eseguita): le impostazioni partono senza,
+        // invece di bloccare tutto il sync. La scelta resta su questo
+        // dispositivo e ripartirà con il prossimo cambio di impostazioni.
+        if (error && 'spendy_ai_enabled' in remoteRow && /spendy_ai_enabled/.test(String(error)) && sameScope(scope)) {
+          const { spendy_ai_enabled: _notYetOnServer, ...withoutPreference } = remoteRow
+          ;({ error } = await remote.upsert(SETTINGS_TABLE, [withoutPreference]))
+        }
         if (!sameScope(scope)) return { pushed, aborted: SCOPE_CHANGED }
         if (error) return { pushed, error }
         state().ackOps(ops)

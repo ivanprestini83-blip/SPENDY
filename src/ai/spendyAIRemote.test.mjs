@@ -29,6 +29,10 @@ import { createAnthropicCaller } from '../../supabase/functions/spendy-ai/anthro
 import { createSupabaseUserVerifier } from '../../supabase/functions/spendy-ai/auth.js'
 import { sanitizeSpendyContext, SPENDY_PERSONALITY } from '../../supabase/functions/_shared/spendyAIRules.js'
 
+// L'utente di questi test ha attivato Spendy AI (profiles.spendy_ai_enabled):
+// senza, la funzione rifiuta ogni chiamata (vedi spendyAIConsent.test).
+const AI_ENABLED = async () => true
+
 const TODAY = '2026-09-20'
 const NOW = Date.parse('2026-09-20T10:00:00Z')
 const URL_FN = functionsUrl('https://progetto.supabase.co')
@@ -62,7 +66,7 @@ function fakeModel(behavior = 'mock') {
 
 function makeServer({ model = fakeModel(), env = ENV } = {}) {
   const logs = []
-  const handler = createSpendyAIHandler({
+  const handler = createSpendyAIHandler({ aiPreference: AI_ENABLED,
     config: readConfig((name) => env[name]),
     verifyUser: async (token) => (token === VALID_TOKEN ? { id: 'utente-1', emailConfirmed: true } : null),
     callModel: model.callModel,
@@ -492,7 +496,7 @@ section('Diagnostica degli errori del provider (solo log, mai la chiave)')
     const env = { ...ENV, AI_MODEL: 'claude-opus-5', AI_API_KEY: API_KEY }
     const config = readConfig((name) => env[name])
     const logs = []
-    const handler = createSpendyAIHandler({
+    const handler = createSpendyAIHandler({ aiPreference: AI_ENABLED,
       config,
       verifyUser: async () => ({ id: 'u-1', emailConfirmed: true }),
       callModel: createAnthropicCaller({ Anthropic: FakeAnthropic, apiKey: API_KEY, config }),
@@ -591,7 +595,7 @@ section('Nessun header anthropic-workspace-id (la chiave basta)')
   check('ANTHROPIC_WORKSPACE_ID non entra nella configurazione', !JSON.stringify(config).includes(OLD_WORKSPACE) && !('workspaceId' in config))
 
   const logs = []
-  const handler = createSpendyAIHandler({
+  const handler = createSpendyAIHandler({ aiPreference: AI_ENABLED,
     config,
     verifyUser: async () => ({ id: 'u-1', emailConfirmed: true }),
     callModel: createAnthropicCaller({ Anthropic: RecordingAnthropic, apiKey: config.apiKey, config }),
