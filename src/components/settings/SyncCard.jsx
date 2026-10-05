@@ -3,6 +3,7 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { supabase } from '../../lib/supabase.js'
 import { getMigrationStatus, isSupabaseConfigured, runMigration, signIn, signOut, signUp, syncNow } from '../../sync/spendySync.js'
 import { ForgotPasswordForm } from './ForgotPasswordForm.jsx'
+import { PasswordToggle } from './PasswordToggle.jsx'
 import { LEGAL_DOCUMENTS, canSignUp } from '../../legal/legal.js'
 import './SyncCard.css'
 
@@ -31,6 +32,7 @@ export function SyncCard() {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState(null)
   const [forgot, setForgot] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   // Solo per "Crea un account": due scelte distinte, mai preselezionate.
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false)
@@ -107,13 +109,20 @@ export function SyncCard() {
               value={email}
               onChange={(event) => setEmail(event.target.value)}
             />
-            <input
-              type="password"
-              autoComplete="current-password"
-              placeholder="Password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
+            <div className="password-field">
+              <input
+                id="sync-card-password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="Password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+              <PasswordToggle visible={showPassword} onToggle={() => setShowPassword((shown) => !shown)} controls="sync-card-password" />
+            </div>
             <button type="button" className="sync-card__link" disabled={busy} onClick={() => setForgot(true)}>
               Password dimenticata?
             </button>

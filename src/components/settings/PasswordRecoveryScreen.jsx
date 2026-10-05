@@ -7,6 +7,7 @@ import {
   subscribeRecovery,
   submitNewPassword,
 } from '../../lib/passwordRecovery.js'
+import { PasswordToggle } from './PasswordToggle.jsx'
 import './SyncCard.css'
 import './PasswordRecoveryScreen.css'
 
@@ -18,6 +19,8 @@ export function PasswordRecoveryScreen({ client = supabase }) {
   const recovery = useSyncExternalStore(subscribeRecovery, getRecoveryState, getRecoveryState)
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmation, setShowConfirmation] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [done, setDone] = useState(false)
@@ -82,20 +85,34 @@ export function PasswordRecoveryScreen({ client = supabase }) {
           <>
             <p className="settings-screen__label">🔑 Scegli una nuova password</p>
             <div className="sync-card__form">
-              <input
-                type="password"
-                autoComplete="new-password"
-                placeholder="Nuova password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-              <input
-                type="password"
-                autoComplete="new-password"
-                placeholder="Ripeti la nuova password"
-                value={confirmation}
-                onChange={(event) => setConfirmation(event.target.value)}
-              />
+              <div className="password-field">
+                <input
+                  id="recovery-new-password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="Nuova password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+                <PasswordToggle visible={showPassword} onToggle={() => setShowPassword((shown) => !shown)} controls="recovery-new-password" />
+              </div>
+              <div className="password-field">
+                <input
+                  id="recovery-confirm-password"
+                  type={showConfirmation ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="Ripeti la nuova password"
+                  value={confirmation}
+                  onChange={(event) => setConfirmation(event.target.value)}
+                />
+                <PasswordToggle visible={showConfirmation} onToggle={() => setShowConfirmation((shown) => !shown)} controls="recovery-confirm-password" />
+              </div>
             </div>
             <button type="button" className="sync-card__primary" disabled={busy || !password || !confirmation} onClick={save}>
               {busy ? 'Attendi…' : 'Salva password'}
