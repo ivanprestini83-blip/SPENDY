@@ -3,6 +3,7 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { getCycleRange, formatCycleLabel } from '../../utils/cycle.js'
 import { formatCurrency } from '../../utils/format.js'
 import { BackupCard } from '../settings/BackupCard.jsx'
+import { DeleteAccountCard } from '../settings/DeleteAccountCard.jsx'
 import { SyncCard } from '../settings/SyncCard.jsx'
 import './SettingsScreen.css'
 
@@ -109,6 +110,8 @@ export function SettingsScreen({ onClose }) {
         <SyncCard />
 
         <BackupCard />
+
+        <DeleteAccountCard />
       </div>
     </div>
   )

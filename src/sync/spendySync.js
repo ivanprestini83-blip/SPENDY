@@ -3,7 +3,8 @@ import { useAppStore } from '../store/useAppStore.js'
 import { createSupabaseRemote } from './supabaseRemote.js'
 import { createSyncEngine } from './syncEngine.js'
 import { migrateLocalToCloud, migrationStatus } from './migrateLocal.js'
-import { GUEST, scopeFor } from '../store/scope.js'
+import { GUEST, retireScope, scopeFor } from '../store/scope.js'
+import { DELETE_ACCOUNT_MESSAGES, requestAccountDeletion } from '../lib/accountDeletion.js'
 
 // Il punto unico in cui l'app accende la sincronizzazione. Un solo
 // motore per tutta la sessione, avviato da App.jsx e comandato dalla
@@ -126,6 +127,55 @@ export async function signOut() {
   stopEngine()
   useAppStore.getState().switchScope(GUEST)
   return null
+}
+
+// Elimina DEFINITIVAMENTE l'account attivo. Ordine voluto:
+//   1. il server cancella l'utente (Edge Function delete-account; i dati sul
+//      cloud spariscono a cascata). Se fallisce, qui non si tocca NIENTE:
+//      sessione, ambito e dati locali restano come prima e torna l'errore;
+//   2. solo dopo il successo: motore spento, sessione chiusa su questo
+//      dispositivo, ambito guest, e via i dati locali di QUELL'account
+//      (nessun altro account, niente guest, niente vecchio 'spendy-storage').
+// Una sola richiesta per volta: un secondo tocco riceve la stessa promessa.
+// → null se riuscita, altrimenti il messaggio d'errore.
+let deletionInFlight = null
+
+export function deleteAccount() {
+  if (deletionInFlight) return deletionInFlight
+  deletionInFlight = (async () => {
+    if (!supabase) return DELETE_ACCOUNT_MESSAGES.noSession
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return DELETE_ACCOUNT_MESSAGES.offline
+
+    let userId = null
+    try {
+      const { data } = await supabase.auth.getSession()
+      userId = data?.session?.user?.id ?? null
+    } catch {
+      userId = null
+    }
+    if (!userId) return DELETE_ACCOUNT_MESSAGES.noSession
+
+    const result = await requestAccountDeletion(supabase)
+    if (!result.ok) return result.message
+
+    // Da qui l'account non esiste più: niente di ciò che arriva dopo (una
+    // frase di Spendy AI già partita, per esempio) può riscrivere i suoi dati.
+    retireScope(scopeFor(userId))
+    stopEngine()
+    try {
+      // L'utente non esiste più sul server: la chiusura può rispondere con un
+      // errore, ma il client toglie comunque la sessione da questo dispositivo.
+      await supabase.auth.signOut({ scope: 'local' })
+    } catch {
+      // vedi sopra: niente da recuperare, l'account è già stato eliminato
+    }
+    useAppStore.getState().switchScope(GUEST)
+    useAppStore.getState().forgetAccountData(userId)
+    return null
+  })().finally(() => {
+    deletionInFlight = null
+  })
+  return deletionInFlight
 }
 
 export function getMigrationStatus() {

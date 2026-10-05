@@ -12,7 +12,7 @@
 // cache): solo load/save/clear toccano lo storage, e non lanciano mai.
 // `scope` è l'ambito della cache: chi salva una risposta arrivata in ritardo
 // deve passare quello con cui la richiesta era partita, non quello attivo.
-import { GUEST, voiceKey } from '../store/scope.js'
+import { GUEST, isRetiredScope, voiceKey } from '../store/scope.js'
 
 export const VOICE_CACHE_KEY = 'spendy-ai-voice'
 export const voiceCacheKey = voiceKey
@@ -51,6 +51,9 @@ export function loadVoiceCache(storage = defaultStorage(), scope = GUEST) {
 }
 
 export function saveVoiceCache(cache, storage = defaultStorage(), scope = GUEST) {
+  // Account eliminato in questa sessione: una risposta arrivata dopo non
+  // ricrea la sua memoria su questo dispositivo (vedi scope.js retireScope).
+  if (isRetiredScope(scope)) return false
   try {
     storage?.setItem(voiceKey(scope), JSON.stringify(cache))
     return true

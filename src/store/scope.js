@@ -42,6 +42,18 @@ export const MIGRATION_KEY = 'spendy-storage-v2-migration'
 export const stateKey = (scope) => `${STATE_BASE}:${scope}`
 export const voiceKey = (scope) => `${VOICE_BASE}:${scope}`
 
+// Account eliminati durante questa sessione dell'app (vedi
+// spendySync.deleteAccount). Una risposta arrivata dopo l'eliminazione —
+// per esempio una frase di Spendy AI partita prima — non deve ricreare sul
+// dispositivo niente che appartenga a quell'account: chi scrive in una
+// chiave legata a un ambito controlla qui. Solo in memoria: dopo un riavvio
+// non esiste più nessuna richiesta in volo da fermare.
+const retiredScopes = new Set()
+export const retireScope = (scope) => {
+  if (isUserScope(scope)) retiredScopes.add(scope)
+}
+export const isRetiredScope = (scope) => retiredScopes.has(scope)
+
 const LISTS = ['expenses', 'incomes', 'goals', 'goalContributions', 'emergencyFundContributions', 'customCategories']
 
 // C'è qualcosa che valga la pena adottare? Un contenitore guest "vuoto" non
@@ -257,9 +269,51 @@ export function createScopeManager({ getStorage, now = () => new Date() }) {
     },
   }
 
+  // Dimentica su QUESTO dispositivo i dati locali di un account (dopo
+  // l'eliminazione dell'account): il suo contenitore, le sue copie ':corrupt:',
+  // la memoria di Spendy AI e le chiavi con i prefissi indicati da chi chiama
+  // (i backup automatici di quell'account). Mai l'ambito attivo, mai il guest,
+  // mai il vecchio 'spendy-storage', mai gli altri account. → chiavi rimosse
+  function forgetScope(scope, extraPrefixes = []) {
+    if (!isUserScope(scope) || scope === active || !storage) return []
+    const exact = new Set([stateKey(scope), voiceKey(scope)])
+    const prefixes = [`${stateKey(scope)}:`, ...extraPrefixes.filter((p) => typeof p === 'string' && p.length > 0)]
+    let keys = []
+    try {
+      keys = typeof storage.length === 'number' && typeof storage.key === 'function'
+        ? Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter(Boolean)
+        : Object.keys(storage)
+    } catch {
+      keys = []
+    }
+    const doomed = keys.filter((key) => exact.has(key) || prefixes.some((prefix) => key.startsWith(prefix)))
+    for (const key of exact) if (!doomed.includes(key) && read(key) !== null) doomed.push(key)
+    doomed.forEach(remove)
+
+    // Le chiavi globali che possono contenere l'id di quell'account.
+    const owner = ownerOf(scope)
+    if (read(GUEST_CLAIM_KEY) === owner) {
+      remove(GUEST_CLAIM_KEY)
+      doomed.push(GUEST_CLAIM_KEY)
+    }
+    // Il marcatore della migrazione NON si cancella (la migrazione ripartirebbe
+    // e ricreerebbe il contenitore): si toglie solo l'ambito che lo nomina.
+    try {
+      const marker = JSON.parse(read(MIGRATION_KEY) ?? 'null')
+      if (marker && typeof marker === 'object' && marker.scope === scope) {
+        const { scope: _forgotten, ...rest } = marker
+        if (write(MIGRATION_KEY, JSON.stringify(rest))) doomed.push(`${MIGRATION_KEY} (ambito rimosso)`)
+      }
+    } catch {
+      // marcatore illeggibile: non nomina nessuno in modo utilizzabile, si lascia
+    }
+    return doomed
+  }
+
   return {
     storage: adapter,
     migration,
+    forgetScope,
     getActive: () => active,
     setActive(scope) {
       active = scope

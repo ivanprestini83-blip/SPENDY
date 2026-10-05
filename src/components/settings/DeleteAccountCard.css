@@ -1,0 +1,79 @@
+.delete-account__start,
+.delete-account__danger,
+.delete-account__cancel {
+  margin-top: 12px;
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.delete-account__start {
+  background: transparent;
+  border: 1px solid var(--color-accent-coral);
+  color: var(--color-accent-coral);
+}
+
+.delete-account__danger {
+  background: var(--color-accent-coral);
+  color: #ffffff;
+}
+
+.delete-account__cancel {
+  margin-top: 8px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  font-weight: 700;
+}
+
+.delete-account__start:disabled,
+.delete-account__danger:disabled,
+.delete-account__cancel:disabled {
+  opacity: 0.4;
+}
+
+.delete-account__box {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-coral-soft);
+}
+
+.delete-account__question {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.delete-account__text {
+  display: block;
+  margin-top: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.delete-account__input {
+  margin-top: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+.delete-account__error {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-accent-coral);
+}

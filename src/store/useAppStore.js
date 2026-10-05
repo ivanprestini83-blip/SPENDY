@@ -2,13 +2,13 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { todayStr } from '../utils/date.js'
 import { registerCustomCategories } from '../data/categories.js'
-import { buildImportPatch } from '../sync/backup.js'
+import { AUTO_BACKUP_PREFIX, buildImportPatch } from '../sync/backup.js'
 import { newId, nowIso } from '../lib/ids.js'
 import { SETTINGS_KEY, ackOps as ackOutboxOps, enqueueOp, hasPending, pendingIds } from '../sync/outbox.js'
 import { mergeRemoteRows } from '../sync/syncEngine.js'
 import { settingsToLocal } from '../sync/mappers.js'
 import { addToState, markAllReadInState, markReadInState, removeFromState, sanitizeNotificationState } from '../notifications/notificationState.js'
-import { STATE_BASE, createScopeManager, isUserScope, isValidScope, ownerOf } from './scope.js'
+import { STATE_BASE, createScopeManager, isUserScope, isValidScope, ownerOf, scopeFor } from './scope.js'
 
 const sumAmounts = (list) => list.reduce((total, entry) => total + entry.amount, 0)
 
@@ -129,6 +129,17 @@ export const useAppStore = create(
       // sopra i dati del vecchio) e poi rilegge quello del nuovo ambito. Le
       // scritture sono bloccate per tutto il passaggio, così niente di
       // intermedio finisce in un contenitore. Non cancella nulla da nessuna parte.
+      // Dopo l'eliminazione dell'account (sync/spendySync.js deleteAccount):
+      // toglie da questo dispositivo i dati locali di QUELL'account e basta.
+      // Si chiama solo quando l'ambito attivo è già un altro (scope.js lo
+      // rifiuta altrimenti). → chiavi rimosse
+      forgetAccountData: (userId) => {
+        if (typeof userId !== 'string' || !userId) return []
+        const scope = scopeFor(userId)
+        const backupPrefix = `${AUTO_BACKUP_PREFIX}${scope.replace(/[^A-Za-z0-9_-]+/g, '-')}-`
+        return scopes.forgetScope(scope, [backupPrefix])
+      },
+
       switchScope: (scope) => {
         if (!isValidScope(scope)) return false
         if (scope === get().scopeId && scope === scopes.getActive()) return false
