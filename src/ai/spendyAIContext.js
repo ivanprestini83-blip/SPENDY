@@ -166,6 +166,21 @@ function fingerprintOf({ band, primary, others }) {
   return [`v${SPENDY_AI_CONTEXT_VERSION}`, band, primaryPart, ...others.map((event) => event.key)].join('|')
 }
 
+// I numeri e le etichette che l'AI ha ricevuto, e che quindi può aver
+// scritto nella frase: budget (disponibile, speso, giorni rimasti…), speso
+// oggi, dettagli degli eventi e dell'obiettivo. NON entrano nell'impronta
+// (un caffè in più non deve chiedere una frase nuova): servono solo a non
+// riproporre dalla cache una frase con numeri che nel frattempo sono cambiati.
+function financialFactsOf(context) {
+  return JSON.stringify({
+    budget: context.budget,
+    spending: context.spending,
+    primaryEvent: context.primaryEvent,
+    otherEvents: context.otherEvents,
+    goal: context.goal,
+  })
+}
+
 // → { context, meta }
 //   context: ciò che viene passato a spendyAI.generate (e, in Fase B, al server)
 //   meta:    ciò che serve solo in locale (impronta, chiave dell'evento)
@@ -222,6 +237,7 @@ export function buildSpendyAIContext({
     context,
     meta: {
       fingerprint: fingerprintOf({ band, primary, others }),
+      facts: financialFactsOf(context),
       eventKey: primary?.key ?? null,
       importance: primary?.importance ?? 0,
     },

@@ -73,13 +73,18 @@ export function recordAICall(cache, { day, now }) {
   return { ...cache, calls: { day, count: sameDay ? cache.calls.count + 1 : 1, lastAt: now } }
 }
 
-export function recordAIVoice(cache, { fingerprint, day, eventKey, voice, now }) {
+// `facts`: i dati finanziari con cui la frase è stata generata (vedi
+// spendyAIContext.js). Una frase si riusa solo se sono ancora gli stessi.
+export function recordAIVoice(cache, { fingerprint, day, eventKey, voice, now, facts }) {
   const history = voice
     ? [...cache.history, { eventKey, message: voice.message, day }].slice(-VOICE_HISTORY_LIMIT)
     : cache.history
   return {
     ...cache,
-    current: { fingerprint, day, eventKey, voice: voice ?? null, silent: !voice, createdAt: now },
+    current: {
+      fingerprint, day, eventKey, voice: voice ?? null, silent: !voice, createdAt: now,
+      facts: typeof facts === 'string' ? facts : null,
+    },
     failure: null,
     history,
   }

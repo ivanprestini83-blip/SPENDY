@@ -9,7 +9,10 @@
 //
 // Ordine delle regole (la prima che scatta decide):
 //   1. nessuno stipendio impostato          → locale (il coach ha già la frase giusta)
-//   2. stessa situazione, stesso giorno     → frase in cache (niente chiamata)
+//   2. stessa situazione, stesso giorno     → frase in cache (niente chiamata),
+//      ma solo se i dati finanziari sono ancora quelli con cui è stata
+//      generata; altrimenti locale (mai una frase con numeri vecchi, e
+//      mai una chiamata in più solo perché sono cambiati gli importi)
 //   3. l'AI ha fallito per questa situazione → locale (niente tentativi a raffica)
 //   4. nessun evento                        → locale
 //   5. evento poco importante               → locale
@@ -50,7 +53,11 @@ export function decideSpendyVoice({ coach, meta, today, cache, now = Date.now(),
 
   const { current, failure, history, calls } = cache
   if (current && current.fingerprint === meta.fingerprint && current.day === today) {
-    return current.voice ? decision('cache', 'cached') : decision('local', 'ai_chose_silence')
+    if (!current.voice) return decision('local', 'ai_chose_silence')
+    // Una cache salvata prima di questo controllo non ha `facts`: non si
+    // può sapere con quali numeri è nata, quindi non si riusa.
+    const sameFacts = typeof current.facts === 'string' && current.facts === meta.facts
+    return sameFacts ? decision('cache', 'cached') : decision('local', 'stale_facts')
   }
   if (failure && failure.fingerprint === meta.fingerprint && failure.day === today) {
     return decision('local', `ai_failed:${failure.error}`)
@@ -95,7 +102,7 @@ export async function requestSpendyVoice({ ai, context, meta, cache, today, now 
 
   if (result.ok) {
     const voice = result.response.shouldShow ? result.response : null
-    next = recordAIVoice(next, { fingerprint: meta.fingerprint, day: today, eventKey: meta.eventKey, voice, now })
+    next = recordAIVoice(next, { fingerprint: meta.fingerprint, day: today, eventKey: meta.eventKey, voice, now, facts: meta.facts })
   } else {
     next = recordAIFailure(next, { fingerprint: meta.fingerprint, day: today, error: result.error, now })
   }

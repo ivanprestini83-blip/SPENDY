@@ -343,11 +343,15 @@ section('15. Cache')
   check('nessuna chiamata in più', calls() === 1)
   check('stessa frase', second.voice.message === first.voice.message && second.voice.source === 'ai')
 
-  // Un caffè in più non cambia l'impronta (niente importi esatti)...
+  // Un caffè in più non cambia l'impronta (niente importi esatti): nessuna
+  // chiamata nuova. Ma i numeri della frase in cache non sono più veri,
+  // quindi si mostra la frase locale, calcolata sui dati di adesso.
   const coffee = await runHome({
     ai, monthlyBudget: 2000, cache: first.cache, expenses: [...categoryRise(), expense('2026-09-14', 2, 'bar')],
   })
-  check('un caffè non genera una frase nuova', coffee.first.action === 'cache', coffee.first.reason)
+  check('un caffè: stessa impronta', coffee.meta.fingerprint === first.meta.fingerprint)
+  check('   nessuna frase AI nuova (nessuna chiamata)', coffee.first.reason === 'stale_facts' && calls() === 1, coffee.first.reason)
+  check('   e niente frase AI con i numeri di prima: frase locale', coffee.voice.source === 'local')
   // ...una spesa grossa sì.
   const big = await runHome({
     ai, monthlyBudget: 2000, cache: first.cache, expenses: [expense(TODAY, 700, 'shopping'), ...categoryRise()],
@@ -364,6 +368,75 @@ section('15. Cache')
   check('ricaricata identica', JSON.stringify(loadVoiceCache(storage)) === JSON.stringify(first.cache))
   check('storage rotto → cache vuota, nessun errore',
     loadVoiceCache({ getItem: () => { throw new Error('bloccato') } }).history.length === 0)
+}
+
+// =====================================================================
+section('Cache: mai una frase AI con numeri non aggiornati')
+// =====================================================================
+{
+  const { ai, calls } = countingAI()
+  const base = await runHome({ ai, monthlyBudget: 2000, expenses: categoryRise() })
+  const aiMessage = base.voice.message
+  check('premessa: frase AI generata e salvata con i suoi dati finanziari',
+    base.voice.source === 'ai' && typeof base.cache.current.facts === 'string' && base.cache.current.facts === base.meta.facts)
+  const facts = JSON.parse(base.cache.current.facts)
+  check('   i dati salvati: disponibile, speso, giorni rimasti, speso oggi, evento',
+    facts.budget.available === base.context.budget.available && facts.budget.spent === base.context.budget.spent
+    && facts.budget.daysRemaining === base.context.budget.daysRemaining && facts.spending.today === base.context.spending.today
+    && JSON.stringify(facts.primaryEvent) === JSON.stringify(base.context.primaryEvent))
+  check('   l\'impronta non contiene importi', !base.meta.fingerprint.includes(String(base.context.budget.available)))
+
+  // stessa impronta + stessi valori → si riusa
+  const same = await runHome({ ai, monthlyBudget: 2000, expenses: categoryRise(), cache: base.cache })
+  check('stessa impronta e stessi valori: frase AI dalla cache', same.first.action === 'cache' && same.voice.message === aiMessage)
+
+  // stessa impronta + disponibile cambiato (stipendio diverso, stessa fascia)
+  const moreIncome = await runHome({ ai, monthlyBudget: 2050, expenses: categoryRise(), cache: base.cache })
+  check('disponibile cambiato: stessa impronta', moreIncome.meta.fingerprint === base.meta.fingerprint)
+  check('   cache AI NON riutilizzata', moreIncome.first.reason === 'stale_facts' && moreIncome.voice.source === 'local', moreIncome.first.reason)
+
+  // stessa impronta + speso cambiato (nuova spesa piccola, stessa fascia)
+  const moreSpent = await runHome({ ai, monthlyBudget: 2000, cache: base.cache, expenses: [...categoryRise(), expense('2026-09-14', 3, 'bar')] })
+  check('speso cambiato: stessa impronta', moreSpent.meta.fingerprint === base.meta.fingerprint)
+  check('   cache AI NON riutilizzata', moreSpent.first.reason === 'stale_facts', moreSpent.first.reason)
+  check('   nessuna frase AI vecchia sullo schermo', moreSpent.voice.source === 'local' && moreSpent.voice.message !== aiMessage)
+  check('   la frase locale è quella del coach di adesso', moreSpent.voice.message === moreSpent.coach.message)
+
+  check('dati cambiati: nessuna chiamata AI in più', calls() === 1, String(calls()))
+
+  // cache di una versione precedente, senza dati finanziari salvati
+  const legacy = { ...base.cache, current: { ...base.cache.current } }
+  delete legacy.current.facts
+  const fromLegacy = await runHome({ ai, monthlyBudget: 2000, expenses: categoryRise(), cache: legacy })
+  check('cache vecchia senza dati salvati: non riutilizzata, nessun errore', fromLegacy.first.reason === 'stale_facts' && fromLegacy.voice.source === 'local')
+  const nullFacts = { ...base.cache, current: { ...base.cache.current, facts: null } }
+  check('   anche con il campo vuoto', decideSpendyVoice({ coach: base.coach, meta: base.meta, today: TODAY, cache: nullFacts, now: NOW }).reason === 'stale_facts')
+  check('   e nessuna chiamata', calls() === 1)
+
+  // una frase "silenzio" resta silenzio (non ha numeri)
+  const silent = { ...base.cache, current: { ...base.cache.current, voice: null, silent: true, facts: null } }
+  check('silenzio dell\'AI: invariato', decideSpendyVoice({ coach: base.coach, meta: base.meta, today: TODAY, cache: silent, now: NOW }).reason === 'ai_chose_silence')
+
+  // i cooldown continuano a valere
+  const otherSituation = { ...base.cache, current: { ...base.cache.current, fingerprint: 'situazione-precedente' } }
+  const cooldown = await runHome({ ai, monthlyBudget: 2000, cache: otherSituation, expenses: [...categoryRise(), expense('2026-09-14', 3, 'bar')] })
+  check('cooldown dello stesso evento: ancora attivo', cooldown.first.reason === 'event_recently_shown' && calls() === 1, cooldown.first.reason)
+  const capped = { ...emptyVoiceCache(), calls: { day: TODAY, count: 3, lastAt: NOW - 3 * 3600000 } }
+  check('limite di 3 al giorno: ancora attivo', (await runHome({ ai, monthlyBudget: 2000, expenses: categoryRise(), cache: capped })).first.reason === 'daily_limit')
+  const soon = { ...emptyVoiceCache(), calls: { day: TODAY, count: 1, lastAt: NOW - 5 * 60000 } }
+  check('30 minuti tra le chiamate: ancora attivo', (await runHome({ ai, monthlyBudget: 2000, expenses: categoryRise(), cache: soon })).first.reason === 'too_soon')
+  check('   e nessuna di queste ha chiamato l\'AI', calls() === 1)
+
+  // il giorno dopo si riparte normalmente
+  const nextDay = { ...base.cache, current: { ...base.cache.current, day: '2026-09-19' } }
+  check('frase di ieri: mai riusata', decideSpendyVoice({ coach: base.coach, meta: base.meta, today: TODAY, cache: nextDay, now: NOW }).action !== 'cache')
+
+  // isolamento: i dati salvati restano nella cache di quell'account
+  const map = new Map()
+  const storage = { getItem: (k) => map.get(k) ?? null, setItem: (k, v) => map.set(k, v), removeItem: (k) => map.delete(k) }
+  saveVoiceCache(base.cache, storage, 'u:utente-a')
+  check('isolamento: la cache con i dati di A sta solo sotto A', loadVoiceCache(storage, 'u:utente-a').current?.facts === base.cache.current.facts)
+  check('   B non la vede', loadVoiceCache(storage, 'u:utente-b').current === null && loadVoiceCache(storage, 'guest').current === null)
 }
 
 // =====================================================================
