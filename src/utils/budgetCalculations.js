@@ -1,5 +1,5 @@
 import { isSameDay } from './date.js'
-import { getCycleRange, getPreviousCycleRange, isWithinRange } from './cycle.js'
+import { getCycleRange, getCycleTiming, getPreviousCycleRange, isWithinRange } from './cycle.js'
 import { getCategory } from '../data/categories.js'
 
 // `cycleStartDay` (1-31, default 1) is the day-of-month the user's
@@ -103,5 +103,8 @@ export function buildFinancialData({ today, monthlyBudget, expenses, goals, cycl
     topCategory: topIncreasingCategory(expenses, today, cycleStartDay),
     topDecreasingCategory: topDecreasingCategory(expenses, today, cycleStartDay),
     goals,
+    // Dove siamo nel ciclo impostato dall'utente (cycle.js getCycleTiming):
+    // l'unica fonte per giorni rimasti e fase, per coach, BehaviorEngine e AI.
+    cycle: today ? getCycleTiming(today, cycleStartDay) : null,
   }
 }

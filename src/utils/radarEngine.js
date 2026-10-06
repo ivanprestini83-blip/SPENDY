@@ -234,7 +234,7 @@ function narrateFrequency(insight) {
 function narrateUnusualPurchase(insight) {
   return {
     title: categoryTitle(insight),
-    metric: { value: formatCurrency(insight.current), label: 'dopo mesi di silenzio' },
+    metric: { value: formatCurrency(insight.current), label: 'dopo diversi cicli di silenzio' },
     comparison: null,
     explanation: `Non spendevi in ${insight.category?.label?.toLowerCase() ?? 'questa categoria'} da diversi cicli.`,
     advice: null,
@@ -277,7 +277,7 @@ function narrateBudgetRespected(insight) {
       direction: 'down',
       baselineText: `${formatCurrency(spent)} spesi su ${formatCurrency(budget)}.`,
     },
-    explanation: `Sei al ${round(percent)}% del budget. A questo punto del ciclo è un ottimo passo.`,
+    explanation: `Sei al ${round(percent)}% del budget: per ora c’è un buon margine.`,
     advice: null,
     action: RADAR_ACTIONS.ANALYTICS,
   }

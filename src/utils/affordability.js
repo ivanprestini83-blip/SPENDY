@@ -31,7 +31,7 @@ export function evaluateAffordability({ amount, availableBudget, goals }) {
     return {
       level: 'green',
       title: 'Puoi permettertelo',
-      message: `Ti restano ${Math.round(remainingAfter)} € questo mese: una spesa gestibile.`,
+      message: `Ti restano ${Math.round(remainingAfter)} € in questo ciclo: una spesa gestibile.`,
     }
   }
 
@@ -39,7 +39,7 @@ export function evaluateAffordability({ amount, availableBudget, goals }) {
     return {
       level: 'yellow',
       title: 'Puoi farlo, ma attenzione',
-      message: `Dopo questa spesa ti resterebbero solo ${Math.round(remainingAfter)} € per il resto del mese.${goalHint}`,
+      message: `Dopo questa spesa ti resterebbero solo ${Math.round(remainingAfter)} € fino alla fine del ciclo.${goalHint}`,
     }
   }
 

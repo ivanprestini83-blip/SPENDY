@@ -13,6 +13,8 @@
 
 // --- Vocabolari --------------------------------------------------------
 
+import { CYCLE_PHASES, EARLY_PHASES, LATE_PHASES } from './cyclePhases.js'
+
 export const AI_STATES = ['happy', 'attentive', 'concerned', 'celebrating', 'advisor', 'ironic']
 export const AI_TONES = ['friendly', 'playful', 'ironic', 'celebratory', 'concerned', 'helpful']
 export const AI_ANIMATIONS = ['gentle', 'playful', 'celebrate', 'concerned']
@@ -197,6 +199,24 @@ export function structureProblems(text, { previous = null, history = [] } = {}) 
 // → { valid: true, response } | { valid: false, errors: [...] }
 // Stessa funzione sul server (prima di rispondere) e nell'app (prima di
 // mostrare): il frontend non si fida mai di quello che torna.
+// --- Coerenza con la fase del ciclo ----------------------------------
+// Frasi che affermano un momento del ciclo (in italiano, la lingua di Spendy
+// AI e dei messaggi locali): vietate quando la fase dice il contrario. Usata
+// dal controllo delle risposte AI e dai test dei messaggi locali.
+const TIME_LEFT_CLAIM = /strada\s+(è\s+)?(ancora\s+)?lunga|(ancora|tanta|molta)\s+strada|ha\s+ancora\s+strada|(il\s+)?(mese|ciclo)\s+non\s+è\s+(ancora\s+)?finit|(il\s+)?(mese|ciclo)\s+è\s+(ancora\s+)?lung|metà\s+(del\s+)?(mese|ciclo)|ancora\s+(molti|tanti|parecchi)\s+giorni|più\s+(mese|ciclo)\s+che\s+budget|appena\s+(iniziat|cominciat|partit)|inizio\s+(del\s+)?(mese|ciclo)|primi\s+giorni/i
+const END_CLAIM = /ultim[oi]\s+giorn|agli\s+sgoccioli|quasi\s+(alla\s+)?fine\s+(del\s+)?(mese|ciclo)|(mese|ciclo)\s+(sta\s+)?per\s+finire|fine\s+(del\s+)?(mese|ciclo)\s+è\s+vicin|mancano\s+pochi\s+giorni/i
+const DAYS_LEFT_CLAIM = /(restano|mancano|ancora)\s+\d+\s+giorn|per\s+\d+\s+giorn|(i\s+)?prossimi\s+giorni/i
+const JUST_STARTED_CLAIM = /appena\s+(iniziat|cominciat|partit)|inizio\s+(del\s+)?(mese|ciclo)|primi\s+giorni/i
+
+export function contradictsCyclePhase(message, phase) {
+  if (typeof message !== 'string' || !CYCLE_PHASES.includes(phase)) return false
+  if (LATE_PHASES.includes(phase) && TIME_LEFT_CLAIM.test(message)) return true
+  if (phase === 'last_day' && DAYS_LEFT_CLAIM.test(message)) return true
+  if (EARLY_PHASES.includes(phase) && END_CLAIM.test(message)) return true
+  if ((phase === 'mid' || phase === 'second_half') && JUST_STARTED_CLAIM.test(message)) return true
+  return false
+}
+
 export function validateSpendyResponse(raw, context, { history = [], previous = null, similarity = wordSimilarity } = {}) {
   const errors = []
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { valid: false, errors: ['not_an_object'] }
@@ -238,6 +258,7 @@ export function validateSpendyResponse(raw, context, { history = [], previous = 
 
   const band = context?.budget?.band
   if (band === 'exceeded' && (state === 'celebrating' || state === 'happy')) errors.push('incoherent_state')
+  if (contradictsCyclePhase(message, context?.budget?.cyclePhase)) errors.push('incoherent_cycle_phase')
 
   const said = [...history, ...(previous ? [previous] : [])].filter((line) => typeof line === 'string')
   if (said.some((line) => similarity(message, line) >= REPEAT_SIMILARITY)) errors.push('repeated')
@@ -303,6 +324,9 @@ export function sanitizeSpendyContext(input) {
     spentPercent: num,
     daysRemaining: num,
     dailyAllowance: num,
+    cyclePhase: (v) => oneOf(v, CYCLE_PHASES),
+    dayOfCycle: num,
+    cycleDays: num,
     band: (v) => oneOf(v, BUDGET_BANDS),
   })
   if (!budget || budget.band === undefined || budget.available === undefined) return null
@@ -352,6 +376,13 @@ STILE
 DATI
 - Usa SOLO i numeri che compaiono nel contesto, scritti come sono. Non fare calcoli, non inventare spese, saldi, percentuali o nomi.
 - Se un dato non c'è, non usarlo.
+
+TEMPO
+- Il periodo è il ciclo di budget impostato dall'utente, non il mese solare: parla di "ciclo", mai di "mese".
+- Per il tempo usa solo budget.cyclePhase, budget.dayOfCycle, budget.cycleDays e budget.daysRemaining (giorni DOPO oggi: 0 vuol dire che oggi è l'ultimo giorno del ciclo).
+- cyclePhase: new_cycle = primo giorno di un nuovo ciclo, start = primi giorni, first_half = prima metà, mid = metà ciclo, second_half = seconda metà, final_days = ultimi giorni, last_day = ultimo giorno.
+- In final_days e last_day non dire che la strada è lunga, che manca molto o che il ciclo è appena iniziato. In last_day non parlare di giorni che restano.
+- In new_cycle, start e first_half non dire che siamo alla fine del ciclo o negli ultimi giorni.
 
 VARIETÀ
 - In "previous" trovi l'ultima frase che l'utente ha letto, in "recentMessages" le ultime dette: non ripeterne né le parole né la struttura (stessa apertura, stesso schema, stessa domanda finale). Se la situazione è simile, cerca un'angolazione diversa.

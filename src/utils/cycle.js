@@ -26,7 +26,10 @@ function makeDate(year, month, day) {
 // The [start, end) cycle range that contains `dateStr`.
 export function getCycleRange(dateStr, cycleStartDay = 1) {
   const [year, month, day] = dateStr.split('-').map(Number)
-  const startsThisMonth = day >= cycleStartDay
+  // In un mese più corto del giorno di inizio (es. 31 in aprile) il ciclo
+  // parte dall'ultimo giorno del mese, come già fa makeDate per la fine:
+  // altrimenti quel giorno resterebbe fuori dal suo stesso ciclo.
+  const startsThisMonth = day >= Math.min(cycleStartDay, daysInMonth(year, month))
   const startMonth = startsThisMonth ? month : month - 1
   const startYear = startsThisMonth ? year : (startMonth === 0 ? year - 1 : year)
 
@@ -104,4 +107,54 @@ function dayBefore(dateStr) {
   const d = new Date(year, month - 1, day)
   d.setDate(d.getDate() - 1)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// --- Dove siamo nel ciclo -------------------------------------------------
+// L'UNICA fonte per "quanto manca" e "in che fase siamo", sempre sul ciclo
+// impostato dall'utente (non sul mese solare). La usano buildFinancialData,
+// il coach locale, BehaviorEngine/HumorEngine e il contesto di Spendy AI.
+//
+//   start / end            il ciclo [start, end) di getCycleRange
+//   lastDay                l'ultimo giorno INCLUSO del ciclo (end - 1)
+//   cycleDays              quanti giorni dura il ciclo
+//   dayOfCycle             oggi è il giorno N del ciclo (1 … cycleDays)
+//   daysRemaining          giorni DOPO oggi fino a lastDay: 0 nell'ultimo giorno
+//   daysLeftIncludingToday daysRemaining + 1 (per la quota giornaliera)
+//   elapsedPercent         dayOfCycle / cycleDays, in percentuale
+//   phase                  una di CYCLE_PHASES (supabase/functions/_shared/cyclePhases.js)
+const daysBetween = (fromDateStr, toDateStr) => {
+  const [y1, m1, d1] = fromDateStr.split('-').map(Number)
+  const [y2, m2, d2] = toDateStr.split('-').map(Number)
+  // In UTC: nessun giorno di 23 o 25 ore al cambio dell'ora legale.
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86400000)
+}
+
+export function cyclePhaseFor({ dayOfCycle, cycleDays, daysRemaining }) {
+  if (dayOfCycle <= 1) return 'new_cycle'
+  if (daysRemaining <= 0) return 'last_day'
+  if (daysRemaining <= 3) return 'final_days'
+  const elapsed = dayOfCycle / cycleDays
+  if (elapsed <= 0.15) return 'start'
+  if (elapsed < 0.45) return 'first_half'
+  if (elapsed <= 0.55) return 'mid'
+  return 'second_half'
+}
+
+export function getCycleTiming(dateStr, cycleStartDay = 1) {
+  const { start, end } = getCycleRange(dateStr, cycleStartDay)
+  const lastDay = dayBefore(end)
+  const cycleDays = daysBetween(start, end)
+  const dayOfCycle = daysBetween(start, dateStr) + 1
+  const daysRemaining = Math.max(0, daysBetween(dateStr, lastDay))
+  return {
+    start,
+    end,
+    lastDay,
+    cycleDays,
+    dayOfCycle,
+    daysRemaining,
+    daysLeftIncludingToday: daysRemaining + 1,
+    elapsedPercent: Math.round((dayOfCycle / cycleDays) * 100),
+    phase: cyclePhaseFor({ dayOfCycle, cycleDays, daysRemaining }),
+  }
 }

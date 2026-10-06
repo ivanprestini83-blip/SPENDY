@@ -78,11 +78,16 @@ function categoryPools(label, direction, generic = []) {
   return bank?.length ? [bank] : generic
 }
 
+// La coda sul budget rispetta la fase del ciclo (budget.cyclePhase): nell'ultimo
+// giorno non si parla di giorni che restano. I giorni non vengono contati a
+// voce: la quota giornaliera (che include oggi) dice già quanto si può spendere.
 function budgetTail(budget) {
+  const lastDay = budget.cyclePhase === 'last_day'
+  if (budget.band === 'exceeded') return lastDay ? 'Oggi il ciclo si chiude: domani si riparte da zero.' : 'Da qui a fine ciclo conviene andarci piano.'
+  if (lastDay) return `Oggi è l’ultimo giorno del ciclo: restano ${eur(budget.available)}.`
   if (budget.band === 'ok') return `Il budget regge: restano ${eur(budget.available)}.`
-  if (budget.band === 'exceeded') return 'Da qui a fine ciclo conviene andarci piano.'
   if (budget.dailyAllowance != null) {
-    return `Restano ${eur(budget.available)} per ${budget.daysRemaining} giorni, circa ${eur(budget.dailyAllowance)} al giorno.`
+    return `Restano ${eur(budget.available)} fino a fine ciclo, circa ${eur(budget.dailyAllowance)} al giorno.`
   }
   return `Restano ${eur(budget.available)} fino a fine ciclo.`
 }
@@ -222,7 +227,7 @@ function unusualPurchaseAngles(ctx) {
   // Quanto pesa sul ciclo: due numeri del contesto, e un giudizio a parole
   // (nessuna percentuale calcolata qui).
   if (ctx.budget.spent > 0 && amount <= ctx.budget.spent) {
-    const weight = amount / ctx.budget.spent < 0.1 ? 'una voce piccola, niente che sposti il mese' : 'una voce che nel mese si fa sentire'
+    const weight = amount / ctx.budget.spent < 0.1 ? 'una voce piccola, niente che sposti il ciclo' : 'una voce che nel ciclo si fa sentire'
     angles.push({
       id: 'weight',
       state: 'attentive',
@@ -293,11 +298,11 @@ const COMPOSERS = {
         quipPools: high ? [] : [LIB.types.budget_rising],
       },
     ]
-    if (ctx.budget.dailyAllowance != null) {
+    if (ctx.budget.dailyAllowance != null && ctx.budget.cyclePhase !== 'last_day') {
       angles.push({
         id: 'daily',
         ...mood,
-        help: `Restano ${eur(ctx.budget.available)} per ${ctx.budget.daysRemaining} giorni: circa ${eur(ctx.budget.dailyAllowance)} al giorno.`,
+        help: `Restano ${eur(ctx.budget.available)} fino a fine ciclo: circa ${eur(ctx.budget.dailyAllowance)} al giorno.`,
         quipPools: high ? [] : [LIB.types.budget_rising],
       })
     }

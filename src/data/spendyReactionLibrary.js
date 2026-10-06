@@ -44,7 +44,7 @@ export const CATEGORIA_ECCESSIVA_RISTORANTI = [
   'A questo punto il ristorante potrebbe intestarti un tavolo.',
   'Mangiare bene sì. Mangiare il budget no.',
   'Il tuo delivery conosce meglio te di me.',
-  'Questa settimana hai finanziato più ristoranti che il tuo futuro.',
+  'In questo ciclo hai finanziato più ristoranti che il tuo futuro.',
   'Il cuoco ti ringrazia. Il conto un po’ meno.',
 ]
 
@@ -108,10 +108,10 @@ export const SPESA_RIPETUTA = [
 export const AUMENTO_ANOMALO = [
   'Ehi… ultimamente stai spendendo un po’ più del solito.',
   'Ho notato una cosa. Le tue spese stanno accelerando.',
-  'Questo mese il ritmo è diverso. Tutto bene?',
+  'In questo ciclo il ritmo è diverso. Tutto bene?',
   'Non voglio allarmarti, ma il tuo conto sta correndo.',
   'Ultimamente la carta sta lavorando parecchio.',
-  'Mi sa che questo mese siamo un po’ più generosi del solito.',
+  'Mi sa che in questo ciclo siamo un po’ più generosi del solito.',
 ]
 
 // 🎯 8. HAI DANNEGGIATO UN OBIETTIVO

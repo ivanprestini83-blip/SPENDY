@@ -10,6 +10,7 @@
 // in humorLibrary.js; this file only decides WHICH bucket of that library
 // a given insight should draw from, and tags each candidate with enough
 // metadata (source, lang) for JokeEvaluator to score it well.
+import { LATE_PHASES, PHASES_WITH_TIME_LEFT } from '../../supabase/functions/_shared/cyclePhases.js'
 import { BEHAVIOR_TYPES, getInsightDirection } from './behaviorEngine.js'
 import { humorLibrary } from './humorLibrary.js'
 import { formatCurrency } from './format.js'
@@ -44,7 +45,21 @@ function resolveTemplates(insight, lang) {
   }
 
   const typeBank = library.types[insight.type]
-  if (typeBank?.length) return { templates: typeBank, source: 'type' }
+  if (typeBank?.length) {
+    // Battute che affermano che "c'è ancora tempo" (il ciclo non è finito, la
+    // strada è lunga…): solo quando la fase del ciclo lo rende vero. Senza
+    // fase nota, mai.
+    // Battute che affermano che il ciclo è concluso ("budget rispettato",
+    // "missione compiuta"…): solo negli ultimi giorni del ciclo.
+    const timeLeftBank = library.types[`${insight.type}_time_left`] ?? []
+    const cycleEndBank = library.types[`${insight.type}_cycle_end`] ?? []
+    const templates = [
+      ...typeBank,
+      ...(PHASES_WITH_TIME_LEFT.includes(insight.cyclePhase) ? timeLeftBank : []),
+      ...(LATE_PHASES.includes(insight.cyclePhase) ? cycleEndBank : []),
+    ]
+    return { templates, source: 'type' }
+  }
 
   return { templates: library.types.fallback, source: 'fallback' }
 }

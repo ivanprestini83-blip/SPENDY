@@ -47,6 +47,7 @@ import { generateJokeCandidates } from './humorEngine.js'
 import { pickBestJoke } from './jokeEvaluator.js'
 import { rankInsightsByImportance } from './importantEventSelector.js'
 import { evaluateExpenseReaction } from './expenseReactionEngine.js'
+import { getCycleTiming } from './cycle.js'
 
 export const SPENDY_STATES = {
   HAPPY: 'happy',
@@ -60,6 +61,46 @@ export const SPENDY_STATES = {
 // --- Tunable thresholds — named so the rules below read like the spec ---
 const BUDGET_ATTENTIVE_AT = 70 // % of monthly budget
 const BUDGET_CONCERNED_AT = 85
+
+// Le frasi descrittive dei livelli 3 e 4 (budget alto / in salita) dipendono
+// da DOVE siamo nel ciclo impostato dall'utente: "la strada è ancora lunga" è
+// vero all'inizio, falso nell'ultimo giorno. Le soglie restano quelle sopra:
+// cambia solo cosa dice Spendy, non quando avvisa. Senza fase nota, la frase
+// neutra (nessuna affermazione sul tempo).
+const BUDGET_WARNING_MESSAGES = {
+  concerned: {
+    early: '🚨 Il budget ha alzato le mani: siamo praticamente al tappeto e il ciclo è appena cominciato.',
+    middle: '🚨 Il budget ha alzato le mani: siamo praticamente al tappeto e il ciclo non è ancora finito.',
+    final_days: '🚨 Il budget è quasi al tappeto: tieni duro, mancano pochi giorni alla fine del ciclo.',
+    last_day: '🚨 Il budget è quasi al tappeto, ma oggi è l’ultimo giorno del ciclo: domani si riparte.',
+    neutral: '🚨 Il budget ha alzato le mani: siamo praticamente al tappeto.',
+  },
+  attentive: {
+    early: '👀 Il budget sta già sudando: abbiamo superato i tre quarti e la strada è ancora lunga.',
+    middle: '👀 Il budget sta sudando: oltre i tre quarti, e il ciclo non è ancora finito.',
+    final_days: '👀 Oltre i tre quarti del budget, ma mancano pochi giorni alla fine del ciclo: si può chiudere bene.',
+    last_day: '👀 Ultimo giorno del ciclo: oltre i tre quarti del budget, ma domani si riparte.',
+    neutral: '👀 Il budget sta sudando: abbiamo superato i tre quarti.',
+  },
+}
+
+const PHASE_GROUP = {
+  new_cycle: 'early', start: 'early', first_half: 'early',
+  mid: 'middle', second_half: 'middle',
+  final_days: 'final_days', last_day: 'last_day',
+}
+
+function budgetWarningMessage(level, phase) {
+  return BUDGET_WARNING_MESSAGES[level][PHASE_GROUP[phase] ?? 'neutral']
+}
+
+// La fase del ciclo: da buildFinancialData (financialData.cycle) o, se manca,
+// ricalcolata dalla data e dal giorno di inizio; null se non si può sapere.
+function cyclePhaseOf(financialData, behaviorContext) {
+  if (financialData?.cycle?.phase) return financialData.cycle.phase
+  if (behaviorContext?.today) return getCycleTiming(behaviorContext.today, behaviorContext.cycleStartDay ?? 1).phase
+  return null
+}
 const CATEGORY_DROP_ADVISOR_AT = -15 // % decrease vs last month
 const CATEGORY_DROP_MIN_AMOUNT = 5 // €, ignore trivial drops
 
@@ -206,19 +247,19 @@ function describeInsight(insight) {
     case 'category_trend_down':
       return label ? `${label}: solo ${Math.round(insight.current)} € invece dei soliti ${Math.round(insight.baseline)} €.` : null
     case 'amount_above_average':
-      return label ? `È la spesa più alta del mese in ${label.toLowerCase()}.` : null
+      return label ? `È la spesa più alta del ciclo in ${label.toLowerCase()}.` : null
     case 'amount_below_average':
       return label ? `Una spesa ben sotto la media per ${label.toLowerCase()}.` : null
     case 'savings_vs_usual':
-      return `${Math.round(Math.abs(insight.changeAmount))} € in meno del solito questo mese.`
+      return `${Math.round(Math.abs(insight.changeAmount))} € in meno del solito in questo ciclo.`
     case 'unusual_purchase':
-      return label ? `Prima spesa in ${label.toLowerCase()} da diversi mesi.` : null
+      return label ? `Prima spesa in ${label.toLowerCase()} da diversi cicli.` : null
     case 'unusual_frequency':
-      return label ? `Frequenza fuori dal solito in ${label.toLowerCase()} questo mese.` : null
+      return label ? `Frequenza fuori dal solito in ${label.toLowerCase()} in questo ciclo.` : null
     case 'positive_streak':
-      return 'Diversi mesi di fila sotto budget.'
+      return 'Diversi cicli di fila sotto budget.'
     case 'negative_streak':
-      return 'Diversi mesi di fila sopra la soglia di attenzione.'
+      return 'Diversi cicli di fila sopra la soglia di attenzione.'
     default:
       return null
   }
@@ -287,7 +328,7 @@ export function getSpendyCoach(financialData, behaviorContext = null) {
   // unconditionally). Tries the joke pipeline first, falling back to the
   // descriptive sentence if nothing valid comes back.
   if (spentRatio >= BUDGET_CONCERNED_AT) {
-    const descriptiveMessage = '🚨 Il budget ha alzato le mani: siamo praticamente al tappeto e il mese non è ancora finito.'
+    const descriptiveMessage = budgetWarningMessage('concerned', cyclePhaseOf(financialData, behaviorContext))
     const behaviorResult = pickBehaviorInsightJoke(
       behaviorContext,
       (insight) => insight.type === BEHAVIOR_TYPES.BUDGET_HIGH,
@@ -306,7 +347,7 @@ export function getSpendyCoach(financialData, behaviorContext = null) {
   // 4. Category/budget warning — noticeable but not yet alarming. Same
   // joke-first / descriptive-fallback treatment as tier 3.
   if (spentRatio >= BUDGET_ATTENTIVE_AT) {
-    const descriptiveMessage = "👀 Il budget sta già sudando: abbiamo superato i tre quarti e la strada è ancora lunga."
+    const descriptiveMessage = budgetWarningMessage('attentive', cyclePhaseOf(financialData, behaviorContext))
     const behaviorResult = pickBehaviorInsightJoke(
       behaviorContext,
       (insight) => insight.type === BEHAVIOR_TYPES.BUDGET_RISING,
@@ -378,7 +419,7 @@ export function getSpendyCoach(financialData, behaviorContext = null) {
   // 7. Happy — the default: nothing above fired
   return {
     state: SPENDY_STATES.HAPPY,
-    message: '😎 Bravo! Sei sotto budget questa settimana.',
+    message: '😎 Bravo! Per ora sei sotto budget in questo ciclo.',
     reason: 'on_track',
     priority: 7,
     insight: null,

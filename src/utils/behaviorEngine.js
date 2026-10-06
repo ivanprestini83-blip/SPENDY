@@ -357,6 +357,9 @@ function checkCategoryDrop(expenses, today, cycleStartDay, config) {
 function checkBudget(financialData, config) {
   if (!financialData) return null
   const { available = 0, spentRatio = 0 } = financialData
+  // La fase del ciclo dell'utente (cycle.js getCycleTiming via buildFinancialData):
+  // HumorEngine la usa per non scegliere battute che la contraddicono.
+  const cyclePhase = financialData.cycle?.phase ?? null
 
   if (available < 0) {
     return {
@@ -371,6 +374,7 @@ function checkBudget(financialData, config) {
       significance: 200,
       suggestedState: 'concerned',
       samples: null,
+      cyclePhase,
     }
   }
 
@@ -387,6 +391,7 @@ function checkBudget(financialData, config) {
       significance: 60,
       suggestedState: 'happy',
       samples: null,
+      cyclePhase,
     }
   }
 
@@ -409,6 +414,7 @@ function checkBudget(financialData, config) {
       significance: 150,
       suggestedState: 'concerned',
       samples: null,
+      cyclePhase,
     }
   }
 
@@ -425,6 +431,7 @@ function checkBudget(financialData, config) {
       significance: 120,
       suggestedState: 'attentive',
       samples: null,
+      cyclePhase,
     }
   }
 

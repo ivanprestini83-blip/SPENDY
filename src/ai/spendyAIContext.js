@@ -14,7 +14,7 @@
 // eventi. Le sole operazioni qui sono arrotondare, contare i giorni al
 // termine del ciclo e dividere il disponibile per quei giorni.
 import { getCategory } from '../data/categories.js'
-import { getCycleRange } from '../utils/cycle.js'
+import { getCycleTiming } from '../utils/cycle.js'
 import { todaysExpenses } from '../utils/budgetCalculations.js'
 import { SPENDY_EVENTS } from './spendyEvents.js'
 
@@ -31,12 +31,6 @@ export function budgetBand({ available, spentPercent }) {
 }
 
 const round = (value) => (Number.isFinite(value) ? Math.round(value) : null)
-
-function daysUntil(fromDateStr, toDateStr) {
-  const from = new Date(`${fromDateStr}T00:00:00`)
-  const to = new Date(`${toDateStr}T00:00:00`)
-  return Math.max(0, Math.round((to - from) / 86400000))
-}
 
 function categoryLabel(categoryId, insight) {
   if (insight?.category?.label) return insight.category.label
@@ -196,8 +190,10 @@ export function buildSpendyAIContext({
   const monthly = financialData?.monthlyBudget ?? 0
   const available = financialData?.available ?? 0
   const spentPercent = round(financialData?.spentRatio ?? 0)
-  const { end } = getCycleRange(today, cycleStartDay)
-  const daysRemaining = daysUntil(today, end)
+  // Il tempo del ciclo impostato dall'utente, dalla stessa fonte del resto
+  // dell'app (cycle.js getCycleTiming): daysRemaining = giorni DOPO oggi,
+  // quindi 0 nell'ultimo giorno del ciclo.
+  const timing = financialData?.cycle ?? getCycleTiming(today, cycleStartDay)
   const band = budgetBand({ available, spentPercent })
 
   const budget = {
@@ -205,10 +201,14 @@ export function buildSpendyAIContext({
     spent: round(financialData?.spentThisMonth ?? 0),
     available: round(available),
     spentPercent,
-    daysRemaining,
+    daysRemaining: timing.daysRemaining,
+    cyclePhase: timing.phase,
+    dayOfCycle: timing.dayOfCycle,
+    cycleDays: timing.cycleDays,
     band,
   }
-  if (available > 0 && daysRemaining > 0) budget.dailyAllowance = Math.floor(available / daysRemaining)
+  // La quota giornaliera conta anche oggi: nell'ultimo giorno è tutto il disponibile.
+  if (available > 0) budget.dailyAllowance = Math.floor(available / timing.daysLeftIncludingToday)
 
   const spending = { today: round(todaysExpenses(expenses, today).total) }
   const savings = events.find((event) => event.id === SPENDY_EVENTS.SAVINGS_ABOVE_USUAL)
