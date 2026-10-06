@@ -11,8 +11,8 @@
 // definita da un legale (vedi privacy.html).
 
 export const LEGAL_DOCUMENTS = {
-  terms: { url: '/termini.html', version: 'bozza-2026-10-05' },
-  privacy: { url: '/privacy.html', version: 'bozza-2026-10-05' },
+  terms: { url: '/termini.html', version: '2026-10-06' },
+  privacy: { url: '/privacy.html', version: '2026-10-06' },
 }
 
 export const SIGNUP_ACCEPTANCE_REQUIRED =

@@ -12,9 +12,6 @@
         --text: #10182b;
         --muted: #5b6478;
         --border: #e3e8f2;
-        --accent: #f4645f;
-        --todo-bg: #fff4d6;
-        --todo-text: #7a5600;
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -23,8 +20,6 @@
           --text: #eef2fb;
           --muted: #a4adc2;
           --border: #2a3350;
-          --todo-bg: #3d3214;
-          --todo-text: #f5d58a;
         }
       }
       * { box-sizing: border-box; }
@@ -52,14 +47,7 @@
       }
       ol, ul { padding-left: 20px; }
       a { color: inherit; }
-      .todo {
-        display: inline-block;
-        padding: 1px 6px;
-        border-radius: 6px;
-        background: var(--todo-bg);
-        color: var(--todo-text);
-        font-weight: 700;
-      }
+      .note { font-size: 14px; }
     </style>
   </head>
   <body>
@@ -81,10 +69,9 @@
         <h2>Senza l'app</h2>
         <p>
           Se non ricordi la password, prova prima "Password dimenticata?" nella schermata di accesso. Se non puoi più
-          accedere all'app, scrivi a
-          <span class="todo">[DA COMPLETARE: indirizzo email di contatto]</span>
-          dall'indirizzo email con cui ti sei registrato, chiedendo l'eliminazione dell'account.
-          Risponderemo entro <span class="todo">[DA COMPLETARE: tempi di risposta, max 30 giorni]</span>.
+          accedere all'app, scrivi a <a href="mailto:privacy@getspendy.info">privacy@getspendy.info</a> dall'indirizzo
+          email con cui ti sei registrato, chiedendo l'eliminazione dell'account. Rispondiamo entro un mese dalla richiesta,
+          come previsto dal GDPR.
         </p>
       </section>
 
@@ -98,18 +85,22 @@
           <li>la registrazione delle versioni di Termini e Privacy Policy accettati alla registrazione.</li>
         </ul>
         <p>
-          Nell'app, l'eliminazione rimuove anche i dati locali di quell'account dal dispositivo da cui la richiedi.
-          Su <strong>altri dispositivi</strong> dove avevi usato l'account, la copia locale dei suoi dati resta finché
-          non la rimuovi disinstallando l'app o cancellando i dati del sito: lì l'account non potrà più accedere né
-          sincronizzarsi. I dati che hai usato senza account (in modalità ospite) restano sul dispositivo.
+          Nell'app, l'eliminazione rimuove anche, dal dispositivo da cui la richiedi, i dati locali di quell'account, la
+          memoria delle frasi di Spendy, le copie di sicurezza automatiche dell'account e la sessione di accesso.
         </p>
       </section>
 
       <section>
-        <h2>Dati conservati</h2>
-        <p>
-          <span class="todo">[DA COMPLETARE: eventuali dati da conservare per obblighi di legge e per quanto tempo — oppure indicare che non viene conservato nulla]</span>
-        </p>
+        <h2>Cosa può rimanere</h2>
+        <p>L'eliminazione dall'app non può raggiungere:</p>
+        <ul>
+          <li>la copia locale dell'account su <strong>altri dispositivi</strong> dove lo avevi usato: lì l'account non potrà più accedere né sincronizzarsi, e i dati restano finché non li rimuovi disinstallando l'app o cancellando i dati del sito;</li>
+          <li>i dati di una versione precedente di SPENDY salvati sul dispositivo nel vecchio formato locale;</li>
+          <li>i dati usati senza account (modalità ospite) e il loro archivio, conservato sul dispositivo quando sono stati associati all'account al primo accesso;</li>
+          <li>i file di backup JSON che hai già esportato;</li>
+          <li>i log tecnici e le copie di sicurezza gestiti dai fornitori (Supabase, Vercel, servizio di invio email, Anthropic se usavi Spendy AI), secondo le loro politiche.</li>
+        </ul>
+        <p>Per rimuovere tutto dal dispositivo puoi cancellare i dati dell'app o del sito dalle impostazioni del browser o del sistema.</p>
       </section>
 
       <section>
@@ -120,9 +111,10 @@
       <section>
         <h2>Contatti</h2>
         <p>
-          Titolare del trattamento: <span class="todo">[DA COMPLETARE: nome del titolare]</span><br />
-          Email: <span class="todo">[DA COMPLETARE: indirizzo email di contatto]</span>
+          Titolare del trattamento: Ivan Prestini, Via Paolo VI 1, 25020 Gambara (BS), Italia<br />
+          Email: <a href="mailto:privacy@getspendy.info">privacy@getspendy.info</a>
         </p>
+        <p class="note">Versione 2026-10-06 · 6 ottobre 2026</p>
       </section>
     </main>
   </body>

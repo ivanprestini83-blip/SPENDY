@@ -250,14 +250,18 @@ section('12–13. Pagine pubbliche e link')
   for (const [name, path] of Object.entries(pages)) {
     const html = readText(path)
     check(`${name}: presente, con titolo e viewport`, /<title>[^<]+<\/title>/.test(html) && /name="viewport"/.test(html))
-    check(`   segnaposto visibili, non nascosti`, html.includes('[DA COMPLETARE') && !/display:\s*none/.test(html))
+    check(`   nessun segnaposto rimasto, nessun testo nascosto`, !html.includes('DA COMPLETARE') && !html.includes('class="todo"') && !/display:\s*none/.test(html))
+    check(`   versione ${LEGAL_DOCUMENTS.privacy.version} indicata`, html.includes(LEGAL_DOCUMENTS.privacy.version))
     check(`   collega le altre pagine`, Object.values(pages).filter((p) => p !== path).every((p) => html.includes(`href="/${p.slice('public/'.length)}"`)))
   }
   const privacy = readText(pages.privacy)
   const terms = readText(pages.terms)
   check('privacy: versione tecnica uguale a quella registrata', privacy.includes(LEGAL_DOCUMENTS.privacy.version))
   check('termini: versione tecnica uguale a quella registrata', terms.includes(LEGAL_DOCUMENTS.terms.version))
-  check('privacy: Versione e Ultimo aggiornamento da completare', /Versione: <span class="todo">\[DA COMPLETARE\]/.test(privacy) && /Ultimo aggiornamento: <span class="todo">\[DA COMPLETARE\]/.test(privacy))
+  for (const [name, html] of [['privacy', privacy], ['termini', terms]]) {
+    check(`${name}: Versione e Ultimo aggiornamento compilati`, html.includes(`<p>Versione: ${LEGAL_DOCUMENTS.privacy.version}</p>`) && html.includes('<p>Ultimo aggiornamento: 6 ottobre 2026</p>'))
+  }
+  check('privacy e termini: stessa versione registrata alla registrazione', LEGAL_DOCUMENTS.privacy.version === '2026-10-06' && LEGAL_DOCUMENTS.terms.version === '2026-10-06')
   check('termini: niente consulenza finanziaria, anche per le frasi AI', /non costituiscono consulenza finanziaria/.test(terms) && /Spendy AI/.test(terms))
   for (const file of ['src/components/settings/SyncCard.jsx', 'src/components/settings/PrivacyCard.jsx', 'src/components/settings/SpendyAICard.jsx']) {
     const source = readText(file)
