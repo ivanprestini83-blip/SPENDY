@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 import { check, section, report } from './testkit.mjs'
 import { installFakeDom } from '../store/fakeDom.mjs'
+import { LEGAL_VERSIONS } from '../../supabase/functions/_shared/legalVersions.js'
 
 // localStorage finto: senza, i dati di A non sopravvivrebbero al cambio di ambito.
 installFakeDom(new Map())
@@ -64,6 +65,9 @@ function createFake() {
     emit: async (event, s) => { for (const cb of f.listeners) await cb(event, s) },
   }
   f.supabase = {
+    // Account che ha già accettato Termini e Privacy correnti (legal_acceptances):
+    // il sync parte come prima del cancello legale (vedi legalGate.test).
+    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { terms_version: LEGAL_VERSIONS.terms, privacy_version: LEGAL_VERSIONS.privacy }, error: null }) }) }) }),
     auth: {
       getSession: async () => ({ data: { session: f.current } }),
       onAuthStateChange: (cb) => { f.listeners.push(cb); return { data: { subscription: { unsubscribe() {} } } } },

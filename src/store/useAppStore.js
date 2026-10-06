@@ -90,6 +90,7 @@ export const emptyScopeState = () => ({
   cycleStartDay: null,
   amountHidden: false,
   spendyAIEnabled: false,
+  legalAcceptedVersion: null,
   expenses: [],
   incomes: [],
   customCategories: [],
@@ -212,6 +213,14 @@ export const useAppStore = create(
       // chiamata all'AI (vedi ai/useSpendyVoice.js).
       spendyAIEnabled: false,
       setSpendyAIEnabled: (enabled) => set((state) => withSettingsOp(state, { spendyAIEnabled: enabled === true })),
+
+      // Le versioni di Termini e Privacy che il SERVER ha confermato per
+      // questo account (legal/legalGate.js currentLegalVersionKey). Solo una
+      // copia locale, per aprire l'app anche offline: non viaggia con il sync
+      // (la fonte resta legal_acceptances) e sparisce con il contenitore
+      // dell'account, quindi anche con l'eliminazione dell'account.
+      legalAcceptedVersion: null,
+      setLegalAcceptedVersion: (version) => set({ legalAcceptedVersion: typeof version === 'string' && version ? version : null }),
 
       expenses: [],
       addExpense: (expense) =>
@@ -621,6 +630,7 @@ export const useAppStore = create(
         cycleStartDay: state.cycleStartDay,
         amountHidden: state.amountHidden,
         spendyAIEnabled: state.spendyAIEnabled,
+        legalAcceptedVersion: state.legalAcceptedVersion,
         expenses: state.expenses,
         incomes: state.incomes,
         customCategories: state.customCategories,

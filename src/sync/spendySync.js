@@ -5,7 +5,10 @@ import { createSyncEngine } from './syncEngine.js'
 import { migrateLocalToCloud, migrationStatus } from './migrateLocal.js'
 import { GUEST, retireScope, scopeFor } from '../store/scope.js'
 import { DELETE_ACCOUNT_MESSAGES, requestAccountDeletion } from '../lib/accountDeletion.js'
-import { SIGNUP_ACCEPTANCE_REQUIRED, buildSignUpMetadata } from '../legal/legal.js'
+import { SIGNUP_ACCEPTANCE_REQUIRED, buildSignUpMetadata, canSignUp } from '../legal/legal.js'
+import {
+  LEGAL_GATE_MESSAGES, currentLegalVersionKey, getLegalGateState, needsAcceptance, requestLegalAcceptance, setLegalGateState,
+} from '../legal/legalGate.js'
 
 // Il punto unico in cui l'app accende la sincronizzazione. Un solo
 // motore per tutta la sessione, avviato da App.jsx e comandato dalla
@@ -13,20 +16,147 @@ import { SIGNUP_ACCEPTANCE_REQUIRED, buildSignUpMetadata } from '../legal/legal.
 
 let engine = null
 let currentUserId = null
+let legalCheck = null // { userId, promise }: una sola verifica per volta
+
+const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
+const stillCurrent = (userId) => currentUserId === userId && useAppStore.getState().scopeId === scopeFor(userId)
 
 function startFor(userId) {
-  if (currentUserId === userId && engine) return
+  // Già aperto, o in attesa dei documenti (verifica in corso o schermata
+  // mostrata): un altro evento della stessa sessione non rifà niente.
+  if (currentUserId === userId && (engine || legalCheck?.userId === userId || getLegalGateState()?.userId === userId)) return
   engine?.stop()
+  engine = null
 
   // I dati locali cambiano ambito PRIMA di avviare il motore: il motore di un
   // account parte solo nel contenitore di quell'account (engine.start lo
   // verifica), e lo stato in memoria non porta più niente dell'account
   // precedente. Se l'ambito è già quello giusto non succede nulla.
   useAppStore.getState().switchScope(scopeFor(userId))
-
-  engine = createSyncEngine({ store: useAppStore, remote: createSupabaseRemote(supabase) })
   currentUserId = userId
+  return openAccount(userId)
+}
+
+function startEngine(userId) {
+  engine?.stop()
+  engine = createSyncEngine({ store: useAppStore, remote: createSupabaseRemote(supabase) })
   return engine.start(userId)
+}
+
+// --- Termini e Privacy prima del sync ------------------------------------
+// Il sync di un account parte SOLO se il server ha registrato che l'utente ha
+// accettato i Termini e preso visione della Privacy Policy nella versione
+// corrente (legal_acceptances, letta con la sessione dell'utente: la RLS
+// mostra solo la sua riga). Altrimenti: LegalGateScreen, e nessun sync.
+
+async function readLegalAcceptance(userId) {
+  const { data, error } = await supabase
+    .from('legal_acceptances')
+    .select('terms_version, privacy_version')
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) throw error
+  return data ?? null
+}
+
+function openAccount(userId) {
+  // Già confermato dal server su QUESTO dispositivo, per queste versioni:
+  // l'account si apre subito, anche offline. Il server viene comunque
+  // ricontrollato, e se la riga non c'è più la schermata torna.
+  if (useAppStore.getState().legalAcceptedVersion === currentLegalVersionKey()) {
+    setLegalGateState(null)
+    const started = startEngine(userId)
+    recheckInBackground(userId)
+    return started
+  }
+  return checkLegal(userId)
+}
+
+function checkLegal(userId) {
+  if (legalCheck?.userId === userId) return legalCheck.promise
+  const promise = runLegalCheck(userId).finally(() => {
+    if (legalCheck?.promise === promise) legalCheck = null
+  })
+  legalCheck = { userId, promise }
+  return promise
+}
+
+async function runLegalCheck(userId) {
+  setLegalGateState({ status: 'checking', userId })
+  if (isOffline()) {
+    setLegalGateState({ status: 'unavailable', userId, message: LEGAL_GATE_MESSAGES.offline })
+    return { skipped: 'legal-unavailable' }
+  }
+  let row
+  try {
+    row = await readLegalAcceptance(userId)
+  } catch {
+    if (stillCurrent(userId)) {
+      setLegalGateState({ status: 'unavailable', userId, message: isOffline() ? LEGAL_GATE_MESSAGES.offline : LEGAL_GATE_MESSAGES.unavailable })
+    }
+    return { skipped: 'legal-unavailable' }
+  }
+  if (!stillCurrent(userId)) return { skipped: 'scope-changed' }
+  if (needsAcceptance(row)) {
+    setLegalGateState({ status: 'required', userId })
+    return { skipped: 'legal-required' }
+  }
+  useAppStore.getState().setLegalAcceptedVersion(currentLegalVersionKey())
+  setLegalGateState(null)
+  return startEngine(userId)
+}
+
+async function recheckInBackground(userId) {
+  if (isOffline()) return
+  let row
+  try {
+    row = await readLegalAcceptance(userId)
+  } catch {
+    return // nessuna risposta: resta valida la conferma già ricevuta
+  }
+  if (!stillCurrent(userId) || !needsAcceptance(row)) return
+  engine?.stop()
+  engine = null
+  useAppStore.getState().setLegalAcceptedVersion(null)
+  setLegalGateState({ status: 'required', userId })
+}
+
+// "Riprova" della schermata quando la verifica non è stata possibile.
+export function retryLegalCheck() {
+  return currentUserId ? checkLegal(currentUserId) : Promise.resolve({ skipped: 'nessun utente' })
+}
+
+// "Accetto e continuo". Registra l'accettazione SOLO lato server (Edge Function
+// accept-legal, orario del server); il sync parte solo dopo { accepted: true }.
+// Un secondo tocco riceve la stessa operazione. → null se riuscita, altrimenti
+// il messaggio d'errore (e la schermata resta).
+let acceptInFlight = null
+
+export function acceptLegalDocuments(acceptance) {
+  if (acceptInFlight) return acceptInFlight
+  acceptInFlight = (async () => {
+    const userId = currentUserId
+    if (!supabase || !userId) return LEGAL_GATE_MESSAGES.unauthenticated
+    if (!canSignUp(acceptance)) return LEGAL_GATE_MESSAGES.required
+    if (isOffline()) {
+      setLegalGateState({ status: 'required', userId, error: LEGAL_GATE_MESSAGES.offline })
+      return LEGAL_GATE_MESSAGES.offline
+    }
+    setLegalGateState({ status: 'submitting', userId })
+    const result = await requestLegalAcceptance(supabase)
+    if (!stillCurrent(userId)) return LEGAL_GATE_MESSAGES.failed
+    if (!result.ok) {
+      setLegalGateState({ status: 'required', userId, error: result.message })
+      return result.message
+    }
+    useAppStore.getState().setLegalAcceptedVersion(currentLegalVersionKey())
+    setLegalGateState(null)
+    startEngine(userId)
+    return null
+  })().finally(() => {
+    acceptInFlight = null
+  })
+  return acceptInFlight
 }
 
 function stopEngine() {
@@ -132,6 +262,7 @@ export async function signOut() {
 
   stopEngine()
   useAppStore.getState().switchScope(GUEST)
+  setLegalGateState(null)
   return null
 }
 
@@ -177,6 +308,7 @@ export function deleteAccount() {
     }
     useAppStore.getState().switchScope(GUEST)
     useAppStore.getState().forgetAccountData(userId)
+    setLegalGateState(null)
     return null
   })().finally(() => {
     deletionInFlight = null

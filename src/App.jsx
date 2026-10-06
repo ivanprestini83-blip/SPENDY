@@ -20,6 +20,7 @@ import { NotificationsScreen } from './components/notifications/NotificationsScr
 import { startNotificationWatcher } from './notifications/notificationWatcher.js'
 import { unreadCount } from './notifications/notificationState.js'
 import { PasswordRecoveryScreen } from './components/settings/PasswordRecoveryScreen.jsx'
+import { LegalGateScreen } from './components/legal/LegalGateScreen.jsx'
 import { HomePage } from './pages/HomePage.jsx'
 import { ExpensesPage } from './pages/ExpensesPage.jsx'
 import { IncomesPage } from './pages/IncomesPage.jsx'
@@ -126,7 +127,8 @@ function App() {
       {modal === 'settings' && <SettingsScreen onClose={closeModal} />}
       {modal === 'notifications' && <NotificationsScreen onClose={closeModal} />}
     </div>
-    {/* Fuori dalla schermata a chiave: sopravvive al cambio di ambito. */}
+    {/* Fuori dalla schermata a chiave: sopravvivono al cambio di ambito. */}
+    <LegalGateScreen />
     <PasswordRecoveryScreen />
     </>
   )

@@ -157,7 +157,15 @@ try {
     }
     globalThis.__legalCard = runtime
     const { SyncCard } = await server.ssrLoadModule('/src/components/settings/SyncCard.jsx')
-    const render = () => { cursor = 0; effects = []; return SyncCard() }
+    // Le caselle stanno in LegalConsentFields (senza hook): la si espande
+    // nell'albero per verificare quello che l'utente vede davvero.
+    const expand = (node) => {
+      if (Array.isArray(node)) return node.map(expand)
+      if (!node || typeof node !== 'object' || !node.props) return node
+      if (typeof node.type === 'function' && node.type.name === 'LegalConsentFields') return expand(node.type(node.props))
+      return { ...node, props: { ...node.props, children: expand(node.props.children) } }
+    }
+    const render = () => { cursor = 0; effects = []; return expand(SyncCard()) }
 
     const walk = (node, visit) => {
       if (Array.isArray(node)) return node.forEach((child) => walk(child, visit))
@@ -263,7 +271,9 @@ section('12–13. Pagine pubbliche e link')
   }
   check('privacy e termini: stessa versione registrata alla registrazione', LEGAL_DOCUMENTS.privacy.version === '2026-10-06' && LEGAL_DOCUMENTS.terms.version === '2026-10-06')
   check('termini: niente consulenza finanziaria, anche per le frasi AI', /non costituiscono consulenza finanziaria/.test(terms) && /Spendy AI/.test(terms))
-  for (const file of ['src/components/settings/SyncCard.jsx', 'src/components/settings/PrivacyCard.jsx', 'src/components/settings/SpendyAICard.jsx']) {
+  check('SyncCard.jsx: le caselle vengono da LegalConsentFields, nessun indirizzo scritto a mano',
+    readText('src/components/settings/SyncCard.jsx').includes('<LegalConsentFields') && !/href="\/(privacy|termini)/.test(readText('src/components/settings/SyncCard.jsx')))
+  for (const file of ['src/components/settings/LegalConsentFields.jsx', 'src/components/settings/PrivacyCard.jsx', 'src/components/settings/SpendyAICard.jsx']) {
     const source = readText(file)
     check(`${file.split('/').pop()}: link presi da LEGAL_DOCUMENTS, nessun indirizzo scritto a mano`,
       source.includes('LEGAL_DOCUMENTS') && !/href="\/(privacy|termini)/.test(source))

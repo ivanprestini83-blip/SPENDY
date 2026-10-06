@@ -3,16 +3,23 @@
 // Un solo posto per gli indirizzi delle pagine pubbliche (public/*.html) e
 // per gli identificativi di versione registrati quando un utente crea
 // l'account. Cambiando il testo di un documento si cambia anche la sua
-// versione qui: chi si registra dopo risulterà aver accettato quella nuova.
+// versione (in _shared/legalVersions.js): chi si registra dopo risulterà aver
+// accettato quella nuova, e chi aveva accettato la precedente dovrà
+// riaccettare (legal/legalGate.js).
 //
 // Le due azioni restano separate: accettare i Termini e prendere visione
 // dell'Informativa privacy. Nessuna delle due vale per l'altra, nessuna è
 // preselezionata. La base giuridica del trattamento non è decisa qui: va
 // definita da un legale (vedi privacy.html).
 
+import { LEGAL_VERSIONS } from '../../supabase/functions/_shared/legalVersions.js'
+
+// Le versioni vengono da supabase/functions/_shared/legalVersions.js, la stessa
+// fonte usata dalla Edge Function accept-legal: app e server non possono
+// divergere.
 export const LEGAL_DOCUMENTS = {
-  terms: { url: '/termini.html', version: '2026-10-06' },
-  privacy: { url: '/privacy.html', version: '2026-10-06' },
+  terms: { url: '/termini.html', version: LEGAL_VERSIONS.terms },
+  privacy: { url: '/privacy.html', version: LEGAL_VERSIONS.privacy },
 }
 
 export const SIGNUP_ACCEPTANCE_REQUIRED =

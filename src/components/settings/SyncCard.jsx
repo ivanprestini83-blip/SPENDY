@@ -4,7 +4,8 @@ import { supabase } from '../../lib/supabase.js'
 import { getMigrationStatus, isSupabaseConfigured, runMigration, signIn, signOut, signUp, syncNow } from '../../sync/spendySync.js'
 import { ForgotPasswordForm } from './ForgotPasswordForm.jsx'
 import { PasswordToggle } from './PasswordToggle.jsx'
-import { LEGAL_DOCUMENTS, canSignUp } from '../../legal/legal.js'
+import { canSignUp } from '../../legal/legal.js'
+import { LegalConsentFields } from './LegalConsentFields.jsx'
 import './SyncCard.css'
 
 const STATUS_LABELS = {
@@ -135,31 +136,13 @@ export function SyncCard() {
           >
             {busy ? 'Attendi…' : 'Accedi'}
           </button>
-          <div className="sync-card__legal">
-            <p className="sync-card__legal-title">Per creare un nuovo account:</p>
-            <label className="sync-card__check">
-              <input
-                type="checkbox"
-                checked={termsAccepted}
-                onChange={(event) => setTermsAccepted(event.target.checked)}
-              />
-              <span>
-                Ho letto e accetto i{' '}
-                <a href={LEGAL_DOCUMENTS.terms.url} target="_blank" rel="noopener noreferrer">Termini di utilizzo</a>.
-              </span>
-            </label>
-            <label className="sync-card__check">
-              <input
-                type="checkbox"
-                checked={privacyAcknowledged}
-                onChange={(event) => setPrivacyAcknowledged(event.target.checked)}
-              />
-              <span>
-                Ho preso visione della{' '}
-                <a href={LEGAL_DOCUMENTS.privacy.url} target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
-              </span>
-            </label>
-          </div>
+          <LegalConsentFields
+            title="Per creare un nuovo account:"
+            termsAccepted={termsAccepted}
+            privacyAcknowledged={privacyAcknowledged}
+            onTermsChange={setTermsAccepted}
+            onPrivacyChange={setPrivacyAcknowledged}
+          />
           <button
             type="button"
             className="sync-card__secondary"
