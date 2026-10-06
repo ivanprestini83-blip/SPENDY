@@ -8,6 +8,18 @@ import { COLLECTION_KEYS, SETTINGS_TABLE, SYNC_COLLECTIONS } from './mappers.js'
 
 const ALL_TABLES = [...COLLECTION_KEYS.map((key) => SYNC_COLLECTIONS[key].table), SETTINGS_TABLE]
 
+// Righe per pagina del pull. Va tenuto NON oltre il "Max rows" dell'API di
+// Supabase (1000 di default): una pagina più corta del richiesto è il segnale
+// che le righe sono finite. 500 lascia margine anche se Max rows venisse
+// abbassato fino a quel valore.
+export const PULL_PAGE_SIZE = 500
+// Tetto di sicurezza contro cicli infiniti (es. una riga senza id).
+export const PULL_MAX_PAGES = 2000
+
+// Valori dentro i filtri or() di PostgREST: tra virgolette, perché date e id
+// contengono caratteri riservati (':', '.', ',').
+const quoteFilterValue = (value) => `"${String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+
 export function createSupabaseRemote(client) {
   return {
     async upsert(table, rows) {
@@ -24,12 +36,33 @@ export function createSupabaseRemote(client) {
       // qui darebbe la falsa impressione che sia il client a garantire
       // l'isolamento dei dati, quando invece è (e deve essere) il
       // database a deciderlo.
-      const { data, error } = await client
-        .from(table)
-        .select('*')
-        .gt('updated_at', since)
-        .order('updated_at', { ascending: true })
-      return { rows: data ?? [], error: error ? `${table}: ${error.message}` : null }
+      //
+      // Paginato: PostgREST restituisce al massimo "Max rows" righe per
+      // richiesta (1000 di default su Supabase). Le pagine seguono la chiave
+      // (updated_at, id), non la posizione: è deterministica anche con
+      // migliaia di righe con lo stesso updated_at (un upsert ne scrive tante
+      // nello stesso istante) e non salta righe se qualcosa cambia tra una
+      // pagina e l'altra. Se una pagina fallisce non torna niente: il motore
+      // non sposta il cursore e il prossimo sync riparte da capo.
+      const rows = []
+      let after = null
+      for (let page = 0; page < PULL_MAX_PAGES; page += 1) {
+        let query = client.from(table).select('*').gt('updated_at', since)
+        if (after) {
+          const at = quoteFilterValue(after.updated_at)
+          query = query.or(`updated_at.gt.${at},and(updated_at.eq.${at},id.gt.${quoteFilterValue(after.id)})`)
+        }
+        const { data, error } = await query
+          .order('updated_at', { ascending: true })
+          .order('id', { ascending: true })
+          .limit(PULL_PAGE_SIZE)
+        if (error) return { rows: [], error: `${table}: ${error.message}` }
+        const batch = data ?? []
+        rows.push(...batch)
+        if (batch.length < PULL_PAGE_SIZE) return { rows, error: null }
+        after = batch[batch.length - 1]
+      }
+      return { rows: [], error: `${table}: troppe pagine (oltre ${PULL_MAX_PAGES * PULL_PAGE_SIZE} righe)` }
     },
 
     subscribe(userId, onRow) {

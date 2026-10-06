@@ -13,8 +13,18 @@
 //
 // Grazie a questo, i test di "Samsung ↔ Mac", offline e conflitti girano
 // senza rete e senza un progetto Supabase.
+//
+// In più, come PostgREST su Supabase:
+//   4. "Max rows": una richiesta restituisce al massimo MEMORY_DB_MAX_ROWS
+//      righe (1000, il default di Supabase), e il pull del remote finto passa
+//      dalla VERA paginazione di supabaseRemote.js;
+//   5. un upsert è un'unica istruzione: tutte le sue righe ricevono lo
+//      STESSO updated_at (now() della transazione), come nel Postgres vero.
+import { createSupabaseRemote } from './supabaseRemote.js'
 
-export function createMemoryDatabase() {
+export const MEMORY_DB_MAX_ROWS = 1000
+
+export function createMemoryDatabase({ maxRows = MEMORY_DB_MAX_ROWS } = {}) {
   const tables = new Map()
   const subscribers = []
   // Orologio server monotòno: due scritture consecutive hanno sempre
@@ -54,6 +64,8 @@ export function createMemoryDatabase() {
       this.countCalls.upsert += 1
       const store = table(name)
       const emitted = []
+      // Un'istruzione, un istante: come now() in Postgres (vedi punto 5).
+      const at = serverNow()
 
       for (const row of rows) {
         // RLS: with check (auth.uid() = user_id)
@@ -68,8 +80,8 @@ export function createMemoryDatabase() {
         const saved = {
           ...existing,
           ...row,
-          created_at: existing?.created_at ?? serverNow(),
-          updated_at: serverNow(),
+          created_at: existing?.created_at ?? at,
+          updated_at: at,
         }
         store.set(row.id, saved)
         emitted.push({ table: name, row: saved })
@@ -83,13 +95,19 @@ export function createMemoryDatabase() {
       return { error: null }
     },
 
-    pull(name, since, userId) {
+    // Una richiesta PostgREST di pull: righe dell'utente (RLS) con
+    // updated_at > since, eventualmente dopo la chiave (updated_at, id)
+    // dell'ultima riga già ricevuta, ordinate per (updated_at, id) e mai più
+    // di maxRows per richiesta, qualunque limit chieda il client.
+    query(name, userId, { since, after = null, limit = Infinity }) {
       this.countCalls.pull += 1
       const rows = [...table(name).values()]
-        .map(asPostgrest)
         .filter((row) => ownerOf(name, row) === userId) // RLS: using (auth.uid() = user_id)
         .filter((row) => row.updated_at > since)
-        .sort((a, b) => (a.updated_at < b.updated_at ? -1 : 1))
+        .filter((row) => !after || row.updated_at > after.updated_at || (row.updated_at === after.updated_at && row.id > after.id))
+        .sort((a, b) => (a.updated_at === b.updated_at ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.updated_at < b.updated_at ? -1 : 1))
+        .slice(0, Math.min(limit, maxRows))
+        .map(asPostgrest)
       return { rows, error: null }
     },
 
@@ -104,20 +122,62 @@ export function createMemoryDatabase() {
   }
 }
 
+// Il minimo di client PostgREST che supabaseRemote.pull usa — from / select /
+// gt / or / order / limit — sopra il database in memoria, per l'utente del
+// dispositivo. Il filtro or() è quello della paginazione per chiave:
+//   updated_at.gt."T",and(updated_at.eq."T",id.gt."ID")
+const QUOTED = '"((?:[^"\\\\]|\\\\.)*)"'
+const KEYSET_FILTER = new RegExp(`^updated_at\\.gt\\.${QUOTED},and\\(updated_at\\.eq\\.${QUOTED},id\\.gt\\.${QUOTED}\\)$`)
+const unquote = (value) => value.replace(/\\(.)/g, '$1')
+
+function memoryPostgrest(db, userId) {
+  return {
+    from(name) {
+      const request = { since: '', after: null, limit: Infinity }
+      const builder = {
+        select: () => builder,
+        gt(column, value) {
+          if (column !== 'updated_at') throw new Error(`filtro non previsto: ${column}`)
+          request.since = value
+          return builder
+        },
+        or(expression) {
+          const match = KEYSET_FILTER.exec(expression)
+          if (!match || unquote(match[1]) !== unquote(match[2])) throw new Error(`filtro or() non previsto: ${expression}`)
+          request.after = { updated_at: unquote(match[1]), id: unquote(match[3]) }
+          return builder
+        },
+        order: () => builder, // l'ordine (updated_at, id) lo applica già query()
+        limit(n) {
+          request.limit = n
+          return builder
+        },
+        then(resolve, reject) {
+          const { rows, error } = db.query(name, userId, request)
+          return Promise.resolve({ data: rows, error: error ? { message: error } : null }).then(resolve, reject)
+        },
+      }
+      return builder
+    },
+  }
+}
+
 // Il "client" di un singolo dispositivo: stessa interfaccia che l'engine
-// si aspetta da supabaseRemote.js (upsert / pull / subscribe).
+// si aspetta da supabaseRemote.js (upsert / pull / subscribe). Il pull è
+// quello VERO di supabaseRemote.js, paginato, sopra memoryPostgrest.
 export function createMemoryRemote(db, userId, options = {}) {
   let online = options.online ?? true
   let realtimeEnabled = options.realtime ?? false
 
   const offlineError = { error: 'network: offline' }
+  const paginated = createSupabaseRemote(memoryPostgrest(db, userId))
 
   return {
     setOnline: (value) => {
       online = value
     },
     upsert: async (table, rows) => (online ? db.upsert(table, rows, userId) : offlineError),
-    pull: async (table, since) => (online ? db.pull(table, since, userId) : { rows: [], ...offlineError }),
+    pull: async (table, since) => (online ? paginated.pull(table, since) : { rows: [], ...offlineError }),
     subscribe: (id, callback) => (realtimeEnabled ? db.subscribe(id, callback) : () => {}),
     enableRealtime: () => {
       realtimeEnabled = true
