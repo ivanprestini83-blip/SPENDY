@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore.js'
 import { getCategory } from '../../data/categories.js'
 import './EditExpenseModal.css'
+import { isValidAmount } from '../../utils/amounts.js'
+import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
 
 // The income twin of EditExpenseModal — reachable by tapping any row in
 // IncomesPage's list. Only ever opened for a ONE-OFF income (Extra/
@@ -20,7 +22,7 @@ export function EditIncomeModal({ income, onClose }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const amountValue = parseFloat(amount.replace(',', '.'))
-  const canSave = Number.isFinite(amountValue) && amountValue > 0
+  const canSave = isValidAmount(amountValue)
 
   const handleSave = () => {
     if (!canSave) return
@@ -64,6 +66,7 @@ export function EditIncomeModal({ income, onClose }) {
             />
           </div>
         </label>
+        <AmountLimitHint value={amountValue} />
 
         <label className="edit-expense__field">
           <span>Data</span>

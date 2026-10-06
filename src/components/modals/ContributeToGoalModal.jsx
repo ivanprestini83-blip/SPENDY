@@ -4,6 +4,8 @@ import { FormField } from './FormField.jsx'
 import { useAppStore } from '../../store/useAppStore.js'
 import { formatCurrency } from '../../utils/format.js'
 import './modalForm.css'
+import { isValidAmount } from '../../utils/amounts.js'
+import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
 
 // Opened from a GoalCard's "+ Aggiungi" (see GoalsSection.jsx) — the one
 // place `saved` on a goal ever changes, via the store's contributeToGoal.
@@ -12,7 +14,7 @@ export function ContributeToGoalModal({ goal, onClose }) {
   const [amount, setAmount] = useState('')
 
   const amountValue = parseFloat(amount.replace(',', '.'))
-  const canSave = Number.isFinite(amountValue) && amountValue > 0
+  const canSave = isValidAmount(amountValue)
 
   const handleSave = () => {
     if (!canSave) return
@@ -30,6 +32,7 @@ export function ContributeToGoalModal({ goal, onClose }) {
         value={amount}
         onChange={(event) => setAmount(event.target.value)}
       />
+      <AmountLimitHint value={amountValue} />
 
       <p className="modal-form__hint">
         Hai risparmiato {formatCurrency(goal.saved)} su {formatCurrency(goal.target)}.

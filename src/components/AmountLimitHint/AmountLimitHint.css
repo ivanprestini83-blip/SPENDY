@@ -1,0 +1,6 @@
+.amount-limit-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-accent-coral);
+}

@@ -4,6 +4,8 @@ import { SpendyCharacterWithMessage } from '../spendy/SpendyCharacterWithMessage
 import { ProgressBar } from '../ProgressBar/ProgressBar.jsx'
 import { formatCurrency } from '../../utils/format.js'
 import './EmergencyFundScreen.css'
+import { isValidAmount } from '../../utils/amounts.js'
+import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
 
 // "fino ad arrivare ad una cifra di 4 o 6 mensilità" — 6 is the target
 // this screen aims for; the 10-20% figure below is what Spendy suggests
@@ -69,7 +71,7 @@ export function EmergencyFundScreen({ onClose }) {
   const coach = encouragement(emergencyFundSaved, target, monthlyBudget)
 
   const amountValue = parseFloat(amount.replace(',', '.'))
-  const canAdd = Number.isFinite(amountValue) && amountValue > 0
+  const canAdd = isValidAmount(amountValue)
 
   const handleAdd = () => {
     if (!canAdd) return
@@ -95,7 +97,7 @@ export function EmergencyFundScreen({ onClose }) {
 
   const saveEdit = () => {
     const value = parseFloat(editAmount.replace(',', '.'))
-    if (!Number.isFinite(value) || value <= 0) return
+    if (!isValidAmount(value)) return
     editEmergencyFundContribution(editingId, { amount: value, date: editDate })
     setEditingId(null)
   }
@@ -138,6 +140,7 @@ export function EmergencyFundScreen({ onClose }) {
             />
           </div>
         </label>
+        <AmountLimitHint value={amountValue} />
 
         <button type="button" className="emergency-fund-screen__cta" disabled={!canAdd} onClick={handleAdd}>
           Aggiungi al fondo emergenza

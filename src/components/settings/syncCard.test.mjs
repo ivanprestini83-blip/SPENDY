@@ -302,6 +302,26 @@ try {
     const { before } = await pressSyncNow(SyncCard, {})
     check('con la sessione attiva il link non compare', !findButton(before, 'Password dimenticata?'))
   }
+
+  // =====================================================================
+  section('5. Modifiche rifiutate dal server')
+  // =====================================================================
+  {
+    const rejectedText = (tree) => findAll(tree, (n) => n.type === 'p' && /non (è stata|sono state) accettat/.test(textOf(n))).map(textOf)
+    const none = await pressSyncNow(SyncCard, {})
+    check('nessuna rifiutata: nessun avviso', rejectedText(none.tree).length === 0)
+    const runtime = createCardRuntime({ syncNowResult: {} })
+    runtime.store.sync.rejected = [{ collection: 'expenses', rowId: 'e1', error: 'expenses: numeric field overflow' }]
+    globalThis.__card = runtime
+    runtime.render(SyncCard)
+    runtime.runEffects()
+    await tick()
+    const one = runtime.render(SyncCard)
+    check('una rifiutata: "1 modifica non è stata accettata … è rimasta solo su questo dispositivo"', /1 modifica non è stata accettata dal\s+server .*è rimasta solo su questo dispositivo/.test(rejectedText(one)[0] ?? ''))
+    check('   la vista si disegna senza errori', draw(one).error === null)
+    runtime.store.sync.rejected = [{ rowId: 'a' }, { rowId: 'b' }, { rowId: 'c' }]
+    check('tre rifiutate: plurale', /3 modifiche non sono state accettate.*sono rimaste/.test(rejectedText(runtime.render(SyncCard))[0] ?? ''))
+  }
 } finally {
   await server.close()
 }

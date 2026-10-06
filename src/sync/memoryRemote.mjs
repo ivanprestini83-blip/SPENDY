@@ -19,7 +19,10 @@
 //      righe (1000, il default di Supabase), e il pull del remote finto passa
 //      dalla VERA paginazione di supabaseRemote.js;
 //   5. un upsert è un'unica istruzione: tutte le sue righe ricevono lo
-//      STESSO updated_at (now() della transazione), come nel Postgres vero.
+//      STESSO updated_at (now() della transazione), come nel Postgres vero,
+//      ed è ATOMICO: se una riga è rifiutata non viene salvata nessuna riga;
+//   6. le colonne numeric(12,2) rifiutano valori oltre 9.999.999.999,99
+//      (codice Postgres 22003); l'RLS rifiuta con 42501.
 import { createSupabaseRemote } from './supabaseRemote.js'
 
 export const MEMORY_DB_MAX_ROWS = 1000
@@ -47,6 +50,7 @@ export function createMemoryDatabase({ maxRows = MEMORY_DB_MAX_ROWS } = {}) {
   // e i totali sarebbero sbagliati senza nessun errore a schermo. Il
   // database finto la riproduce apposta, così i test la coprono.
   const NUMERIC_COLUMNS = ['amount', 'target', 'monthly_budget']
+  const NUMERIC_12_2_LIMIT = 1e10 // numeric(12,2): al massimo 9.999.999.999,99
   const asPostgrest = (row) => {
     const copy = { ...row }
     for (const column of NUMERIC_COLUMNS) {
@@ -67,11 +71,27 @@ export function createMemoryDatabase({ maxRows = MEMORY_DB_MAX_ROWS } = {}) {
       // Un'istruzione, un istante: come now() in Postgres (vedi punto 5).
       const at = serverNow()
 
+      // Atomico (punto 5): prima si controllano TUTTE le righe, e se una è
+      // rifiutata l'istruzione intera fallisce senza salvare niente.
       for (const row of rows) {
         // RLS: with check (auth.uid() = user_id)
         if (ownerOf(name, row) !== userId) {
-          return { error: `RLS: riga ${row.id} non appartiene a ${userId}` }
+          return { error: `RLS: riga ${row.id} non appartiene a ${userId}`, code: '42501' }
         }
+        // RLS sull'update dell'upsert: using (auth.uid() = user_id) sulla riga
+        // esistente. Lo stesso id già di un altro utente → errore, non sovrascrittura.
+        const current = store.get(row.id)
+        if (current && ownerOf(name, current) !== userId) {
+          return { error: `RLS: riga ${row.id} non appartiene a ${userId}`, code: '42501' }
+        }
+        for (const column of NUMERIC_COLUMNS) {
+          if (typeof row[column] === 'number' && Math.abs(row[column]) >= NUMERIC_12_2_LIMIT) {
+            return { error: 'numeric field overflow', code: '22003' }
+          }
+        }
+      }
+
+      for (const row of rows) {
 
         const existing = store.get(row.id)
         // Trigger LWW: l'aggiornamento più vecchio non passa.
@@ -92,7 +112,7 @@ export function createMemoryDatabase({ maxRows = MEMORY_DB_MAX_ROWS } = {}) {
           if (sub.userId === ownerOf(t, row)) sub.callback({ table: t, row })
         }
       }
-      return { error: null }
+      return { error: null, code: null }
     },
 
     // Una richiesta PostgREST di pull: righe dell'utente (RLS) con

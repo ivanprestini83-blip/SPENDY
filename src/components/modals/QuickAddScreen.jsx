@@ -3,6 +3,8 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { CATEGORIES, INCOME_CATEGORIES } from '../../data/categories.js'
 import { EMOJI_GROUPS } from '../../data/emojiPicker.js'
 import './QuickAddScreen.css'
+import { isValidAmount } from '../../utils/amounts.js'
+import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
 
 // "tenendole premute" — how long a press on a custom category tile has
 // to hold before it counts as a long-press (pin/unpin) instead of a tap
@@ -70,7 +72,7 @@ export function QuickAddScreen({ type, onClose }) {
   const pinnedIds = new Set(pinnedCustom.map((entry) => entry.id))
 
   const amountValue = parseFloat(amount.replace(',', '.'))
-  const canConfirm = Number.isFinite(amountValue) && amountValue > 0
+  const canConfirm = isValidAmount(amountValue)
 
   const handlePick = (pickedCategory) => {
     // A long-press that just fired pin/unpin still ends in the same
@@ -306,6 +308,7 @@ export function QuickAddScreen({ type, onClose }) {
               onChange={(event) => setAmount(event.target.value)}
             />
           </div>
+          <AmountLimitHint value={amountValue} />
 
           <button type="button" className="quick-add__confirm" disabled={!canConfirm} onClick={handleConfirm}>
             Conferma

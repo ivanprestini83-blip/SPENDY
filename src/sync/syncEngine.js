@@ -11,6 +11,14 @@ import { isUserScope, ownerOf, scopeFor } from '../store/scope.js'
 // finto in memoria — con le stesse regole del vero, trigger LWW incluso —
 // e quindi di verificare offline, conflitti e Samsung ↔ Mac senza rete.
 
+// Errori DEFINITIVI del database per una riga: non passerà mai così com'è.
+//   22xxx  dati non validi (es. 22003 numeric overflow: importo oltre numeric(12,2))
+//   23xxx  vincoli violati (not null, check…)
+//   42501  RLS: la riga appartiene a un altro utente
+// Tutto il resto (rete, timeout, 5xx, colonna non ancora creata…) è
+// temporaneo: le operazioni restano in coda e si riprova.
+export const isPermanentRejection = (code) => typeof code === 'string' && (/^2[23][0-9A-Z]{3}$/.test(code) || code === '42501')
+
 export const EPOCH = '1970-01-01T00:00:00.000Z'
 
 // Il cursore torna indietro di un secondo rispetto all'ultimo
@@ -113,6 +121,38 @@ export function createSyncEngine({ store, remote, autoFlushMs = 1200, onStatus =
 
   // ------------------------------------------------------------- push
 
+  // Invia un gruppo di operazioni della stessa tabella. Se il database le
+  // rifiuta con un errore DEFINITIVO (isPermanentRejection), il gruppo viene
+  // diviso a metà finché si isolano le sole righe non valide: quelle escono
+  // dalla coda e finiscono in sync.rejected, tutte le altre partono. Un errore
+  // temporaneo invece ferma l'invio: le operazioni restano in coda e ripartono.
+  // → { pushed, rejected, error?, aborted? }
+  async function sendOps(table, ops, toRow, scope) {
+    const { error, code } = await remote.upsert(table, ops.map(toRow))
+    if (!sameScope(scope)) return { pushed: 0, rejected: 0, aborted: true }
+    if (!error) {
+      // Le operazioni escono dalla coda SOLO ora, dopo la conferma del
+      // server. Se la rete cade a metà, restano dove sono e ripartono.
+      state().ackOps(ops)
+      return { pushed: ops.length, rejected: 0 }
+    }
+    if (!isPermanentRejection(code)) return { pushed: 0, rejected: 0, error }
+    if (ops.length === 1) {
+      state().rejectOps(ops, error)
+      return { pushed: 0, rejected: 1 }
+    }
+    const middle = Math.ceil(ops.length / 2)
+    const first = await sendOps(table, ops.slice(0, middle), toRow, scope)
+    if (first.aborted || first.error) return first
+    const second = await sendOps(table, ops.slice(middle), toRow, scope)
+    return {
+      pushed: first.pushed + second.pushed,
+      rejected: first.rejected + second.rejected,
+      ...(second.error ? { error: second.error } : {}),
+      ...(second.aborted ? { aborted: true } : {}),
+    }
+  }
+
   async function pushPending(scope = state().scopeId) {
     if (!sameScope(scope)) return { pushed: 0, aborted: SCOPE_CHANGED }
 
@@ -125,40 +165,45 @@ export function createSyncEngine({ store, remote, autoFlushMs = 1200, onStatus =
     if (mismatch) return { pushed: 0, error: mismatch }
 
     let pushed = 0
+    let rejected = 0
     for (const [collection, ops] of groupByCollection(outbox)) {
-      if (!sameScope(scope)) return { pushed, aborted: SCOPE_CHANGED }
+      if (!sameScope(scope)) return { pushed, rejected, aborted: SCOPE_CHANGED }
 
       if (collection === SETTINGS_KEY) {
         const op = ops[ops.length - 1]
         const remoteRow = settingsToRemote(op.row, userId)
-        let { error } = await remote.upsert(SETTINGS_TABLE, [remoteRow])
+        let { error, code } = await remote.upsert(SETTINGS_TABLE, [remoteRow])
         // La colonna spendy_ai_enabled non esiste ancora (migration
         // privacy_consent.sql non eseguita): le impostazioni partono senza,
         // invece di bloccare tutto il sync. La scelta resta su questo
         // dispositivo e ripartirà con il prossimo cambio di impostazioni.
         if (error && 'spendy_ai_enabled' in remoteRow && /spendy_ai_enabled/.test(String(error)) && sameScope(scope)) {
           const { spendy_ai_enabled: _notYetOnServer, ...withoutPreference } = remoteRow
-          ;({ error } = await remote.upsert(SETTINGS_TABLE, [withoutPreference]))
+          ;({ error, code } = await remote.upsert(SETTINGS_TABLE, [withoutPreference]))
         }
-        if (!sameScope(scope)) return { pushed, aborted: SCOPE_CHANGED }
-        if (error) return { pushed, error }
+        if (!sameScope(scope)) return { pushed, rejected, aborted: SCOPE_CHANGED }
+        if (error && !isPermanentRejection(code)) return { pushed, rejected, error }
+        if (error) {
+          // Impostazioni che il database non accetterà mai (es. uno
+          // stipendio oltre numeric(12,2)): fuori dalla coda, non bloccano.
+          state().rejectOps(ops, error)
+          rejected += ops.length
+          continue
+        }
         state().ackOps(ops)
         pushed += 1
         continue
       }
 
       const table = SYNC_COLLECTIONS[collection].table
-      const rows = ops.map((op) => toRemoteRow(collection, op.row, userId))
-      const { error } = await remote.upsert(table, rows)
-      if (!sameScope(scope)) return { pushed, aborted: SCOPE_CHANGED }
-      if (error) return { pushed, error }
-      // Le operazioni escono dalla coda SOLO ora, dopo la conferma del
-      // server. Se la rete cade a metà, restano dove sono e ripartono.
-      state().ackOps(ops)
-      pushed += ops.length
+      const result = await sendOps(table, ops, (op) => toRemoteRow(collection, op.row, userId), scope)
+      pushed += result.pushed
+      rejected += result.rejected
+      if (result.aborted) return { pushed, rejected, aborted: SCOPE_CHANGED }
+      if (result.error) return { pushed, rejected, error: result.error }
     }
 
-    return { pushed }
+    return { pushed, rejected }
   }
 
   // ------------------------------------------------------------- pull
@@ -219,15 +264,16 @@ export function createSyncEngine({ store, remote, autoFlushMs = 1200, onStatus =
         // toccata qui.
         const push = await pushPending(scope)
         if (push.aborted) return { skipped: SCOPE_CHANGED }
-        if (push.error) {
-          setStatus({ status: 'error', error: String(push.error) }, scope)
-          return push
-        }
+        // Anche se l'invio non è riuscito, si scarica comunque: le modifiche
+        // degli altri dispositivi devono arrivare. È sicuro, perché le righe
+        // con una modifica locale ancora in coda vengono saltate dal pull
+        // (mergeRemoteRows) e restano quelle locali.
         const pull = await pullAll(scope)
         if (pull.aborted) return { skipped: SCOPE_CHANGED }
-        if (pull.error) {
-          setStatus({ status: 'error', error: String(pull.error) }, scope)
-          return pull
+        const error = push.error ?? pull.error ?? null
+        if (error) {
+          setStatus({ status: 'error', error: String(error) }, scope)
+          return { ...push, ...pull, error }
         }
         setStatus({ status: 'synced', error: null, lastSyncAt: new Date().toISOString() }, scope)
         return { ...push, ...pull }

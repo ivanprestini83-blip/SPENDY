@@ -181,6 +181,12 @@ export function SyncCard() {
           </dl>
 
           {sync.error && <p className="sync-card__error">{sync.error}</p>}
+          {sync.rejected?.length > 0 && (
+            <p className="sync-card__error">
+              {sync.rejected.length === 1 ? '1 modifica non è stata accettata' : `${sync.rejected.length} modifiche non sono state accettate`} dal
+              server (per esempio un importo troppo grande): {sync.rejected.length === 1 ? 'è rimasta' : 'sono rimaste'} solo su questo dispositivo.
+            </p>
+          )}
 
           {migration?.needed && (
             <div className="sync-card__migration">

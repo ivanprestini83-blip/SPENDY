@@ -3,6 +3,8 @@ import { Modal } from './Modal.jsx'
 import { FormField } from './FormField.jsx'
 import { useAppStore } from '../../store/useAppStore.js'
 import './modalForm.css'
+import { isValidAmount } from '../../utils/amounts.js'
+import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
 
 function monthsUntil(targetDateStr, todayStr) {
   const [ty, tm] = targetDateStr.split('-').map(Number)
@@ -22,7 +24,8 @@ export function NewGoalModal({ onClose }) {
 
   const targetValue = parseFloat(target.replace(',', '.'))
   const savedValue = parseFloat((saved || '0').replace(',', '.'))
-  const canSave = label.trim().length > 0 && Number.isFinite(targetValue) && targetValue > 0
+  const canSave = label.trim().length > 0 && isValidAmount(targetValue)
+    && (!Number.isFinite(savedValue) || savedValue === 0 || isValidAmount(savedValue))
 
   const handleSave = () => {
     if (!canSave) return
@@ -54,6 +57,7 @@ export function NewGoalModal({ onClose }) {
         value={target}
         onChange={(event) => setTarget(event.target.value)}
       />
+      <AmountLimitHint value={targetValue} />
 
       <FormField
         label="Data obiettivo"
@@ -70,6 +74,7 @@ export function NewGoalModal({ onClose }) {
         value={saved}
         onChange={(event) => setSaved(event.target.value)}
       />
+      <AmountLimitHint value={savedValue} />
 
       <button type="button" className="modal-form__submit" disabled={!canSave} onClick={handleSave}>
         Crea obiettivo

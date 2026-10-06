@@ -9,6 +9,7 @@ import { mergeRemoteRows } from '../sync/syncEngine.js'
 import { settingsToLocal } from '../sync/mappers.js'
 import { addToState, markAllReadInState, markReadInState, removeFromState, sanitizeNotificationState } from '../notifications/notificationState.js'
 import { STATE_BASE, createScopeManager, isUserScope, isValidScope, ownerOf, scopeFor } from './scope.js'
+import { isValidAmount, isValidBudget } from '../utils/amounts.js'
 
 const sumAmounts = (list) => list.reduce((total, entry) => total + entry.amount, 0)
 
@@ -76,9 +77,16 @@ const INITIAL_SYNC = {
   cursors: {},
   lastSyncAt: null,
   migratedAt: null,
+  // Operazioni che il database ha rifiutato in modo definitivo (vedi
+  // syncEngine isPermanentRejection): tolte dalla coda perché non blocchino le
+  // altre, e tenute qui (le più recenti, al massimo MAX_REJECTED) per poterle
+  // mostrare. La riga resta sul dispositivo, ma non sul cloud.
+  rejected: [],
   status: 'idle',
   error: null,
 }
+
+const MAX_REJECTED = 50
 
 // Tutto ciò che appartiene a UN ambito (guest o un account, vedi scope.js) e
 // che quindi va svuotato quando si cambia ambito: sono esattamente i campi di
@@ -187,7 +195,7 @@ export const useAppStore = create(
       cycleStartDay: null,
       setMonthlyBudget: (monthlyBudget, date) =>
         set((state) =>
-          withSettingsOp(state, {
+          !isValidBudget(monthlyBudget) ? {} : withSettingsOp(state, {
             monthlyBudget,
             cycleStartDay: state.cycleStartDay ?? Number((date ?? state.today).slice(8, 10)),
           }),
@@ -225,6 +233,8 @@ export const useAppStore = create(
       expenses: [],
       addExpense: (expense) =>
         set((state) => {
+          // Importi fuori dal limite di SPENDY (utils/amounts.js): ignorati.
+          if (!isValidAmount(expense?.amount)) return {}
           const row = { id: newId('e'), date: state.today, ...expense, updatedAt: nowIso() }
           return { expenses: [row, ...state.expenses], sync: withOp(state.sync, 'expenses', row) }
         }),
@@ -236,7 +246,7 @@ export const useAppStore = create(
       editExpense: (id, updates) =>
         set((state) => {
           const target = state.expenses.find((expense) => expense.id === id)
-          if (!target) return {}
+          if (!target || ('amount' in (updates ?? {}) && !isValidAmount(updates.amount))) return {}
           const row = { ...target, ...updates, updatedAt: nowIso() }
           return {
             expenses: state.expenses.map((expense) => (expense.id === id ? row : expense)),
@@ -265,6 +275,7 @@ export const useAppStore = create(
       incomes: [],
       addIncome: (income) =>
         set((state) => {
+          if (!isValidAmount(income?.amount)) return {}
           const row = { id: newId('i'), date: state.today, ...income, updatedAt: nowIso() }
           return { incomes: [row, ...state.incomes], sync: withOp(state.sync, 'incomes', row) }
         }),
@@ -278,7 +289,7 @@ export const useAppStore = create(
       editIncome: (id, updates) =>
         set((state) => {
           const target = state.incomes.find((income) => income.id === id)
-          if (!target) return {}
+          if (!target || ('amount' in (updates ?? {}) && !isValidAmount(updates.amount))) return {}
           const row = { ...target, ...updates, updatedAt: nowIso() }
           return {
             incomes: state.incomes.map((income) => (income.id === id ? row : income)),
@@ -350,6 +361,7 @@ export const useAppStore = create(
       addGoal: (goal) =>
         set((state) => {
           const { saved: initialSaved = 0, ...rest } = goal
+          if (!isValidAmount(rest.target) || (initialSaved !== 0 && !isValidAmount(initialSaved))) return {}
           const row = { id: newId('g'), ...rest, saved: 0, updatedAt: nowIso() }
           let sync = withOp(state.sync, 'goals', row)
           let goalContributions = state.goalContributions
@@ -372,6 +384,7 @@ export const useAppStore = create(
       // directly.
       contributeToGoal: (goalId, amount) =>
         set((state) => {
+          if (!isValidAmount(amount)) return {}
           const contribution = { id: newId('gc'), goalId, amount, date: state.today, updatedAt: nowIso() }
           const goalContributions = [contribution, ...state.goalContributions]
           return {
@@ -415,6 +428,7 @@ export const useAppStore = create(
       emergencyFundContributions: [],
       contributeToEmergencyFund: (amount) =>
         set((state) => {
+          if (!isValidAmount(amount)) return {}
           const row = { id: newId('ef'), amount, date: state.today, updatedAt: nowIso() }
           const emergencyFundContributions = [row, ...state.emergencyFundContributions]
           return {
@@ -426,7 +440,7 @@ export const useAppStore = create(
       editEmergencyFundContribution: (id, updates) =>
         set((state) => {
           const target = state.emergencyFundContributions.find((contribution) => contribution.id === id)
-          if (!target) return {}
+          if (!target || ('amount' in (updates ?? {}) && !isValidAmount(updates.amount))) return {}
           const row = { ...target, ...updates, updatedAt: nowIso() }
           const emergencyFundContributions = state.emergencyFundContributions.map((contribution) =>
             contribution.id === id ? row : contribution,
@@ -509,6 +523,18 @@ export const useAppStore = create(
       setCursor: (table, iso) =>
         set((state) => ({ sync: { ...state.sync, cursors: { ...state.sync.cursors, [table]: iso } } })),
       ackOps: (ops) => set((state) => ({ sync: { ...state.sync, outbox: ackOutboxOps(state.sync.outbox, ops) } })),
+      rejectOps: (ops, reason) =>
+        set((state) => {
+          const at = nowIso()
+          const entries = ops.map((op) => ({ collection: op.collection, rowId: op.rowId, row: op.row, error: String(reason ?? '').slice(0, 200), at }))
+          return {
+            sync: {
+              ...state.sync,
+              outbox: ackOutboxOps(state.sync.outbox, ops),
+              rejected: [...entries, ...(state.sync.rejected ?? [])].slice(0, MAX_REJECTED),
+            },
+          }
+        }),
       markMigrated: (iso) => set((state) => ({ sync: { ...state.sync, migratedAt: iso } })),
       // Usata solo dalla migrazione iniziale (sync/migrateLocal.js): mette
       // in coda righe già esistenti senza modificarle, così il primo
@@ -652,6 +678,7 @@ export const useAppStore = create(
           cursors: state.sync.cursors,
           lastSyncAt: state.sync.lastSyncAt,
           migratedAt: state.sync.migratedAt,
+          rejected: state.sync.rejected ?? [],
         },
       }),
       // Custom categories live in the store (so they persist) but are

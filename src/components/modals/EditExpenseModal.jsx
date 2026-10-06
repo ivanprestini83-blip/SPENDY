@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore.js'
 import { getCategory } from '../../data/categories.js'
 import './EditExpenseModal.css'
+import { isValidAmount } from '../../utils/amounts.js'
+import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
 
 // Reachable by tapping any row in ExpensesPage's list — "modificare
 // cifra o giorno" on a transaction already entered, or undo it entirely
@@ -18,7 +20,7 @@ export function EditExpenseModal({ expense, onClose }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const amountValue = parseFloat(amount.replace(',', '.'))
-  const canSave = Number.isFinite(amountValue) && amountValue > 0
+  const canSave = isValidAmount(amountValue)
 
   const handleSave = () => {
     if (!canSave) return
@@ -62,6 +64,7 @@ export function EditExpenseModal({ expense, onClose }) {
             />
           </div>
         </label>
+        <AmountLimitHint value={amountValue} />
 
         <label className="edit-expense__field">
           <span>Data</span>

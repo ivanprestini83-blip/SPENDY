@@ -28,7 +28,10 @@ export function createSupabaseRemote(client) {
       // dieci. `onConflict: 'id'` rende l'operazione idempotente —
       // rimandare la stessa riga non crea un duplicato, aggiorna.
       const { error } = await client.from(table).upsert(rows, { onConflict: 'id' })
-      return { error: error ? `${table}: ${error.message}` : null }
+      // `code` è il codice Postgres/PostgREST (es. 22003 numeric overflow,
+      // 42501 RLS): serve al motore per distinguere un rifiuto definitivo
+      // della riga da un errore temporaneo (rete, timeout, 5xx).
+      return { error: error ? `${table}: ${error.message}` : null, code: error?.code ?? null }
     },
 
     async pull(table, since) {
