@@ -6,6 +6,8 @@
 // Tutta la conoscenza dei nomi delle colonne sta qui dentro: il resto
 // del sync layer ragiona solo su "righe locali" e "tabelle".
 
+import { tombstoneToRemote } from './tombstones.js'
+
 // La mappa che tiene insieme le due metà: chiave = nome della collezione
 // nello store, `table` = nome della tabella su Supabase.
 // L'ordine conta: è quello in cui pullAll scarica le tabelle. Le categorie
@@ -155,7 +157,12 @@ const MAPPERS = {
   customCategories: { toRemote: categoryToRemote, toLocal: categoryToLocal },
 }
 
-export const toRemoteRow = (collection, row, userId) => MAPPERS[collection].toRemote(row, userId)
+// Una riga cancellata viaggia come marcatore minimo (vedi tombstones.js):
+// solo i campi tecnici, valori neutri per le colonne obbligatorie.
+export const toRemoteRow = (collection, row, userId) =>
+  row.deletedAt
+    ? tombstoneToRemote(SYNC_COLLECTIONS[collection].table, row, userId)
+    : MAPPERS[collection].toRemote(row, userId)
 export const toLocalRow = (collection, row) => MAPPERS[collection].toLocal(row)
 
 // --- impostazioni (tabella profiles, una riga per utente) -------------

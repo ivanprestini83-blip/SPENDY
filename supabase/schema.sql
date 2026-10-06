@@ -194,6 +194,76 @@ drop trigger if exists custom_categories_touch on public.custom_categories;
 create trigger custom_categories_touch before insert or update on public.custom_categories
   for each row execute function public.spendy_touch_row();
 
+-- Voci cancellate: sul cloud resta solo un marcatore tecnico (id, user_id,
+-- deleted_at, timestamp). In ogni scrittura con deleted_at il contenuto è
+-- sostituito da valori neutri, anche se un client vecchio manda la riga
+-- completa. Stesso codice di tombstone_minimization.sql (lì le spiegazioni,
+-- le query di verifica e la pulizia delle voci già cancellate). Parte prima
+-- di <tabella>_touch (ordine alfabetico), che resta l'unico arbitro dei
+-- conflitti.
+create or replace function public.spendy_scrub_tombstone()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.deleted_at is null then
+    return new;
+  end if;
+
+  if tg_table_name in ('expenses', 'incomes') then
+    new.amount := 0;
+    new.category_id := 'altro';
+    new.subcategory := null;
+    new.description := '';
+    new.date := date '1970-01-01';
+  elsif tg_table_name = 'goals' then
+    new.emoji := '🎯';
+    new.label := '';
+    new.target := 0;
+    new.eta_months := 6;
+  elsif tg_table_name = 'goal_contributions' then
+    new.goal_id := '';
+    new.amount := 0;
+    new.date := date '1970-01-01';
+  elsif tg_table_name = 'emergency_fund_contributions' then
+    new.amount := 0;
+    new.date := date '1970-01-01';
+  elsif tg_table_name = 'custom_categories' then
+    new.label := '';
+    new.emoji := '🏷️';
+    new.type := 'expense';
+    new.pinned := false;
+    new.subcategories := '[]'::jsonb;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists expenses_scrub_tombstone on public.expenses;
+create trigger expenses_scrub_tombstone before insert or update on public.expenses
+  for each row execute function public.spendy_scrub_tombstone();
+
+drop trigger if exists incomes_scrub_tombstone on public.incomes;
+create trigger incomes_scrub_tombstone before insert or update on public.incomes
+  for each row execute function public.spendy_scrub_tombstone();
+
+drop trigger if exists goals_scrub_tombstone on public.goals;
+create trigger goals_scrub_tombstone before insert or update on public.goals
+  for each row execute function public.spendy_scrub_tombstone();
+
+drop trigger if exists goal_contributions_scrub_tombstone on public.goal_contributions;
+create trigger goal_contributions_scrub_tombstone before insert or update on public.goal_contributions
+  for each row execute function public.spendy_scrub_tombstone();
+
+drop trigger if exists emergency_fund_contributions_scrub_tombstone on public.emergency_fund_contributions;
+create trigger emergency_fund_contributions_scrub_tombstone before insert or update on public.emergency_fund_contributions
+  for each row execute function public.spendy_scrub_tombstone();
+
+drop trigger if exists custom_categories_scrub_tombstone on public.custom_categories;
+create trigger custom_categories_scrub_tombstone before insert or update on public.custom_categories
+  for each row execute function public.spendy_scrub_tombstone();
+
 -- ------------------------------------------------------------------- RLS
 
 alter table public.profiles                     enable row level security;

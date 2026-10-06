@@ -29,9 +29,12 @@ const withOps = (sync, collection, rows) => rows.reduce((acc, row) => withOp(acc
 // cancellazione deve poter viaggiare fino agli altri dispositivi. Dagli
 // array locali invece sparisce subito, perché tutti i calcoli (totali,
 // BehaviorEngine, Radar) leggono quegli array così come sono.
+// Della riga resta solo ciò che serve a propagare la cancellazione: niente
+// descrizione, importo, categoria o data, né nella coda né sul cloud (i
+// valori neutri per le colonne obbligatorie li mette sync/tombstones.js).
 const tombstone = (row) => {
   const at = nowIso()
-  return { ...row, deletedAt: at, updatedAt: at }
+  return { id: row.id, deletedAt: at, updatedAt: at }
 }
 
 // `saved` di un obiettivo non è più un numero che si incrementa: è

@@ -22,10 +22,24 @@
 //      STESSO updated_at (now() della transazione), come nel Postgres vero,
 //      ed è ATOMICO: se una riga è rifiutata non viene salvata nessuna riga;
 //   6. le colonne numeric(12,2) rifiutano valori oltre 9.999.999.999,99
-//      (codice Postgres 22003); l'RLS rifiuta con 42501.
+//      (codice Postgres 22003); l'RLS rifiuta con 42501;
+//   7. trigger spendy_scrub_tombstone (supabase/tombstone_minimization.sql):
+//      una riga scritta con deleted_at perde il contenuto, qualunque cosa
+//      mandi il client. I valori sono ricopiati qui A MANO dall'SQL, non
+//      importati da tombstones.js: un test li confronta con entrambi.
 import { createSupabaseRemote } from './supabaseRemote.js'
 
 export const MEMORY_DB_MAX_ROWS = 1000
+
+const EPOCH_DATE = '1970-01-01'
+export const MEMORY_DB_SCRUB = {
+  expenses: { amount: 0, category_id: 'altro', subcategory: null, description: '', date: EPOCH_DATE },
+  incomes: { amount: 0, category_id: 'altro', subcategory: null, description: '', date: EPOCH_DATE },
+  goals: { emoji: '🎯', label: '', target: 0, eta_months: 6 },
+  goal_contributions: { goal_id: '', amount: 0, date: EPOCH_DATE },
+  emergency_fund_contributions: { amount: 0, date: EPOCH_DATE },
+  custom_categories: { label: '', emoji: '🏷️', type: 'expense', pinned: false, subcategories: [] },
+}
 
 export function createMemoryDatabase({ maxRows = MEMORY_DB_MAX_ROWS } = {}) {
   const tables = new Map()
@@ -100,6 +114,8 @@ export function createMemoryDatabase({ maxRows = MEMORY_DB_MAX_ROWS } = {}) {
         const saved = {
           ...existing,
           ...row,
+          // Trigger spendy_scrub_tombstone (punto 7).
+          ...(row.deleted_at ? MEMORY_DB_SCRUB[name] : {}),
           created_at: existing?.created_at ?? at,
           updated_at: at,
         }
