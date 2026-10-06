@@ -108,7 +108,7 @@ function App() {
 
       {modal === 'addTransaction' && <AddTransactionTypeModal onClose={closeModal} />}
       {modal === 'quickAdd' && modalPayload && (
-        <QuickAddScreen type={modalPayload.type} onClose={closeModal} />
+        <QuickAddScreen type={modalPayload.type} initialCategoryId={modalPayload.categoryId} onClose={closeModal} />
       )}
       {modal === 'editExpense' && modalPayload && (
         <EditExpenseModal expense={modalPayload} onClose={closeModal} />

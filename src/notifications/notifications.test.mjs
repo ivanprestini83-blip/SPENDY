@@ -197,7 +197,7 @@ async function freshAccount(scope = scopeFor(A)) {
 
 {
   const { S, stop } = await freshAccount()
-  S().setMonthlyBudget(1000)
+  S().addSalary({ amount: 1000 })
   S().addExpense({ amount: 850, categoryId: 'spesa', description: 'x' })
   check('85% → niente', S().notifications.length === 0)
   S().addExpense({ amount: 60, categoryId: 'spesa', description: 'x' })
@@ -214,7 +214,7 @@ async function freshAccount(scope = scopeFor(A)) {
 }
 {
   const { S, stop } = await freshAccount()
-  S().setMonthlyBudget(1000)
+  S().addSalary({ amount: 1000 })
   S().addExpense({ amount: 100, categoryId: 'spesa', description: 'x' })
   S().addExpense({ amount: 1000, categoryId: 'spesa', description: 'x' })
   check('salto diretto da sotto il 90% a oltre il 100% → SOLO "superato"', S().notifications.length === 1 && /^budget:over:/.test(S().notifications[0].eventKey))
@@ -294,7 +294,7 @@ section('7. Dati remoti, caricamento account, sincronizzazione')
 // =====================================================================
 {
   const { S, stop } = await freshAccount()
-  S().setMonthlyBudget(1000)
+  S().addSalary({ amount: 1000 })
   const remote = Array.from({ length: 3 }, (_, i) => ({ id: `r-${i}`, date: S().today, amount: 500, categoryId: 'spesa', description: 'dal cloud', updatedAt: new Date().toISOString() }))
   S().applyRemote('expenses', remote)
   check('dati arrivati dal cloud che superano il budget → nessuna notifica', S().notifications.length === 0 && S().expenses.length === 3)
@@ -307,7 +307,7 @@ section('7. Dati remoti, caricamento account, sincronizzazione')
   const map = new Map()
   const first = await bootDevice(map)
   first.getState().switchScope(scopeFor(A))
-  first.getState().setMonthlyBudget(1000)
+  first.getState().addSalary({ amount: 1000 })
   first.getState().addExpense({ amount: 1500, categoryId: 'spesa', description: 'x' })
   first.getState().addGoal({ emoji: '🎯', label: 'G', target: 100, etaMonths: 1, saved: 100 })
   check('(preparazione) A senza watcher: nessuna notifica', first.getState().notifications.length === 0)

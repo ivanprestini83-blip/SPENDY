@@ -1,6 +1,7 @@
 import { isSameDay } from './date.js'
 import { getCycleRange, getCycleTiming, getPreviousCycleRange, isWithinRange } from './cycle.js'
 import { getCategory } from '../data/categories.js'
+import { extraIncomes } from './salary.js'
 
 // `cycleStartDay` (1-31, default 1) is the day-of-month the user's
 // budgeting cycle starts on — see cycle.js. Every function below takes
@@ -83,14 +84,14 @@ export function topDecreasingCategory(expenses, today, cycleStartDay = 1) {
 // duplicare la logica finanziaria nella Home" applies just as much to a
 // second page reusing the same coach.
 //
-// `incomes` (default []) are one-off income entries (Extra/Investimenti/
-// Regalo/Rimborso/custom — see useAppStore's addIncome) on top of the
-// recurring `monthlyBudget` ("Stipendio"): `totalForMonth` is generic
-// over any {date, amount} list, so the exact same cycle-bucketing logic
-// that sums expenses sums these too, no separate calculation needed.
+// `monthlyBudget` qui è lo stipendio DEL CICLO IN CORSO (utils/salary.js
+// currentCycleSalary), non più una cifra ricorrente: 0 se in questo ciclo non
+// è ancora stato inserito. `incomes` (default []) sono le entrate: quelle
+// "stipendio" sono già in monthlyBudget, quindi qui si sommano solo le extra
+// (Extra/Investimenti/Regalo/Rimborso/personalizzate) del ciclo.
 export function buildFinancialData({ today, monthlyBudget, expenses, goals, cycleStartDay = 1, incomes = [] }) {
   const spentThisMonth = totalForMonth(expenses, today, cycleStartDay)
-  const extraIncomeThisMonth = totalForMonth(incomes, today, cycleStartDay)
+  const extraIncomeThisMonth = totalForMonth(extraIncomes(incomes), today, cycleStartDay)
   const available = monthlyBudget + extraIncomeThisMonth - spentThisMonth
   const spentRatio = monthlyBudget > 0 ? (spentThisMonth / monthlyBudget) * 100 : 0
 

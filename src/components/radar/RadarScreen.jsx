@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore.js'
 import { buildFinancialData } from '../../utils/budgetCalculations.js'
+import { currentCycleSalary } from '../../utils/salary.js'
 import { buildRadar, RADAR_STATUS } from '../../utils/radarEngine.js'
 import { SpendyCharacterWithMessage } from '../spendy/SpendyCharacterWithMessage.jsx'
 import { RadarDetailModal } from '../modals/RadarDetailModal.jsx'
@@ -13,10 +14,12 @@ import './RadarScreen.css'
 // bisogno di un browser.
 export function RadarScreen({ onClose }) {
   const today = useAppStore((state) => state.today)
-  const monthlyBudget = useAppStore((state) => state.monthlyBudget)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
   const incomes = useAppStore((state) => state.incomes)
+  // Lo stipendio DEL CICLO IN CORSO (utils/salary.js): 0 finché in questo
+  // ciclo non è stato inserito, mai quello del ciclo precedente.
+  const monthlyBudget = currentCycleSalary(incomes, today, cycleStartDay)
   const goals = useAppStore((state) => state.goals)
   const jokeHistory = useAppStore((state) => state.spendyJokeHistory)
   const setActiveTab = useAppStore((state) => state.setActiveTab)

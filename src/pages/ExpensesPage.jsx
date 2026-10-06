@@ -1,14 +1,18 @@
 import { useAppStore } from '../store/useAppStore.js'
 import { totalForMonth } from '../utils/budgetCalculations.js'
+import { currentCycleSalary } from '../utils/salary.js'
 import { formatCurrency } from '../utils/format.js'
 import { getCategory } from '../data/categories.js'
 import './ExpensesPage.css'
 
 export function ExpensesPage() {
   const today = useAppStore((state) => state.today)
-  const monthlyBudget = useAppStore((state) => state.monthlyBudget)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
+  const incomes = useAppStore((state) => state.incomes)
+  // Lo stipendio DEL CICLO IN CORSO (utils/salary.js): 0 finché in questo
+  // ciclo non è stato inserito, mai quello del ciclo precedente.
+  const monthlyBudget = currentCycleSalary(incomes, today, cycleStartDay)
   const openModal = useAppStore((state) => state.openModal)
   const setActiveTab = useAppStore((state) => state.setActiveTab)
 
@@ -31,7 +35,7 @@ export function ExpensesPage() {
           arrivare a un'entrata già inserita e correggerne importo o
           data — la bottom nav non ha una voce Entrate. */}
       <button type="button" className="expenses-page__switch" onClick={() => setActiveTab('incomes')}>
-        Vedi le entrate extra <span aria-hidden="true">→</span>
+        Vedi le entrate <span aria-hidden="true">→</span>
       </button>
 
       <button type="button" className="expenses-page__add" onClick={() => openModal('quickAdd', { type: 'expense' })}>

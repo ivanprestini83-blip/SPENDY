@@ -3,16 +3,22 @@
 // regole di ciclo/budget del resto dell'app — il test 13 lo verifica
 // confrontando il ciclo corrente con buildFinancialData, cioè con quello
 // che la Home mostra davvero.
+//
+// Lo stipendio è un'entrata 'stipendio' registrata in un ciclo (utils/
+// salary.js): qui, salvo dove indicato, ce n'è uno da 1500 € a settembre.
 
 import { check, section, report } from '../sync/testkit.mjs'
 import { buildAndamento, compareCycles, computeChange, ANDAMENTO_MAX_CYCLES } from './andamentoEngine.js'
 import { buildFinancialData } from './budgetCalculations.js'
+import { currentCycleSalary } from './salary.js'
 
 const TODAY = '2026-09-22'
 let seq = 0
 const expense = (date, amount, categoryId = 'spesa') => ({ id: `e-${seq++}`, date, amount, categoryId, updatedAt: '2026-09-01T00:00:00Z' })
 const income = (date, amount, categoryId = 'extra') => ({ id: `i-${seq++}`, date, amount, categoryId, updatedAt: '2026-09-01T00:00:00Z' })
-const andamento = (input) => buildAndamento({ today: TODAY, cycleStartDay: 1, monthlyBudget: 1500, ...input })
+const salary = (date, amount) => income(date, amount, 'stipendio')
+const andamento = ({ incomes = [], ...input } = {}) =>
+  buildAndamento({ today: TODAY, cycleStartDay: 1, ...input, incomes: [salary('2026-09-01', 1500), ...incomes] })
 const cycleAt = (result, start) => result.cycles.find((cycle) => cycle.key === start)
 const near = (a, b) => Math.abs(a - b) < 1e-9
 
@@ -26,8 +32,8 @@ check('spese a zero', vuoto.current.spent === 0 && vuoto.current.categories.leng
 check('entrate = stipendio', vuoto.current.income === 1500)
 check('risparmio = stipendio', vuoto.current.savings === 1500)
 check('budget usato 0%', vuoto.current.budgetUsed === 0)
-check('hasData false', vuoto.hasData === false)
-const senzaStipendio = andamento({ monthlyBudget: 0 })
+check('hasData false (nessuna spesa né entrata)', buildAndamento({ today: TODAY }).hasData === false)
+const senzaStipendio = buildAndamento({ today: TODAY, cycleStartDay: 1 })
 check('senza stipendio il budget usato è null, non 0% né NaN', senzaStipendio.current.budgetUsed === null)
 
 // =====================================================================
@@ -81,7 +87,7 @@ check('una spesa futura non crea cicli nel futuro', futuro.cycles.length === 1 &
 section('5. Ciclo personalizzato con cycleStartDay = 27')
 // =====================================================================
 const custom = buildAndamento({
-  today: TODAY, cycleStartDay: 27, monthlyBudget: 1700,
+  today: TODAY, cycleStartDay: 27, incomes: [salary('2026-08-27', 1700)],
   expenses: [expense('2026-08-27', 100), expense('2026-09-22', 50), expense('2026-08-26', 400), expense('2026-07-27', 30)],
 })
 check('il ciclo corrente va dal 27 agosto al 26 settembre', custom.current.range.start === '2026-08-27' && custom.current.range.end === '2026-09-27')
@@ -90,21 +96,21 @@ check('etichetta breve "27 Ago"', custom.current.shortLabel === '27 Ago')
 check('il 27/8 sta nel ciclo corrente, il 26/8 no', custom.current.spent === 150)
 check('il 26/8 sta nel ciclo precedente, col 27/7', cycleAt(custom, '2026-07-27').spent === 430)
 check('due cicli in tutto', custom.cycles.length === 2)
-const nullDay = buildAndamento({ today: TODAY, cycleStartDay: null, monthlyBudget: 0, expenses: [expense('2026-09-01', 5)] })
+const nullDay = buildAndamento({ today: TODAY, cycleStartDay: null, expenses: [expense('2026-09-01', 5)] })
 check('cycleStartDay null si comporta come il mese di calendario', nullDay.current.label === 'Settembre 2026')
 
 // =====================================================================
 section('6. Confronto tra due cicli')
 // =====================================================================
 const esempio = buildAndamento({
-  today: TODAY, cycleStartDay: 1, monthlyBudget: 1500,
+  today: TODAY, cycleStartDay: 1,
   expenses: [
     expense('2026-08-05', 180, 'ristoranti'), expense('2026-08-06', 320, 'spesa'), expense('2026-08-07', 150, 'shopping'),
     expense('2026-08-08', 590, 'casa'),
     expense('2026-09-05', 110, 'ristoranti'), expense('2026-09-06', 350, 'spesa'), expense('2026-09-07', 30, 'bar'),
     expense('2026-09-08', 590, 'casa'),
   ],
-  incomes: [income('2026-08-20', 200), income('2026-09-20', 200)],
+  incomes: [salary('2026-08-01', 1500), salary('2026-09-01', 1500), income('2026-08-20', 200), income('2026-09-20', 200)],
 })
 const agosto = cycleAt(esempio, '2026-08-01')
 const settembre = cycleAt(esempio, '2026-09-01')
@@ -117,8 +123,8 @@ check('risparmio +160', confronto.savings.diff === 160 && confronto.savings.kind
 check('budget usato 82,7% → 72%', near(confronto.budgetUsed.before, (1240 / 1500) * 100) && near(confronto.budgetUsed.after, 72))
 check('differenza in punti di budget', near(confronto.budgetUsed.diffPoints, 72 - (1240 / 1500) * 100))
 check('senza stipendio il confronto budget è null', compareCycles(
-  buildAndamento({ today: TODAY, monthlyBudget: 0 }).current,
-  buildAndamento({ today: TODAY, monthlyBudget: 0 }).current,
+  buildAndamento({ today: TODAY }).current,
+  buildAndamento({ today: TODAY }).current,
 ).budgetUsed === null)
 
 // =====================================================================
@@ -143,7 +149,7 @@ check('0 → 0 è "uguale", senza percentuale', computeChange(0, 0).kind === 'sa
 check('riga categoria nuova senza percentuale', riga('bar').percent === null)
 check('categoria azzerata: -100% calcolabile ma segnata "gone"', riga('shopping').percent === -100 && riga('shopping').kind === 'gone')
 check('base negativa (risparmio in rosso): niente percentuale', computeChange(-50, 100).percent === null && computeChange(-50, 100).kind === 'up')
-const cicloVuoto = buildAndamento({ today: TODAY, monthlyBudget: 0, expenses: [expense('2026-07-05', 100)] })
+const cicloVuoto = buildAndamento({ today: TODAY, expenses: [expense('2026-07-05', 100)] })
 const daVuoto = compareCycles(cycleAt(cicloVuoto, '2026-08-01'), cicloVuoto.current)
 check('confronto fra due cicli vuoti: tutto finito', [daVuoto.spent, daVuoto.income, daVuoto.savings]
   .every((change) => Number.isFinite(change.diff) && change.percent === null))
@@ -169,7 +175,7 @@ section('12. Cicli senza dati intermedi')
 const buchi = andamento({ expenses: [expense('2026-05-10', 200, 'viaggi'), expense('2026-09-10', 100)] })
 check('cinque cicli da maggio a settembre, anche se vuoti in mezzo', buchi.cycles.length === 5)
 check('i cicli intermedi sono a zero', buchi.cycles.slice(1, 4).every((c) => c.spent === 0 && c.categories.length === 0))
-check('ma hanno comunque lo stipendio', buchi.cycles.slice(1, 4).every((c) => c.income === 1500 && c.savings === 1500))
+check('e senza uno stipendio registrato hanno stipendio 0 (nessuna eredità)', buchi.cycles.slice(1, 4).every((c) => c.salary === 0 && c.income === 0 && c.savings === 0 && c.budgetUsed === null))
 check('confronto maggio vs settembre salta i buchi', compareCycles(buchi.cycles[0], buchi.current).spent.diff === -100)
 
 // =====================================================================
@@ -177,9 +183,9 @@ section('13. Coerenza con i numeri della Home (buildFinancialData)')
 // =====================================================================
 for (const cycleStartDay of [1, 27]) {
   const expenses = [expense('2026-09-01', 33.3), expense('2026-08-28', 12.2), expense('2026-09-20', 400, 'casa')]
-  const incomes = [income('2026-09-02', 75)]
-  const home = buildFinancialData({ today: TODAY, monthlyBudget: 1200, expenses, incomes, goals: [], cycleStartDay })
-  const { current } = buildAndamento({ today: TODAY, monthlyBudget: 1200, expenses, incomes, cycleStartDay })
+  const incomes = [income('2026-09-02', 75), salary('2026-09-01', 1200)]
+  const home = buildFinancialData({ today: TODAY, monthlyBudget: currentCycleSalary(incomes, TODAY, cycleStartDay), expenses, incomes, goals: [], cycleStartDay })
+  const { current } = buildAndamento({ today: TODAY, expenses, incomes, cycleStartDay })
   check(`giorno ${cycleStartDay}: spese uguali alla Home`, near(current.spent, Math.round(home.spentThisMonth * 100) / 100))
   check(`giorno ${cycleStartDay}: risparmio = disponibile della Home`, near(current.savings, Math.round(home.available * 100) / 100))
   check(`giorno ${cycleStartDay}: budget usato = spentRatio della Home`, near(current.budgetUsed, home.spentRatio))

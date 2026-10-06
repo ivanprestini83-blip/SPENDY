@@ -11,10 +11,13 @@
 //
 // Le regole sui cicli sono quelle di cycle.js (le stesse di Budget, Analisi
 // e Radar), le somme sono quelle di budgetCalculations.js, e le entrate
-// seguono buildFinancialData: lo stipendio è `monthlyBudget`, una cifra
-// ricorrente che vale per ogni ciclo, più le entrate una tantum del ciclo.
+// seguono utils/salary.js: lo stipendio di un ciclo è la somma delle entrate
+// "stipendio" registrate in quel ciclo (0 se non ce ne sono), più le entrate
+// extra del ciclo. `monthlyBudget` non conta: non è lo stipendio di nessun
+// ciclo, e cambiare lo stipendio di oggi non riscrive i cicli passati.
 import { lastCycles, getPreviousCycleRange, isWithinRange, formatCycleLabel, formatCycleStartLabel } from './cycle.js'
 import { totalForPeriod } from './budgetCalculations.js'
+import { extraIncomes, salaryForPeriod } from './salary.js'
 import { getCategory } from '../data/categories.js'
 
 // Oltre un anno la schermata smetterebbe di essere "come sto andando" e
@@ -67,10 +70,11 @@ function countCyclesWithData(entries, currentRange, cycleStartDay, maxCycles) {
   return count
 }
 
-function buildCycle({ range, expenses, incomes, monthlyBudget, cycleStartDay, isCurrent }) {
+function buildCycle({ range, expenses, incomes, cycleStartDay, isCurrent }) {
   const spent = round2(totalForPeriod(expenses, range))
-  const extraIncome = round2(totalForPeriod(incomes, range))
-  const income = round2(monthlyBudget + extraIncome)
+  const salary = round2(salaryForPeriod(incomes, range))
+  const extraIncome = round2(totalForPeriod(extraIncomes(incomes), range))
+  const income = round2(salary + extraIncome)
   const categoryTotals = categoriesFor(expenses, range)
 
   const categories = [...categoryTotals.entries()]
@@ -89,38 +93,38 @@ function buildCycle({ range, expenses, incomes, monthlyBudget, cycleStartDay, is
     label: formatCycleLabel(range, cycleStartDay),
     shortLabel: formatCycleStartLabel(range, cycleStartDay),
     isCurrent,
-    salary: monthlyBudget,
+    salary,
     extraIncome,
     income,
     spent,
     // Stessa formula di buildFinancialData.available.
     savings: round2(income - spent),
-    // Stessa formula di buildFinancialData.spentRatio; null invece di 0
-    // quando lo stipendio non è impostato, perché "0% del budget" su un
-    // budget che non esiste sarebbe una bugia rassicurante.
-    budgetUsed: monthlyBudget > 0 ? (spent / monthlyBudget) * 100 : null,
+    // Stessa formula di buildFinancialData.spentRatio, sullo stipendio DI
+    // QUESTO ciclo; null invece di 0 quando in questo ciclo non c'è uno
+    // stipendio, perché "0% del budget" su un budget che non esiste sarebbe
+    // una bugia rassicurante (e niente divisione per zero).
+    budgetUsed: salary > 0 ? (spent / salary) * 100 : null,
     expenseCount: expenses.filter((expense) => isWithinRange(expense.date, range)).length,
     categories,
   }
 }
 
-// Input: gli stessi campi dello store, passati a mano.
+// Input: gli stessi campi dello store, passati a mano (un eventuale
+// `monthlyBudget` viene ignorato: vedi sopra).
 // Output: { cycles (dal più vecchio al corrente), current, hasData }.
 export function buildAndamento({
   expenses = [],
   incomes = [],
-  monthlyBudget = 0,
   today,
   cycleStartDay = 1,
   maxCycles = ANDAMENTO_MAX_CYCLES,
 }) {
   const startDay = cycleStartDay ?? 1
-  const budget = Number.isFinite(monthlyBudget) ? monthlyBudget : 0
   const [currentRange] = lastCycles(today, 1, startDay)
   const count = countCyclesWithData([...expenses, ...incomes], currentRange, startDay, maxCycles)
 
   const cycles = lastCycles(today, count, startDay).map((range, index) =>
-    buildCycle({ range, expenses, incomes, monthlyBudget: budget, cycleStartDay: startDay, isCurrent: index === count - 1 }),
+    buildCycle({ range, expenses, incomes, cycleStartDay: startDay, isCurrent: index === count - 1 }),
   )
 
   return {

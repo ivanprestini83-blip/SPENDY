@@ -1,0 +1,56 @@
+.salary-transition {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-accent-violet-soft);
+  box-shadow: var(--shadow-card);
+}
+
+.salary-transition__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.salary-transition__text {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.salary-transition__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.salary-transition__primary,
+.salary-transition__secondary {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.salary-transition__primary {
+  background: var(--color-accent-violet);
+  color: #ffffff;
+}
+
+.salary-transition__secondary {
+  background: var(--color-accent-violet-soft);
+  color: var(--color-accent-violet);
+}
+
+.salary-transition__link {
+  align-self: center;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}

@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useAppStore } from '../store/useAppStore.js'
 import { buildFinancialData } from '../utils/budgetCalculations.js'
+import { currentCycleSalary } from '../utils/salary.js'
 import { getSpendyCoach, getInsightTopicKey } from '../utils/spendyCoach.js'
 import { buildRadar, RADAR_STATUS } from '../utils/radarEngine.js'
 import { SpendyCharacterWithMessage } from '../components/spendy/SpendyCharacterWithMessage.jsx'
@@ -20,10 +21,12 @@ import './SpendyPage.css'
 // percentage-only tiers HomePage isn't limited to.
 export function SpendyPage() {
   const today = useAppStore((state) => state.today)
-  const monthlyBudget = useAppStore((state) => state.monthlyBudget)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
   const incomes = useAppStore((state) => state.incomes)
+  // Lo stipendio DEL CICLO IN CORSO (utils/salary.js): 0 finché in questo
+  // ciclo non è stato inserito, mai quello del ciclo precedente.
+  const monthlyBudget = currentCycleSalary(incomes, today, cycleStartDay)
   const goals = useAppStore((state) => state.goals)
   const openModal = useAppStore((state) => state.openModal)
   const jokeHistory = useAppStore((state) => state.spendyJokeHistory)

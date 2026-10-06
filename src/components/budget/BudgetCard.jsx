@@ -71,7 +71,11 @@ export function BudgetCard({ available, spent, monthlyBudget, period, hidden, on
         {hidden ? '•••• €' : formatCurrency(available)}
       </p>
 
-      <p className="budget-card__period">Budget mensile {formatCurrency(monthlyBudget)} · {period}</p>
+      {/* Il budget è lo stipendio di QUESTO ciclo (utils/salary.js): a inizio
+          ciclo, finché non viene inserito, è 0 e lo si dice. */}
+      <p className="budget-card__period">
+        {monthlyBudget > 0 ? `Budget mensile ${formatCurrency(monthlyBudget)}` : 'Stipendio di questo ciclo non ancora inserito'} · {period}
+      </p>
 
       <div className="budget-card__progress">
         <ProgressBar value={animatedRatio} colorValue={BUDGET_BAR_COLORS[barState]} />

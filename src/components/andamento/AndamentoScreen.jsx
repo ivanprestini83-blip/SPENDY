@@ -16,14 +16,13 @@ import './AndamentoScreen.css'
 // il sync tiene allineate fra Mac e Samsung.
 export function AndamentoScreen({ onClose }) {
   const today = useAppStore((state) => state.today)
-  const monthlyBudget = useAppStore((state) => state.monthlyBudget)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
   const incomes = useAppStore((state) => state.incomes)
 
   const andamento = useMemo(
-    () => buildAndamento({ expenses, incomes, monthlyBudget, today, cycleStartDay }),
-    [expenses, incomes, monthlyBudget, today, cycleStartDay],
+    () => buildAndamento({ expenses, incomes, today, cycleStartDay }),
+    [expenses, incomes, today, cycleStartDay],
   )
   const { cycles, current } = andamento
   const previous = cycles.length > 1 ? cycles[cycles.length - 2] : current

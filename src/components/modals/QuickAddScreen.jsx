@@ -5,6 +5,7 @@ import { EMOJI_GROUPS } from '../../data/emojiPicker.js'
 import './QuickAddScreen.css'
 import { isValidAmount } from '../../utils/amounts.js'
 import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
+import { SALARY_CATEGORY_ID, lastKnownSalary } from '../../utils/salary.js'
 
 // "tenendole premute" — how long a press on a custom category tile has
 // to hold before it counts as a long-press (pin/unpin) instead of a tap
@@ -22,26 +23,39 @@ const LONG_PRESS_MOVE_TOLERANCE_PX = 10
 // The whole point of this screen: registrare una spesa in 2 passaggi —
 // tap an icon, type an amount, confirm. No dropdown, no required
 // description/date. Reuses the exact same store actions the old
-// AddExpenseModal/SetBudgetModal used (addExpense/addIncome/
-// setMonthlyBudget) — this is a new SHELL around existing actions, not a
+// AddExpenseModal/SetBudgetModal used (addExpense/addIncome; lo stipendio
+// passa da addSalary, un'entrata datata) — this is a new SHELL around existing actions, not a
 // second transaction system. Once confirmed, the store update alone is
 // what makes budget/Analisi/donut/Radar/Spendy's joke all react —
 // HomePage/AnalyticsPage/SpendyPage already recompute everything from
 // the store on every render, so nothing here needs to "push" to them.
-export function QuickAddScreen({ type, onClose }) {
+export function QuickAddScreen({ type, initialCategoryId = null, onClose }) {
   const today = useAppStore((state) => state.today)
   const monthlyBudget = useAppStore((state) => state.monthlyBudget)
+  const incomes = useAppStore((state) => state.incomes)
   const customCategories = useAppStore((state) => state.customCategories)
   const addExpense = useAppStore((state) => state.addExpense)
   const addIncome = useAppStore((state) => state.addIncome)
-  const setMonthlyBudget = useAppStore((state) => state.setMonthlyBudget)
+  const addSalary = useAppStore((state) => state.addSalary)
   const addCustomCategory = useAppStore((state) => state.addCustomCategory)
   const deleteCustomCategory = useAppStore((state) => state.deleteCustomCategory)
   const togglePinCategory = useAppStore((state) => state.togglePinCategory)
 
-  const [step, setStep] = useState('pick') // 'pick' | 'amount' | 'newCategory'
-  const [category, setCategory] = useState(null)
-  const [amount, setAmount] = useState('')
+  // Lo stipendio proposto nel campo: l'ultimo conosciuto, solo come testo
+  // (nessuna entrata esiste finché non si preme Conferma).
+  const salarySuggestion = () => {
+    const suggested = lastKnownSalary(incomes, monthlyBudget)
+    return suggested > 0 ? String(suggested) : ''
+  }
+  // Aperta con una categoria già scelta (es. "Inserisci un altro importo"
+  // della scheda di passaggio allo stipendio per ciclo): si parte dall'importo.
+  const initialCategory = initialCategoryId
+    ? (type === 'expense' ? CATEGORIES : INCOME_CATEGORIES).find((cat) => cat.id === initialCategoryId) ?? null
+    : null
+
+  const [step, setStep] = useState(initialCategory ? 'amount' : 'pick') // 'pick' | 'amount' | 'newCategory'
+  const [category, setCategory] = useState(initialCategory)
+  const [amount, setAmount] = useState(() => (initialCategory?.id === SALARY_CATEGORY_ID ? salarySuggestion() : ''))
   const [showDetails, setShowDetails] = useState(false)
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(today)
@@ -84,7 +98,7 @@ export function QuickAddScreen({ type, onClose }) {
     }
     setCategory(pickedCategory)
     setCategoryOverride('')
-    setAmount(pickedCategory.id === 'stipendio' && monthlyBudget > 0 ? String(monthlyBudget) : '')
+    setAmount(pickedCategory.id === SALARY_CATEGORY_ID ? salarySuggestion() : '')
     setDescription('')
     setDate(today)
     setShowDetails(false)
@@ -133,8 +147,8 @@ export function QuickAddScreen({ type, onClose }) {
     const finalCategoryId = categoryOverride || category.id
     if (isExpense) {
       addExpense({ amount: amountValue, categoryId: finalCategoryId, description: description.trim() || category.label, date })
-    } else if (finalCategoryId === 'stipendio') {
-      setMonthlyBudget(amountValue, date)
+    } else if (finalCategoryId === SALARY_CATEGORY_ID) {
+      addSalary({ amount: amountValue, description: description.trim() || category.label, date })
     } else {
       addIncome({ amount: amountValue, categoryId: finalCategoryId, description: description.trim() || category.label, date })
     }

@@ -16,20 +16,17 @@ import './SettingsScreen.css'
 // FIRST time ever, by design (a stipendio entered every month shouldn't
 // keep reshuffling the billing cycle). "la data del guadagno non cambia
 // in home" after that first time isn't a bug, it's this missing control.
-// Same reasoning is why "cancellare uno stipendio già registrato" lives
-// here too: Stipendio is a single recurring figure with no per-entry
-// list anywhere else to delete a row from (see useAppStore's
-// deleteMonthlyBudget).
+// Lo stipendio invece non si gestisce più qui: è un'entrata datata per
+// ciclo (useAppStore addSalary), che si modifica o si elimina dalla lista
+// delle entrate come tutte le altre.
 export function SettingsScreen({ onClose }) {
   const today = useAppStore((state) => state.today)
   const monthlyBudget = useAppStore((state) => state.monthlyBudget)
-  const deleteMonthlyBudget = useAppStore((state) => state.deleteMonthlyBudget)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay)
   const setCycleStartDay = useAppStore((state) => state.setCycleStartDay)
 
   const [day, setDay] = useState(String(cycleStartDay ?? 1))
   const [saved, setSaved] = useState(false)
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const dayValue = parseInt(day, 10)
   const canSave = Number.isInteger(dayValue) && dayValue >= 1 && dayValue <= 31
@@ -41,15 +38,6 @@ export function SettingsScreen({ onClose }) {
     if (!canSave) return
     setCycleStartDay(dayValue)
     setSaved(true)
-  }
-
-  const handleDeleteBudget = () => {
-    if (!confirmingDelete) {
-      setConfirmingDelete(true)
-      return
-    }
-    deleteMonthlyBudget()
-    setConfirmingDelete(false)
   }
 
   return (
@@ -66,19 +54,10 @@ export function SettingsScreen({ onClose }) {
           <p className="settings-screen__label">Stipendio</p>
           <p className="settings-screen__hint">
             {monthlyBudget > 0
-              ? `Guadagno mensile impostato: ${formatCurrency(monthlyBudget)}.`
-              : 'Nessuno stipendio impostato al momento.'}
+              ? `Ultimo stipendio inserito: ${formatCurrency(monthlyBudget)}. `
+              : 'Nessuno stipendio inserito finora. '}
+            Ogni ciclo usa lo stipendio inserito in quel ciclo (+ → Guadagno → Stipendio); per correggerlo o eliminarlo, aprilo dalla lista delle entrate.
           </p>
-
-          {monthlyBudget > 0 && (
-            <button
-              type="button"
-              className={`settings-screen__delete${confirmingDelete ? ' settings-screen__delete--confirm' : ''}`}
-              onClick={handleDeleteBudget}
-            >
-              {confirmingDelete ? 'Tocca di nuovo per confermare' : '🗑️ Elimina stipendio'}
-            </button>
-          )}
         </div>
 
         <div className="settings-screen__card">

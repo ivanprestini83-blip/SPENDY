@@ -6,6 +6,7 @@ import {
 } from '../utils/budgetCalculations.js'
 import { getSpendyCoach, getInsightTopicKey } from '../utils/spendyCoach.js'
 import { getCycleRange, formatCycleLabel } from '../utils/cycle.js'
+import { currentCycleSalary } from '../utils/salary.js'
 import { buildRadar } from '../utils/radarEngine.js'
 import { SpendyHero } from '../components/spendy/SpendyHero.jsx'
 import { getSpendyHeroLayout } from '../components/spendy/spendyHeroLayouts.js'
@@ -13,6 +14,7 @@ import { RadarPreview } from '../components/radar/RadarPreview.jsx'
 import { SpendyVoiceDebug } from '../components/spendy/SpendyVoiceDebug.jsx'
 import { useSpendyVoice } from '../ai/useSpendyVoice.js'
 import { BudgetCard } from '../components/budget/BudgetCard.jsx'
+import { SalaryTransitionCard } from '../components/budget/SalaryTransitionCard.jsx'
 import { ExpenseSummaryCards } from '../components/budget/ExpenseSummaryCards.jsx'
 import { AffordabilityCTA } from '../components/affordability/AffordabilityCTA.jsx'
 import { GoalCard } from '../components/goals/GoalCard.jsx'
@@ -36,10 +38,15 @@ const EMERGENCY_FUND_TARGET_MONTHS = 6
 // just recompute from the latest numbers.
 export function HomePage() {
   const today = useAppStore((state) => state.today)
-  const monthlyBudget = useAppStore((state) => state.monthlyBudget)
+  // L'ultimo stipendio inserito: solo per l'obiettivo del fondo emergenza
+  // (logica invariata, monthlyBudget × mesi).
+  const lastSalary = useAppStore((state) => state.monthlyBudget)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
   const incomes = useAppStore((state) => state.incomes)
+  // Lo stipendio DEL CICLO IN CORSO (utils/salary.js): 0 finché in questo
+  // ciclo non è stato inserito, mai quello del ciclo precedente.
+  const monthlyBudget = currentCycleSalary(incomes, today, cycleStartDay)
   const goals = useAppStore((state) => state.goals)
   const emergencyFundSaved = useAppStore((state) => state.emergencyFundSaved)
   const amountHidden = useAppStore((state) => state.amountHidden)
@@ -133,7 +140,7 @@ export function HomePage() {
     emoji: '🚨',
     label: 'Fondo emergenza',
     saved: emergencyFundSaved,
-    target: monthlyBudget * EMERGENCY_FUND_TARGET_MONTHS,
+    target: lastSalary * EMERGENCY_FUND_TARGET_MONTHS,
     etaMonths: null,
   }
 
@@ -155,6 +162,8 @@ export function HomePage() {
       />
 
       <SpendyVoiceDebug voice={voice} debug={voiceDebug} />
+
+      <SalaryTransitionCard />
 
       <BudgetCard
         available={available}

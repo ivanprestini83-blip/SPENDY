@@ -57,7 +57,7 @@ export function CycleSummary({ cycle }) {
           <span className="cycle-summary__metric-label">Budget utilizzato</span>
           <span className="cycle-summary__metric-value">{formatPercent(cycle.budgetUsed)}</span>
           {cycle.budgetUsed === null ? (
-            <span className="cycle-summary__metric-note">stipendio non impostato</span>
+            <span className="cycle-summary__metric-note">stipendio non registrato in questo ciclo</span>
           ) : (
             <ProgressBar
               value={cycle.budgetUsed}

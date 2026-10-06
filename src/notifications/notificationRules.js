@@ -13,6 +13,7 @@
 
 import { buildFinancialData } from '../utils/budgetCalculations.js'
 import { getCycleRange } from '../utils/cycle.js'
+import { currentCycleSalary } from '../utils/salary.js'
 import { buildRadar, RADAR_ACTIONS } from '../utils/radarEngine.js'
 import { getInsightTopicKey } from '../utils/spendyCoach.js'
 import { BEHAVIOR_TYPES } from '../utils/behaviorEngine.js'
@@ -49,11 +50,16 @@ export function dayOf(date) {
 
 const cycleStartOf = (state) => getCycleRange(state.today, state.cycleStartDay ?? 1).start
 
+// Lo stipendio del ciclo in corso (utils/salary.js), non monthlyBudget: senza
+// uno stipendio registrato in questo ciclo non c'è un budget da superare.
+const cycleSalaryOf = (state) => currentCycleSalary(state.incomes, state.today, state.cycleStartDay ?? 1)
+
 const spentRatioOf = (state) => {
-  if (!(state.monthlyBudget > 0)) return 0
+  const monthlyBudget = cycleSalaryOf(state)
+  if (!(monthlyBudget > 0)) return 0
   return buildFinancialData({
     today: state.today,
-    monthlyBudget: state.monthlyBudget,
+    monthlyBudget,
     expenses: state.expenses,
     incomes: state.incomes,
     goals: state.goals,
@@ -74,7 +80,7 @@ export function isLocalChange(prev, next) {
 // ------------------------------------------------------------------- budget
 
 export function budgetNotifications(prev, next) {
-  if (!(next.monthlyBudget > 0)) return []
+  if (!(cycleSalaryOf(next) > 0)) return []
   const before = spentRatioOf(prev)
   const after = spentRatioOf(next)
   const { budgetNear, budgetOver } = NOTIFICATION_THRESHOLDS
@@ -128,12 +134,13 @@ const NOT_FOR_RADAR_NOTIFICATIONS = new Set([
 function importantRadarCards(state) {
   if (!state.today) return new Map()
   const cycleStartDay = state.cycleStartDay ?? 1
+  const monthlyBudget = cycleSalaryOf(state)
   const financialData = buildFinancialData({
-    today: state.today, monthlyBudget: state.monthlyBudget, expenses: state.expenses,
+    today: state.today, monthlyBudget, expenses: state.expenses,
     incomes: state.incomes, goals: state.goals, cycleStartDay,
   })
   const radar = buildRadar({
-    expenses: state.expenses, goals: state.goals, today: state.today, monthlyBudget: state.monthlyBudget,
+    expenses: state.expenses, goals: state.goals, today: state.today, monthlyBudget,
     cycleStartDay, financialData, jokeHistory: [], rng: () => 0,
   })
   const cards = new Map()

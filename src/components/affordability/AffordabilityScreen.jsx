@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore.js'
 import { totalForMonth } from '../../utils/budgetCalculations.js'
+import { currentCycleSalary } from '../../utils/salary.js'
 import { evaluateAffordability } from '../../utils/affordability.js'
 import './AffordabilityScreen.css'
 
@@ -12,9 +13,12 @@ const LEVEL_EMOJI = { green: '🟢', yellow: '🟡', red: '🔴' }
 // already in the store.
 export function AffordabilityScreen({ onClose }) {
   const today = useAppStore((state) => state.today)
-  const monthlyBudget = useAppStore((state) => state.monthlyBudget)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
+  const incomes = useAppStore((state) => state.incomes)
+  // Lo stipendio DEL CICLO IN CORSO (utils/salary.js): 0 finché in questo
+  // ciclo non è stato inserito, mai quello del ciclo precedente.
+  const monthlyBudget = currentCycleSalary(incomes, today, cycleStartDay)
   const goals = useAppStore((state) => state.goals)
 
   const [amount, setAmount] = useState('')
