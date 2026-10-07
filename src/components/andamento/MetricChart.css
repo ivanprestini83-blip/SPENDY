@@ -1,0 +1,126 @@
+/* Il pannello del grafico di una metrica (MetricChart.jsx): occupa tutta la
+   riga della griglia 2 × 2, sotto il riquadro toccato. */
+.metric-chart {
+  grid-column: 1 / -1;
+  min-width: 0;
+  padding: 12px 14px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-float);
+  animation: metric-chart-in 0.22s var(--ease-standard);
+}
+
+.metric-chart__title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.metric-chart__periods {
+  margin-top: 1px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+}
+
+.metric-chart__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 4px;
+  overflow: visible;
+}
+
+.metric-chart__grid {
+  stroke: rgba(16, 26, 51, 0.06);
+  stroke-width: 1;
+}
+
+.metric-chart__line {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: metric-chart-draw 0.28s var(--ease-standard);
+}
+
+.metric-chart__dot {
+  fill: var(--color-surface);
+  stroke-width: 3;
+}
+
+.metric-chart__dot--missing {
+  stroke: var(--color-text-tertiary);
+  stroke-dasharray: 3 3;
+  stroke-width: 2;
+}
+
+.metric-chart__value {
+  font-size: 13px;
+  font-weight: 800;
+  fill: var(--color-text-primary);
+}
+
+.metric-chart__label {
+  font-size: 11.5px;
+  font-weight: 700;
+  fill: var(--color-text-tertiary);
+}
+
+.metric-chart--violet .metric-chart__line,
+.metric-chart--violet .metric-chart__dot:not(.metric-chart__dot--missing) { stroke: var(--color-accent-violet); }
+.metric-chart--mint .metric-chart__line,
+.metric-chart--mint .metric-chart__dot:not(.metric-chart__dot--missing) { stroke: var(--color-accent-mint); }
+
+.metric-chart__summary {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.metric-chart__summary--good { color: var(--color-accent-mint); }
+.metric-chart__summary--bad { color: var(--color-accent-coral); }
+.metric-chart__summary--flat { color: var(--color-text-secondary); }
+
+.metric-chart__sentence {
+  margin-top: 2px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
+.metric-chart__note {
+  margin-top: 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+}
+
+/* Su schermi larghi il grafico non cresce oltre misura (i testi dell'SVG
+   scalano con lui). */
+@media (min-width: 600px) {
+  .metric-chart__svg {
+    max-width: 420px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+@keyframes metric-chart-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes metric-chart-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .metric-chart,
+  .metric-chart__line {
+    animation: none;
+  }
+}

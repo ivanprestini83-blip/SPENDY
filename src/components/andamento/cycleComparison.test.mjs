@@ -194,6 +194,92 @@ try {
   const component = readFileSync(new URL('./CycleComparison.jsx', import.meta.url), 'utf8')
   check('il componente usa compareCycles e i formattatori esistenti, senza calcoli propri', component.includes('compareCycles(before, after)') && component.includes('describeChange(comparison.spent') && component.includes('describeDiff(comparison.savings.diff'))
 
+  // =====================================================================
+  section('7. Riquadri cliccabili: un grafico a linea alla volta')
+  // =====================================================================
+  // Si riparte da A (precedente) e B (attuale).
+  await act(() => propsOf(selects()[0]).onChange({ target: { value: A.key } }))
+  await act(() => propsOf(selects()[1]).onChange({ target: { value: B.key } }))
+  const metricButtons = () => nodes(container).filter((n) => n.localName === 'button' && cls(n).split(' ').includes('cycle-comparison__metric'))
+  const buttonOf = (label) => metricButtons().find((b) => text(byClass(b, 'cycle-comparison__metric-label')[0]) === label)
+  const charts = () => byClass(container, 'metric-chart')
+  const chartText = () => text(charts()[0] ?? { childNodes: [] })
+  const chartValues = () => byClass(charts()[0], 'metric-chart__value').map(text)
+  const chartLabels = () => byClass(charts()[0], 'metric-chart__label').map(text)
+  const tap = (label) => act(() => propsOf(buttonOf(label)).onClick({}))
+  const snapshot = () => JSON.stringify({ e: useAppStore.getState().expenses, i: useAppStore.getState().incomes, o: useAppStore.getState().sync.outbox, m: useAppStore.getState().monthlyBudget })
+  const dataBefore = snapshot()
+
+  check('1. i quattro riquadri sono pulsanti, chiusi, con un chevron', metricButtons().length === 4
+    && metricButtons().every((b) => b.attributes.get('aria-expanded') === 'false' && byClass(b, 'cycle-comparison__chevron').length === 1) && charts().length === 0)
+
+  await tap('Spese')
+  check('2. tocco su "Spese": compare il grafico "Andamento delle spese"', charts().length === 1 && text(byClass(charts()[0], 'metric-chart__title')[0]) === 'Andamento delle spese'
+    && buttonOf('Spese').attributes.get('aria-expanded') === 'true' && cls(buttonOf('Spese')).includes('cycle-comparison__metric--open'))
+  check('   collegato al riquadro (aria-controls → id del grafico)', buttonOf('Spese').attributes.get('aria-controls') === charts()[0].attributes.get('id'))
+  check('3. due punti con i valori del motore: 2117,23 € (7 Set) → 17,00 € (7 Ott)', chartValues().join('|') === `${formatCurrency(A.spent)}|${formatCurrency(B.spent)}`
+    && chartValues().join('|') === '2117,23 €|17,00 €' && chartLabels().join('|') === `${A.shortLabel}|${B.shortLabel}`)
+  check('   periodi "7 Set – 6 Ott → 7 Ott – 6 Nov" e una linea che li unisce', text(byClass(charts()[0], 'metric-chart__periods')[0]) === `${A.label} → ${B.label}` && byClass(charts()[0], 'metric-chart__line').length === 1)
+  check('   sotto: la stessa variazione del riquadro (▼ -2100,23 € · -99,2%) e la frase', text(byClass(charts()[0], 'metric-chart__summary')[0]) === `${spent.arrow} ${spent.text}`
+    && chartText().includes('Hai speso meno rispetto al periodo precedente.'))
+  check('   il grafico sta sotto la prima riga (dopo Spese ed Entrate)', byClass(container, 'cycle-comparison__metrics')[0].childNodes.map((n) => (cls(n).includes('metric-chart') ? 'grafico' : text(byClass(n, 'cycle-comparison__metric-label')[0]))).join('|') === 'Spese|Entrate|grafico|Risparmio|Budget utilizzato')
+
+  await tap('Spese')
+  check('4. secondo tocco su "Spese": il grafico si chiude', charts().length === 0 && buttonOf('Spese').attributes.get('aria-expanded') === 'false')
+
+  await tap('Spese')
+  await tap('Entrate')
+  check('5. "Spese" aperto, poi "Entrate": resta un solo grafico, quello delle entrate', charts().length === 1 && text(byClass(charts()[0], 'metric-chart__title')[0]) === 'Andamento delle entrate'
+    && buttonOf('Spese').attributes.get('aria-expanded') === 'false' && buttonOf('Entrate').attributes.get('aria-expanded') === 'true')
+  check('6. entrate: 2537,00 € → 2451,00 €, ▼ -86,00 € · -3,4%', chartValues().join('|') === '2537,00 €|2451,00 €' && text(byClass(charts()[0], 'metric-chart__summary')[0]) === `${income.arrow} ${income.text}`
+    && chartText().includes('Le entrate sono diminuite.'))
+
+  await tap('Risparmio')
+  check('7. risparmio: 419,77 € → 2434,00 €, ▲ +2014,23 €', charts().length === 1 && chartValues().join('|') === '419,77 €|2434,00 €'
+    && text(byClass(charts()[0], 'metric-chart__summary')[0]) === `${savings.arrow} ${savings.text}` && chartText().includes('Hai messo da parte di più.'))
+  check('   sotto la seconda riga (dopo Risparmio e Budget)', byClass(container, 'cycle-comparison__metrics')[0].childNodes.map((n) => (cls(n).includes('metric-chart') ? 'grafico' : text(byClass(n, 'cycle-comparison__metric-label')[0]))).join('|') === 'Spese|Entrate|Risparmio|Budget utilizzato|grafico')
+
+  await tap('Budget utilizzato')
+  const budgetSummary = text(byClass(charts()[0], 'metric-chart__summary')[0])
+  check(`8. budget: ${fmt.formatPercent(A.budgetUsed)} → ${fmt.formatPercent(B.budgetUsed)}, valori in %`, chartValues().join('|') === `${fmt.formatPercent(A.budgetUsed)}|${fmt.formatPercent(B.budgetUsed)}` && chartValues().every((v) => v.endsWith('%')))
+  check(`9. budget in punti percentuali: "${budgetSummary}" (non una percentuale)`, budgetSummary === `▼ -${Math.abs(points)} punti percentuali` && !budgetSummary.includes('·') && !/\d%/.test(budgetSummary))
+
+  check('15. nessun dato modificato dai tocchi (spese, entrate, coda, stipendio)', snapshot() === dataBefore)
+
+  // =====================================================================
+  section('8. Cambio periodo con un grafico aperto')
+  // =====================================================================
+  await tap('Spese')
+  await act(() => propsOf(selects()[0]).onChange({ target: { value: B.key } }))
+  await act(() => propsOf(selects()[1]).onChange({ target: { value: A.key } }))
+  check('12-13. periodi invertiti: il grafico resta aperto e segue i periodi (il più vecchio a sinistra)', charts().length === 1
+    && chartValues().join('|') === '2117,23 €|17,00 €' && chartLabels().join('|') === `${A.shortLabel}|${B.shortLabel}`)
+  check('14. coerente con il riquadro dopo il cambio', values(buttonOf('Spese')) === '2117,23 €→17,00 €' && text(byClass(charts()[0], 'metric-chart__summary')[0]) === change(buttonOf('Spese')))
+  await act(() => propsOf(selects()[1]).onChange({ target: { value: B.key } }))
+  check('   stesso periodo su entrambi: l\'avviso, nessun grafico', screen().includes('Scegli due periodi diversi') && charts().length === 0)
+  await act(() => propsOf(selects()[0]).onChange({ target: { value: A.key } }))
+  check('   tornati a A → B: il grafico aperto ricompare con i valori giusti', charts().length === 1 && chartValues().join('|') === '2117,23 €|17,00 €')
+
+  // =====================================================================
+  section('9. Periodo senza entrate né stipendio')
+  // =====================================================================
+  await act(() => useAppStore.setState({ incomes: [salary('i-a', 2537, '2026-09-07')] })) // B senza stipendio
+  const noIncome = buildAndamento({ ...state, incomes: [salary('i-a', 2537, '2026-09-07')] })
+  check('premessa: per il motore B non ha entrate né budget', noIncome.cycles[1].income === 0 && noIncome.cycles[1].budgetUsed === null)
+  if (buttonOf('Spese').attributes.get('aria-expanded') === 'true') await tap('Spese')
+  check('riquadro chiuso "Entrate": 2537,00 € → — (nessuna entrata registrata, non "0,00 €")', values(buttonOf('Entrate')) === '2537,00 €→—'
+    && !values(buttonOf('Entrate')).includes('0,00 €') && buttonOf('Entrate').attributes.get('aria-label').includes('7 Ott —'))
+  check('   la variazione resta quella del motore ("Nessuna entrata")', change(buttonOf('Entrate')).includes('Nessuna entrata'))
+  await tap('Entrate')
+  check('11. entrate di B assenti: punto vuoto "—", nessuna linea, mai "0,00 €"', chartValues().join('|') === '2537,00 €|—'
+    && byClass(charts()[0], 'metric-chart__dot--missing').length === 1 && byClass(charts()[0], 'metric-chart__line').length === 0 && !chartText().includes('0,00 €'))
+  check('   "Nessuna entrata registrata" per 7 Ott – 6 Nov', chartText().includes(`${B.label}: Nessuna entrata registrata`))
+  await tap('Budget utilizzato')
+  check('10. budget senza stipendio in B: "Budget non confrontabile", con la spiegazione, nessun valore', chartText().includes('Budget non confrontabile')
+    && chartText().includes(`${B.label} non ha uno stipendio registrato`) && nodes(charts()[0]).every((n) => n.localName !== 'svg'))
+  await act(() => useAppStore.setState({ incomes: state.incomes }))
+  check('tornate le entrate di B: il riquadro torna a 2537,00 € → 2451,00 €', values(buttonOf('Entrate')) === '2537,00 €→2451,00 €')
+
   await act(() => root.unmount())
 } finally {
   await server.close()
