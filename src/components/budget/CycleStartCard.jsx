@@ -15,10 +15,12 @@ import './CycleStartCard.css'
 // 1. Storico del vecchio modello (needsLegacySalaryHistory): prima del 7
 //    ottobre 2026 lo stipendio era un numero unico senza ciclo, quindi i cicli
 //    passati non hanno uno stipendio salvato e Andamento li mostra senza
-//    entrate. Con la conferma dell'utente, l'importo (modificabile) diventa
-//    l'entrata stipendio di ciascuno di quei cicli, datata al suo primo giorno
-//    e indicata come "impostazione precedente". Nessuna conferma, nessuna
-//    entrata.
+//    entrate. L'utente scrive lo stipendio di ciascuno di quei cicli, che
+//    diventa la sua entrata stipendio, datata al primo giorno del ciclo e
+//    indicata come "impostazione precedente". Nessun importo viene proposto:
+//    monthlyBudget è l'ultimo stipendio inserito, che può essere già quello di
+//    un ciclo successivo, e non può ricostruire uno stipendio passato.
+//    Nessun importo scritto, nessuna entrata.
 // 2. Inizio del ciclo nuovo (needsCycleConfirmation): il ciclo precedente resta
 //    in Andamento con i suoi numeri; il nuovo parte da 0 finché l'utente non
 //    inserisce il nuovo stipendio.
@@ -44,18 +46,22 @@ export function CycleStartCard() {
   const legacyLabel = legacyCycles.length === 1
     ? formatCycleLabel(legacyCycles[0], cycleStartDay)
     : `${legacyCycles.length} cicli precedenti`
+  const fieldName = (range) => `legacySalary:${range.start}`
 
+  // Ogni ciclo riceve SOLO l'importo scritto nel suo campo; un campo vuoto
+  // non salva nulla (quel ciclo resta nella scheda, finché ha un importo o
+  // l'utente sceglie "Non conservare").
   const handleKeepLegacy = (event) => {
     event.preventDefault()
-    const amount = parseAmountInput(event.currentTarget.elements.legacySalary?.value)
-    if (!isValidAmount(amount)) return
+    const fields = event.currentTarget.elements
     const store = useAppStore.getState()
     // Di nuovo al momento del tocco: un ciclo che nel frattempo ha ricevuto
     // uno stipendio (da qui o da un altro dispositivo) non ne riceve un altro.
     for (const range of legacySalaryCycles(store)) {
-      store.addSalary({ amount, date: range.start, description: 'Stipendio (impostazione precedente)', keepLastSalary: true })
+      const amount = parseAmountInput(fields[fieldName(range)]?.value)
+      if (!isValidAmount(amount)) continue
+      useAppStore.getState().addSalary({ amount, date: range.start, description: 'Stipendio (impostazione precedente)', keepLastSalary: true })
     }
-    useAppStore.getState().completeLegacySalaryHistory()
   }
 
   const previousIncome = salaryForPeriod(incomes, previous) + totalForPeriod(extraIncomes(incomes), previous)
@@ -67,14 +73,19 @@ export function CycleStartCard() {
         <form className="cycle-start__part" onSubmit={handleKeepLegacy}>
           <p className="cycle-start__title">Stipendio dei cicli precedenti</p>
           <p className="cycle-start__text">
-            Prima dell&apos;aggiornamento SPENDY usava un unico stipendio impostato ({money(monthlyBudget)}), che non era salvato
-            come entrata di nessun ciclo: per questo in Andamento {legacyLabel} {legacyCycles.length === 1 ? 'risulta' : 'risultano'} senza entrate.
+            Prima dell&apos;aggiornamento SPENDY usava un unico stipendio, senza salvarlo come entrata di un ciclo: per questo in
+            Andamento {legacyLabel} {legacyCycles.length === 1 ? 'risulta' : 'risultano'} senza entrate.
           </p>
-          <p className="cycle-start__text">Vuoi conservarlo come stipendio di {legacyCycles.length === 1 ? 'quel ciclo' : 'quei cicli'}? Puoi correggere l&apos;importo.</p>
-          <label className="cycle-start__field">
-            <span>Stipendio di {legacyLabel}</span>
-            <input name="legacySalary" type="number" inputMode="decimal" defaultValue={monthlyBudget > 0 ? String(monthlyBudget) : ''} />
-          </label>
+          <p className="cycle-start__text">
+            Per conservarlo nello storico, scrivi lo stipendio che avevi ricevuto in {legacyCycles.length === 1 ? 'quel ciclo' : 'ciascun ciclo'}.
+            Non viene proposto l&apos;ultimo stipendio salvato, perché può essere già quello di un ciclo successivo.
+          </p>
+          {legacyCycles.map((range) => (
+            <label key={range.start} className="cycle-start__field">
+              <span>Stipendio di {formatCycleLabel(range, cycleStartDay)}</span>
+              <input name={fieldName(range)} type="number" inputMode="decimal" placeholder="Importo" defaultValue="" />
+            </label>
+          ))}
           <div className="cycle-start__actions">
             <button type="submit" className="cycle-start__primary">Conserva nello storico</button>
             <button type="button" className="cycle-start__link" onClick={() => useAppStore.getState().completeLegacySalaryHistory()}>

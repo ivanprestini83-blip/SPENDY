@@ -121,9 +121,21 @@ const find = (tree, predicate) => {
   return found
 }
 const buttonOf = (tree, label) => find(tree, (n) => n.type === 'button' && textOf(n).includes(label))
-const submitLegacy = (tree, value) => find(tree, (n) => n.type === 'form').props.onSubmit({
-  preventDefault() {}, currentTarget: { elements: { legacySalary: { value } } },
-})
+// I campi dello storico, uno per ciclo: legacySalary:<inizio del ciclo>.
+const legacyInputs = (tree) => {
+  const inputs = []
+  walk(tree, (n) => { if (n.type === 'input' && String(n.props.name ?? '').startsWith('legacySalary:')) inputs.push(n) })
+  return inputs
+}
+// `values`: una stringa per tutti i campi, oppure { '<inizio ciclo>': '<importo>' }.
+const submitLegacy = (tree, values) => {
+  const elements = {}
+  for (const input of legacyInputs(tree)) {
+    const start = input.props.name.slice('legacySalary:'.length)
+    elements[input.props.name] = { value: typeof values === 'string' ? values : (values[start] ?? '') }
+  }
+  find(tree, (n) => n.type === 'form').props.onSubmit({ preventDefault() {}, currentTarget: { elements } })
+}
 
 const server = await createServer({
   root: ROOT,
@@ -237,8 +249,11 @@ try {
     check(`il ciclo 7 set – 6 ott (finito entro ${LEGACY_SALARY_MODEL_END}) è del vecchio modello e non ha stipendio`, legacySalaryCycles(d.S()).map((r) => r.start).join() === '2026-09-07' && cycleAt(d.S, '2026-09-07').salary === 0)
     const tree = render(CycleStartCard, d)
     const html = renderToStaticMarkup(tree)
-    check('la scheda propone di conservarlo, con l\'importo modificabile', html.includes('Stipendio dei cicli precedenti') && html.includes('1700,00 €') && html.includes('value="1700"') && Boolean(buttonOf(tree, 'Conserva nello storico')) && Boolean(buttonOf(tree, 'Non conservare')))
+    check('la scheda chiede lo stipendio di quel ciclo, con un campo per il ciclo 7 set – 6 ott', html.includes('Stipendio dei cicli precedenti') && legacyInputs(tree).map((i) => i.props.name).join() === 'legacySalary:2026-09-07' && Boolean(buttonOf(tree, 'Conserva nello storico')) && Boolean(buttonOf(tree, 'Non conservare')))
+    check('   nessun importo proposto: il campo è vuoto e monthlyBudget (1700) non compare', legacyInputs(tree).every((i) => i.props.defaultValue === '' && i.props.value === undefined) && !html.includes('1700'))
     check('mostrarla non crea nulla', !d.S().incomes.some(isSalary))
+    submitLegacy(tree, '')
+    check('"Conserva" con il campo vuoto non salva nulla, e la scheda resta', !d.S().incomes.some(isSalary) && renderToStaticMarkup(render(CycleStartCard, d)).includes('Stipendio dei cicli precedenti'))
     submitLegacy(tree, '1700')
     const kept = d.S().incomes.filter(isSalary)
     check('"Conserva": una entrata stipendio nel ciclo 7 set – 6 ott, datata al suo inizio e indicata come impostazione precedente', kept.length === 1 && kept[0].date === '2026-09-07' && kept[0].amount === 1700 && kept[0].description === 'Stipendio (impostazione precedente)')
@@ -269,8 +284,26 @@ try {
     d.S().addExpense({ amount: 200, categoryId: 'bar', description: 'x', date: '2026-09-10' })
     d.S().addSalary({ amount: 1600, date: '2026-09-07', keepLastSalary: true }) // settembre ha già il suo
     await d.engine.syncNow()
-    submitLegacy(render(CycleStartCard, d), '1500')
-    check('solo i cicli senza stipendio lo ricevono: agosto 1.500, settembre resta 1.600', cycleAt(d.S, '2026-08-07').salary === 1500 && cycleAt(d.S, '2026-09-07').salary === 1600 && d.S().incomes.filter(isSalary).length === 2)
+    const tree = render(CycleStartCard, d)
+    check('solo i cicli senza stipendio hanno un campo: agosto sì, settembre (che ha il suo) no', legacyInputs(tree).map((i) => i.props.name).join() === 'legacySalary:2026-08-07')
+    submitLegacy(tree, { '2026-08-07': '1500' })
+    check('   agosto 1.500, settembre resta 1.600', cycleAt(d.S, '2026-08-07').salary === 1500 && cycleAt(d.S, '2026-09-07').salary === 1600 && d.S().incomes.filter(isSalary).length === 2)
+  }
+  {
+    // Due cicli del vecchio modello con stipendi diversi: ognuno il suo.
+    const d = await device(createMemoryDatabase(), 'utente-due-importi', { today: '2026-10-07' })
+    d.S().setMonthlyBudget(1800, '2026-08-07')
+    d.S().addExpense({ amount: 100, categoryId: 'bar', description: 'x', date: '2026-08-10' })
+    d.S().addExpense({ amount: 200, categoryId: 'bar', description: 'x', date: '2026-09-10' })
+    await d.engine.syncNow()
+    const tree = render(CycleStartCard, d)
+    check('due cicli vecchi: due campi, entrambi vuoti', legacyInputs(tree).length === 2 && legacyInputs(tree).every((i) => i.props.defaultValue === ''))
+    submitLegacy(tree, { '2026-08-07': '1450', '2026-09-07': '' })
+    check('   compilato solo agosto: agosto 1.450, settembre ancora senza, la scheda resta per settembre', cycleAt(d.S, '2026-08-07').salary === 1450 && cycleAt(d.S, '2026-09-07').salary === 0
+      && legacyInputs(render(CycleStartCard, d)).map((i) => i.props.name).join() === 'legacySalary:2026-09-07')
+    submitLegacy(render(CycleStartCard, d), { '2026-09-07': '1520' })
+    check('   poi settembre 1.520: ognuno il suo importo, la scheda sparisce', cycleAt(d.S, '2026-09-07').salary === 1520 && cycleAt(d.S, '2026-08-07').salary === 1450
+      && !renderToStaticMarkup(render(CycleStartCard, d) ?? '').includes('Stipendio dei cicli precedenti'))
   }
   {
     // Un ciclo finito DOPO il rilascio non è del vecchio modello: niente proposta.
@@ -296,6 +329,60 @@ try {
     await b.engine.syncNow()
     check('dopo il sync: il ciclo vecchio ha già lo stipendio, nessuna domanda sull\'altro dispositivo', legacySalaryCycles(b.S()).length === 0 && cycleAt(b.S, '2026-09-07').income === 1700)
     check('   una sola riga sul cloud', shared.rows('incomes').filter((r) => r.category_id === 'stipendio').length === 1)
+  }
+
+  // =====================================================================
+  section('3b. Regressione Production: A = 2537 €, cambio ciclo, B = 2451 €')
+  // =====================================================================
+  {
+    // Il caso reale: stipendio del vecchio modello 2537 € (ciclo 7/9–6/10), poi
+    // nuovo ciclo e stipendio B 2451 € inserito PRIMA di conservare A. Prima
+    // della correzione "Conserva nello storico" proponeva monthlyBudget, ormai
+    // 2451, e lo salvava nel ciclo A.
+    const shared = createMemoryDatabase()
+    const USER = 'utente-2537'
+    const phone = await device(shared, USER, { today: '2026-09-20' })
+    phone.S().setMonthlyBudget(2537, '2026-09-07') // vecchio modello: ciclo A
+    phone.S().addExpense({ amount: 900, categoryId: 'casa', description: 'x', date: '2026-09-21' })
+    await phone.engine.syncNow()
+    phone.store.setState({ today: '2026-10-07' }) // cambio ciclo
+    phone.S().addSalary({ amount: 2451, date: '2026-10-07' }) // ciclo B
+    await phone.engine.syncNow()
+    check('premessa: monthlyBudget ora vale 2451 (l\'ultimo stipendio), A non ha ancora uno stipendio', phone.S().monthlyBudget === 2451 && cycleAt(phone.S, '2026-09-07').salary === 0)
+    const tree = render(CycleStartCard, phone)
+    check('la scheda NON propone 2451 (né alcun importo) per il ciclo A', legacyInputs(tree).length === 1 && legacyInputs(tree)[0].props.defaultValue === '' && !renderToStaticMarkup(tree).includes('2451'))
+    submitLegacy(tree, { '2026-09-07': '2537' })
+    const a = () => cycleAt(phone.S, '2026-09-07')
+    const b = () => cycleAt(phone.S, '2026-10-07')
+    check('Andamento: A = 2537 €, B = 2451 €', a().income === 2537 && b().income === 2451)
+    const rows = phone.S().incomes.filter(isSalary).sort((x, y) => (x.date < y.date ? -1 : 1))
+    check('   due record distinti, uno per ciclo: 07/09 2537 e 07/10 2451', rows.length === 2 && rows[0].id !== rows[1].id
+      && rows[0].date === '2026-09-07' && rows[0].amount === 2537 && rows[1].date === '2026-10-07' && rows[1].amount === 2451)
+    check('   monthlyBudget resta 2451 (conservare A non lo cambia)', phone.S().monthlyBudget === 2451)
+    await phone.engine.syncNow()
+    const mac = await device(shared, USER, { today: '2026-10-07' })
+    await mac.engine.syncNow()
+    check('   anche su un altro dispositivo, dal cloud: A = 2537, B = 2451', cycleAt(mac.S, '2026-09-07').income === 2537 && cycleAt(mac.S, '2026-10-07').income === 2451)
+
+    const idB = rows[1].id
+    phone.S().editIncome(idB, { amount: 2300 })
+    check('modificare B (2451 → 2300) non modifica A', b().income === 2300 && a().income === 2537)
+    phone.S().deleteIncome(idB)
+    check('eliminare B non modifica A', b().income === 0 && a().income === 2537)
+    phone.S().addSalary({ amount: 2451, date: '2026-10-08' })
+    check('inserire un nuovo stipendio B non modifica A', b().income === 2451 && a().income === 2537)
+    await phone.engine.syncNow()
+    await mac.engine.syncNow()
+    check('   e sul cloud il record di A è ancora 2537', shared.rows('incomes').some((r) => r.date === '2026-09-07' && Number(r.amount) === 2537 && r.deleted_at === null)
+      && cycleAt(mac.S, '2026-09-07').income === 2537 && cycleAt(mac.S, '2026-10-07').income === 2451)
+  }
+  {
+    // Lo stesso con il nuovo modello fin dall'inizio: A = 2537 registrato in A.
+    const d = await device(createMemoryDatabase(), 'utente-2537-nuovo', { today: '2026-09-20' })
+    d.S().addSalary({ amount: 2537, date: '2026-09-07' })
+    d.store.setState({ today: '2026-10-07' })
+    d.S().addSalary({ amount: 2451, date: '2026-10-07' })
+    check('nuovo modello: A = 2537, B = 2451', cycleAt(d.S, '2026-09-07').income === 2537 && cycleAt(d.S, '2026-10-07').income === 2451)
   }
 
   // =====================================================================
