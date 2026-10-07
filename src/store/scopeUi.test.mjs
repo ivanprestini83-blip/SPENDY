@@ -62,7 +62,7 @@ try {
 
   const fill = (tag) => {
     const today = S().today
-    S().setMonthlyBudget(3333, today)
+    S().addSalary({ amount: 3333, date: today }) // "+ → Guadagno → Stipendio"
     S().addExpense({ amount: 777.77, categoryId: 'spesa', description: `SEGRETO-${tag}`, date: today })
     S().addCustomCategory({ label: `Categoria-${tag}`, emoji: '🧪', type: 'expense' })
     S().addGoal({ emoji: '🎯', label: `Vacanza-${tag}`, target: 2000, etaMonths: 6, saved: 100 })
@@ -81,6 +81,7 @@ try {
   check('Spese: la spesa di A è visibile', visible('SEGRETO-A') || visible('777,77'))
   await act(() => S().openModal('settings'))
   check('Impostazioni: lo stipendio di A è visibile', /3\.?333/.test(screen()) && visible('settings-screen'))
+  check('   nella sezione "Stipendio di questo ciclo", con Modifica ed Elimina', visible('Stipendio di questo ciclo') && visible('settings-screen__salary-edit') && visible('Elimina'))
 
   // =====================================================================
   section('A esce: nessun dato di A resta visibile')

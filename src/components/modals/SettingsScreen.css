@@ -147,3 +147,60 @@
     animation: none;
   }
 }
+
+/* Stipendio del ciclo in corso (settings/CurrentSalaryCard). */
+.settings-screen__salary {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.settings-screen__salary-amount {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.settings-screen__salary-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.settings-screen__salary-actions .settings-screen__delete {
+  margin-top: 10px;
+}
+
+.settings-screen__salary-edit {
+  margin-top: 10px;
+  width: 100%;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-accent-violet-soft);
+  color: var(--color-accent-violet);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.settings-screen__salary-add {
+  margin-top: 14px;
+}
+
+.settings-screen__salary-empty {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.settings-screen__salary-editor .settings-screen__field {
+  margin-top: 10px;
+}
+
+.settings-screen__salary-cancel {
+  margin-top: 8px;
+  align-self: center;
+  width: 100%;
+  padding: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}

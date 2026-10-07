@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore.js'
 import { getCycleRange, formatCycleLabel } from '../../utils/cycle.js'
-import { formatCurrency } from '../../utils/format.js'
 import { BackupCard } from '../settings/BackupCard.jsx'
+import { CurrentSalaryCard } from '../settings/CurrentSalaryCard.jsx'
 import { DeleteAccountCard } from '../settings/DeleteAccountCard.jsx'
 import { PrivacyCard } from '../settings/PrivacyCard.jsx'
 import { SpendyAICard } from '../settings/SpendyAICard.jsx'
@@ -16,16 +16,20 @@ import './SettingsScreen.css'
 // FIRST time ever, by design (a stipendio entered every month shouldn't
 // keep reshuffling the billing cycle). "la data del guadagno non cambia
 // in home" after that first time isn't a bug, it's this missing control.
-// Lo stipendio invece non si gestisce più qui: è un'entrata datata per
-// ciclo (useAppStore addSalary), che si modifica o si elimina dalla lista
-// delle entrate come tutte le altre.
+// Lo stipendio è un'entrata datata per ciclo (useAppStore addSalary):
+// CurrentSalaryCard mostra quello del ciclo in corso e permette di
+// modificarlo, eliminarlo o reinserirlo.
 export function SettingsScreen({ onClose }) {
   const today = useAppStore((state) => state.today)
-  const monthlyBudget = useAppStore((state) => state.monthlyBudget)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay)
   const setCycleStartDay = useAppStore((state) => state.setCycleStartDay)
 
-  const [day, setDay] = useState(String(cycleStartDay ?? 1))
+  // Il campo mostra il giorno salvato finché non lo si modifica: il giorno può
+  // cambiare mentre questa schermata è aperta (il primo stipendio inserito qui
+  // sopra lo ricava dalla sua data), e "Salva" non deve riportare indietro il
+  // ciclo con un valore letto all'apertura.
+  const [dayDraft, setDay] = useState(null)
+  const day = dayDraft ?? String(cycleStartDay ?? 1)
   const [saved, setSaved] = useState(false)
 
   const dayValue = parseInt(day, 10)
@@ -50,15 +54,7 @@ export function SettingsScreen({ onClose }) {
       </div>
 
       <div className="settings-screen__body">
-        <div className="settings-screen__card">
-          <p className="settings-screen__label">Stipendio</p>
-          <p className="settings-screen__hint">
-            {monthlyBudget > 0
-              ? `Ultimo stipendio inserito: ${formatCurrency(monthlyBudget)}. `
-              : 'Nessuno stipendio inserito finora. '}
-            Ogni ciclo usa lo stipendio inserito in quel ciclo (+ → Guadagno → Stipendio); per correggerlo o eliminarlo, aprilo dalla lista delle entrate.
-          </p>
-        </div>
+        <CurrentSalaryCard />
 
         <div className="settings-screen__card">
           <p className="settings-screen__label">Giorno di inizio ciclo</p>

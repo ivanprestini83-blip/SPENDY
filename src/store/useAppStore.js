@@ -103,7 +103,8 @@ export const emptyScopeState = () => ({
   amountHidden: false,
   spendyAIEnabled: false,
   legalAcceptedVersion: null,
-  salaryTransitionDone: false,
+  legacySalaryHistoryDone: false,
+  confirmedCycleStart: null,
   expenses: [],
   incomes: [],
   customCategories: [],
@@ -215,12 +216,13 @@ export const useAppStore = create(
       //  - monthlyBudget: diventa "l'ultimo stipendio inserito" (obiettivo del
       //    fondo emergenza, versioni precedenti dell'app), aggiornato solo se
       //    questo è il più recente: uno stipendio di un ciclo passato,
-      //    inserito dopo, non lo sovrascrive.
-      addSalary: ({ amount, date, description }) =>
+      //    inserito dopo, non lo sovrascrive. `keepLastSalary` lo lascia
+      //    comunque com'è (lo storico del vecchio modello, CycleStartCard).
+      addSalary: ({ amount, date, description, keepLastSalary = false }) =>
         set((state) => {
           if (!isValidAmount(amount)) return {}
           const row = { id: newId('i'), categoryId: SALARY_CATEGORY_ID, description: description || 'Stipendio', amount, date: date ?? state.today, updatedAt: nowIso() }
-          const isLatest = state.incomes.every((income) => !isSalary(income) || income.date <= row.date)
+          const isLatest = !keepLastSalary && state.incomes.every((income) => !isSalary(income) || income.date <= row.date)
           const settings = {
             ...(isLatest ? { monthlyBudget: amount } : {}),
             ...(state.cycleStartDay == null ? { cycleStartDay: Number(row.date.slice(8, 10)) } : {}),
@@ -229,9 +231,6 @@ export const useAppStore = create(
           return {
             ...patch,
             incomes: [row, ...state.incomes],
-            // Chi ha registrato uno stipendio non ha più bisogno della scheda
-            // di passaggio, nemmeno se un giorno lo elimina.
-            salaryTransitionDone: true,
             sync: withOp(patch.sync ?? state.sync, 'incomes', row),
           }
         }),
@@ -264,14 +263,19 @@ export const useAppStore = create(
       legalAcceptedVersion: null,
       setLegalAcceptedVersion: (version) => set({ legalAcceptedVersion: typeof version === 'string' && version ? version : null }),
 
-      // Passaggio allo stipendio per ciclo (components/budget/SalaryTransitionCard):
-      // true quando la scheda per chi aveva solo il vecchio stipendio unico
-      // (monthlyBudget) ha avuto una risposta, qualunque sia. Come
-      // legalAcceptedVersion è solo locale, per account e per dispositivo: non
-      // viaggia con il sync (servirebbe una colonna nuova nel database) e
-      // sparisce con il contenitore dell'account.
-      salaryTransitionDone: false,
-      completeSalaryTransition: () => set({ salaryTransitionDone: true }),
+      // Le risposte alla scheda di inizio ciclo (components/budget/
+      // CycleStartCard). Come legalAcceptedVersion sono solo locali, per
+      // account e per dispositivo: non viaggiano con il sync (servirebbe una
+      // colonna nuova nel database) e spariscono con il contenitore
+      // dell'account. Non toccano mai i dati: gli stipendi sono entrate.
+      //  - legacySalaryHistoryDone: risposta data sullo stipendio dei cicli del
+      //    vecchio modello (conservato o no);
+      //  - confirmedCycleStart: inizio dell'ultimo ciclo di cui l'utente ha
+      //    confermato la partenza.
+      legacySalaryHistoryDone: false,
+      completeLegacySalaryHistory: () => set({ legacySalaryHistoryDone: true }),
+      confirmedCycleStart: null,
+      confirmCycleStart: (start) => set({ confirmedCycleStart: typeof start === 'string' ? start : null }),
 
       expenses: [],
       addExpense: (expense) =>
@@ -607,10 +611,6 @@ export const useAppStore = create(
           if (collection === 'emergencyFundContributions') patch.emergencyFundSaved = sumAmounts(merged)
           if (collection === 'goalContributions') patch.goals = recomputeGoals(state.goals, merged)
           if (collection === 'goals') patch.goals = recomputeGoals(merged, state.goalContributions)
-          // Uno stipendio per ciclo arrivato da un altro dispositivo: l'account è
-          // già passato al nuovo modello, la scheda di passaggio non serve più
-          // nemmeno qui (neanche se poi quello stipendio viene eliminato).
-          if (collection === 'incomes' && !state.salaryTransitionDone && merged.some(isSalary)) patch.salaryTransitionDone = true
           return patch
         }),
 
@@ -704,7 +704,8 @@ export const useAppStore = create(
         amountHidden: state.amountHidden,
         spendyAIEnabled: state.spendyAIEnabled,
         legalAcceptedVersion: state.legalAcceptedVersion,
-        salaryTransitionDone: state.salaryTransitionDone,
+        legacySalaryHistoryDone: state.legacySalaryHistoryDone,
+        confirmedCycleStart: state.confirmedCycleStart,
         expenses: state.expenses,
         incomes: state.incomes,
         customCategories: state.customCategories,

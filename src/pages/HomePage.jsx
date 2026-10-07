@@ -14,7 +14,7 @@ import { RadarPreview } from '../components/radar/RadarPreview.jsx'
 import { SpendyVoiceDebug } from '../components/spendy/SpendyVoiceDebug.jsx'
 import { useSpendyVoice } from '../ai/useSpendyVoice.js'
 import { BudgetCard } from '../components/budget/BudgetCard.jsx'
-import { SalaryTransitionCard } from '../components/budget/SalaryTransitionCard.jsx'
+import { CycleStartCard } from '../components/budget/CycleStartCard.jsx'
 import { ExpenseSummaryCards } from '../components/budget/ExpenseSummaryCards.jsx'
 import { AffordabilityCTA } from '../components/affordability/AffordabilityCTA.jsx'
 import { GoalCard } from '../components/goals/GoalCard.jsx'
@@ -163,7 +163,7 @@ export function HomePage() {
 
       <SpendyVoiceDebug voice={voice} debug={voiceDebug} />
 
-      <SalaryTransitionCard />
+      <CycleStartCard />
 
       <BudgetCard
         available={available}
