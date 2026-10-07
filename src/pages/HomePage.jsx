@@ -52,6 +52,7 @@ export function HomePage() {
   const amountHidden = useAppStore((state) => state.amountHidden)
   const toggleAmountHidden = useAppStore((state) => state.toggleAmountHidden)
   const setActiveTab = useAppStore((state) => state.setActiveTab)
+  const openExpenses = useAppStore((state) => state.openExpenses)
   const openModal = useAppStore((state) => state.openModal)
   const jokeHistory = useAppStore((state) => state.spendyJokeHistory)
   const recordSpendyJoke = useAppStore((state) => state.recordSpendyJoke)
@@ -178,7 +179,7 @@ export function HomePage() {
         today={todaySummary}
         month={{ total: spentThisMonth }}
         monthlyBudget={monthlyBudget}
-        onOpenExpenses={() => setActiveTab('expenses')}
+        onOpenExpenses={openExpenses}
       />
 
       <RadarPreview radar={radar} onOpen={() => openModal('radar')} />

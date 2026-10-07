@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useAppStore } from './store/useAppStore.js'
+import { startTodayWatcher } from './store/todayWatcher.js'
 import { bootstrapSync } from './sync/spendySync.js'
 import { mockNavItems } from './data/mockData.js'
 import { Header } from './components/Header/Header.jsx'
@@ -60,9 +61,11 @@ function App() {
   // `today` is set once when the store is created — refresh it on mount
   // so a tab reopened days later (or left open across midnight) reads
   // the real current date, not a stale one from whenever this session
-  // started.
+  // started. Poi resta allineato finché l'app è aperta (todayWatcher):
+  // ritorno in primo piano, focus e un controllo al minuto.
   useEffect(() => {
     refreshToday()
+    return startTodayWatcher(useAppStore)
   }, [refreshToday])
 
   // Accende la sincronizzazione se c'e' gia' una sessione salvata. Se

@@ -1,5 +1,5 @@
 import { isSameDay } from './date.js'
-import { getCycleRange, getCycleTiming, getPreviousCycleRange, isWithinRange } from './cycle.js'
+import { getCycleRange, getCycleTiming, getPreviousCycleRange, isWithinRange, lastCycles } from './cycle.js'
 import { getCategory } from '../data/categories.js'
 import { extraIncomes } from './salary.js'
 
@@ -27,6 +27,24 @@ export function todaysExpenses(expenses, today) {
     total: items.reduce((sum, expense) => sum + expense.amount, 0),
     count: items.length,
   }
+}
+
+// Le spese di un periodo, per l'elenco della pagina Spese: lo stesso filtro
+// dei riquadri della Home, senza una seconda logica dei cicli.
+//   view 'today' → solo le spese con la data di oggi (todaysExpenses);
+//   view 'cycle' → solo le spese del ciclo `cycleOffset` cicli prima di
+//   quello in corso (0 = in corso), con i confini di cycle.js
+//   (cycleStartDay, inizio incluso, fine esclusa).
+// Non tocca le spese: filtra soltanto. → { items, total, range }
+export function expensesForPeriod(expenses, { view, today, cycleStartDay = 1, cycleOffset = 0 }) {
+  if (view === 'today') {
+    const { items, total } = todaysExpenses(expenses, today)
+    return { items, total, range: null }
+  }
+  const offset = Number.isInteger(cycleOffset) && cycleOffset > 0 ? cycleOffset : 0
+  const [range] = lastCycles(today, offset + 1, cycleStartDay ?? 1)
+  const items = expenses.filter((expense) => isWithinRange(expense.date, range))
+  return { items, total: totalForPeriod(items, range), range }
 }
 
 // One row per category that has spending in either cycle, sorted by

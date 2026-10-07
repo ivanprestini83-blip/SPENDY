@@ -1,10 +1,16 @@
+import { useState } from 'react'
 import { useAppStore } from '../store/useAppStore.js'
-import { totalForMonth } from '../utils/budgetCalculations.js'
+import { expensesForPeriod } from '../utils/budgetCalculations.js'
+import { formatCycleLabel } from '../utils/cycle.js'
 import { currentCycleSalary } from '../utils/salary.js'
 import { formatCurrency } from '../utils/format.js'
 import { getCategory } from '../data/categories.js'
 import './ExpensesPage.css'
 
+// L'elenco delle spese di UN periodo: oggi, oppure un ciclo (quello in corso
+// o uno precedente). Si apre sul periodo del riquadro della Home da cui si
+// arriva (useAppStore expensesView); i cicli precedenti restano consultabili
+// e modificabili con le frecce. Filtra soltanto: nessuna spesa viene toccata.
 export function ExpensesPage() {
   const today = useAppStore((state) => state.today)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
@@ -15,18 +21,74 @@ export function ExpensesPage() {
   const monthlyBudget = currentCycleSalary(incomes, today, cycleStartDay)
   const openModal = useAppStore((state) => state.openModal)
   const setActiveTab = useAppStore((state) => state.setActiveTab)
+  const initialView = useAppStore((state) => state.expensesView)
 
-  const monthTotal = totalForMonth(expenses, today, cycleStartDay)
-  const sorted = [...expenses].sort((a, b) => (a.date < b.date ? 1 : -1))
+  const [view, setView] = useState(initialView === 'today' ? 'today' : 'cycle')
+  // Quanti cicli prima di quello in corso (0 = in corso): resta giusto anche
+  // se `today` cambia mentre la pagina è aperta.
+  const [cycleOffset, setCycleOffset] = useState(0)
+
+  const period = expensesForPeriod(expenses, { view, today, cycleStartDay, cycleOffset })
+  const sorted = [...period.items].sort((a, b) => (a.date < b.date ? 1 : -1))
+  const hasOlder = period.range !== null && expenses.some((expense) => expense.date < period.range.start)
+
+  let label = 'Spese di oggi'
+  if (view === 'cycle') label = cycleOffset === 0 ? 'Spese di questo mese' : `Spese del ciclo ${formatCycleLabel(period.range, cycleStartDay)}`
+
+  const choose = (next) => {
+    setView(next)
+    setCycleOffset(0)
+  }
 
   return (
     <div className="expenses-page">
+      <div className="expenses-page__periods" role="tablist" aria-label="Periodo">
+        {[['today', 'Oggi'], ['cycle', 'Ciclo']].map(([value, text]) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={view === value}
+            className={`expenses-page__period${view === value ? ' expenses-page__period--active' : ''}`}
+            onClick={() => choose(value)}
+          >
+            {text}
+          </button>
+        ))}
+      </div>
+
+      {view === 'cycle' && (
+        <div className="expenses-page__cycle-nav">
+          <button
+            type="button"
+            className="expenses-page__cycle-arrow"
+            aria-label="Ciclo precedente"
+            disabled={!hasOlder}
+            onClick={() => setCycleOffset((offset) => offset + 1)}
+          >
+            ←
+          </button>
+          <p className="expenses-page__cycle-label">{formatCycleLabel(period.range, cycleStartDay)}</p>
+          <button
+            type="button"
+            className="expenses-page__cycle-arrow"
+            aria-label="Ciclo successivo"
+            disabled={cycleOffset === 0}
+            onClick={() => setCycleOffset((offset) => Math.max(0, offset - 1))}
+          >
+            →
+          </button>
+        </div>
+      )}
+
       <div className="expenses-page__summary">
         <div>
-          <p className="expenses-page__summary-label">Spese di questo mese</p>
-          <p className="expenses-page__summary-amount">{formatCurrency(monthTotal)}</p>
+          <p className="expenses-page__summary-label">{label}</p>
+          <p className="expenses-page__summary-amount">{formatCurrency(period.total)}</p>
         </div>
-        <p className="expenses-page__summary-budget">su {formatCurrency(monthlyBudget)}</p>
+        {view === 'cycle' && cycleOffset === 0 && (
+          <p className="expenses-page__summary-budget">su {formatCurrency(monthlyBudget)}</p>
+        )}
       </div>
 
       {/* Spese ed entrate sono due elenchi gemelli (stessa struttura,
@@ -41,6 +103,12 @@ export function ExpensesPage() {
       <button type="button" className="expenses-page__add" onClick={() => openModal('quickAdd', { type: 'expense' })}>
         + Aggiungi spesa
       </button>
+
+      {sorted.length === 0 && (
+        <p className="expenses-page__empty">
+          {view === 'today' ? 'Nessuna spesa oggi.' : 'Nessuna spesa in questo ciclo.'}
+        </p>
+      )}
 
       <ul className="expenses-page__list">
         {sorted.map((expense) => {

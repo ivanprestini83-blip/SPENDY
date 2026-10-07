@@ -3,12 +3,13 @@ import './ExpenseSummaryCards.css'
 
 // Both cards are buttons, not divs-with-onClick — same interactive
 // element the rest of the app uses for tap targets, so keyboard/focus
-// behavior comes for free. `onOpenExpenses` is how Home hands off to the
-// Spese tab without importing the store itself.
+// behavior comes for free. `onOpenExpenses(view)` is how Home hands off to
+// the Spese tab without importing the store itself: 'today' or 'cycle', so
+// the list shows the same period as the card that was tapped.
 export function ExpenseSummaryCards({ today, month, monthlyBudget, onOpenExpenses = () => {} }) {
   return (
     <div className="expense-summary">
-      <button type="button" className="expense-summary__card" onClick={onOpenExpenses}>
+      <button type="button" className="expense-summary__card" onClick={() => onOpenExpenses('today')}>
         <span className="expense-summary__icon expense-summary__icon--violet" aria-hidden="true">👛</span>
         <span className="expense-summary__arrow" aria-hidden="true">→</span>
         <p className="expense-summary__label">Spese di oggi</p>
@@ -16,7 +17,7 @@ export function ExpenseSummaryCards({ today, month, monthlyBudget, onOpenExpense
         <p className="expense-summary__meta">{today.count} transazioni</p>
       </button>
 
-      <button type="button" className="expense-summary__card" onClick={onOpenExpenses}>
+      <button type="button" className="expense-summary__card" onClick={() => onOpenExpenses('cycle')}>
         <span className="expense-summary__icon expense-summary__icon--blue" aria-hidden="true">📊</span>
         <span className="expense-summary__arrow" aria-hidden="true">→</span>
         <p className="expense-summary__label">Spese di questo mese</p>

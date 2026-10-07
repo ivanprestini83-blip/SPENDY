@@ -176,14 +176,24 @@ export const useAppStore = create(
       },
 
       activeTab: 'home',
-      setActiveTab: (tab) => set({ activeTab: tab }),
+      setActiveTab: (tab) => set({ activeTab: tab, expensesView: 'cycle' }),
+      // Quale periodo mostra la pagina Spese quando si apre: 'today' dal
+      // riquadro "Spese di oggi", 'cycle' (il ciclo in corso) da tutto il
+      // resto. Solo interfaccia: non viene salvato.
+      expensesView: 'cycle',
+      openExpenses: (view) => set({ activeTab: 'expenses', expensesView: view === 'today' ? 'today' : 'cycle' }),
 
       today: todayStr(),
       // Called once on App mount (see App.jsx) so a tab left open across
       // midnight — or reopened days later — still reads the real date,
       // not whatever date happened to be current when the store was
       // first created this session.
-      refreshToday: () => set({ today: todayStr() }),
+      // Nessun aggiornamento se il giorno non è cambiato: chi lo chiama spesso
+      // (app che torna in primo piano, controllo periodico) non ridisegna nulla.
+      refreshToday: () => set((state) => {
+        const today = todayStr()
+        return state.today === today ? state : { today }
+      }),
 
       monthlyBudget: 0,
       currency: '€',
