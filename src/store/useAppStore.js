@@ -11,6 +11,7 @@ import { addToState, markAllReadInState, markReadInState, removeFromState, sanit
 import { STATE_BASE, createScopeManager, isUserScope, isValidScope, ownerOf, scopeFor } from './scope.js'
 import { isValidAmount, isValidBudget } from '../utils/amounts.js'
 import { SALARY_CATEGORY_ID, isSalary } from '../utils/salary.js'
+import { DEFAULT_LANGUAGE, normalizeLanguage } from '../i18n/languages.js'
 
 const sumAmounts = (list) => list.reduce((total, entry) => total + entry.amount, 0)
 
@@ -105,6 +106,7 @@ export const emptyScopeState = () => ({
   legalAcceptedVersion: null,
   legacySalaryHistoryDone: false,
   confirmedCycleStart: null,
+  language: DEFAULT_LANGUAGE,
   expenses: [],
   incomes: [],
   customCategories: [],
@@ -272,6 +274,15 @@ export const useAppStore = create(
       // dell'account, quindi anche con l'eliminazione dell'account.
       legalAcceptedVersion: null,
       setLegalAcceptedVersion: (version) => set({ legalAcceptedVersion: typeof version === 'string' && version ? version : null }),
+
+      // La lingua dell'app (i18n/languages.js): una preferenza dell'esperienza,
+      // non un dato finanziario. Come legalAcceptedVersion vive nel contenitore
+      // locale dell'account (quindi ogni account sullo stesso dispositivo ha la
+      // sua), non viaggia con il sync e non tocca nessun altro campo. Un valore
+      // non valido diventa l'italiano. Si legge e si cambia solo da
+      // i18n/useLanguage.js.
+      language: DEFAULT_LANGUAGE,
+      setLanguage: (language) => set({ language: normalizeLanguage(language) }),
 
       // Le risposte alla scheda di inizio ciclo (components/budget/
       // CycleStartCard). Come legalAcceptedVersion sono solo locali, per
@@ -716,6 +727,7 @@ export const useAppStore = create(
         legalAcceptedVersion: state.legalAcceptedVersion,
         legacySalaryHistoryDone: state.legacySalaryHistoryDone,
         confirmedCycleStart: state.confirmedCycleStart,
+        language: state.language,
         expenses: state.expenses,
         incomes: state.incomes,
         customCategories: state.customCategories,
@@ -748,6 +760,10 @@ export const useAppStore = create(
       onRehydrateStorage: () => (state) => {
         if (!state) return
         if (state.customCategories) registerCustomCategories(state.customCategories)
+
+        // Contenitori salvati prima della scelta della lingua, o con un valore
+        // non valido: italiano.
+        state.language = normalizeLanguage(state.language)
 
         // Contenitori salvati prima delle notifiche, o con dati non validi.
         Object.assign(state, sanitizeNotificationState(state.notifications, state.notificationKeys))

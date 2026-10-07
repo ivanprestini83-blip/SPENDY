@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useAppStore } from './store/useAppStore.js'
 import { startTodayWatcher } from './store/todayWatcher.js'
+import { startDocumentLanguage } from './i18n/documentLanguage.js'
 import { bootstrapSync } from './sync/spendySync.js'
 import { mockNavItems } from './data/mockData.js'
 import { Header } from './components/Header/Header.jsx'
@@ -67,6 +68,9 @@ function App() {
     refreshToday()
     return startTodayWatcher(useAppStore)
   }, [refreshToday])
+
+  // <html lang> segue la lingua scelta (i18n/documentLanguage.js).
+  useEffect(() => startDocumentLanguage(useAppStore), [])
 
   // Accende la sincronizzazione se c'e' gia' una sessione salvata. Se
   // Supabase non e' configurato non fa assolutamente nulla e l'app resta

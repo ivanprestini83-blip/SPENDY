@@ -3,6 +3,7 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { getCycleRange, formatCycleLabel } from '../../utils/cycle.js'
 import { BackupCard } from '../settings/BackupCard.jsx'
 import { CurrentSalaryCard } from '../settings/CurrentSalaryCard.jsx'
+import { LanguageCard } from '../settings/LanguageCard.jsx'
 import { DeleteAccountCard } from '../settings/DeleteAccountCard.jsx'
 import { PrivacyCard } from '../settings/PrivacyCard.jsx'
 import { SpendyAICard } from '../settings/SpendyAICard.jsx'
@@ -83,6 +84,8 @@ export function SettingsScreen({ onClose }) {
             {saved ? '✓ Salvato' : 'Salva'}
           </button>
         </div>
+
+        <LanguageCard />
 
         <SyncCard />
 
