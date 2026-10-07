@@ -8,7 +8,8 @@ import './CategoryComparison.css'
 const VISIBLE_ROWS = 5
 
 // Le righe arrivano già ordinate dall'engine (compareCycles) per
-// variazione assoluta: qui si decide solo quante mostrarne.
+// variazione assoluta: qui si decide solo quante mostrarne e quanto lunga
+// disegnare la barra (proporzionale alla variazione più grande fra tutte).
 export function CategoryComparison({ rows, beforeLabel, afterLabel }) {
   const [expanded, setExpanded] = useState(false)
   const visible = expanded ? rows : rows.slice(0, VISIBLE_ROWS)
@@ -17,30 +18,39 @@ export function CategoryComparison({ rows, beforeLabel, afterLabel }) {
     return <p className="category-comparison__empty">Nessuna spesa in nessuno dei due periodi.</p>
   }
 
+  const largest = rows.reduce((max, row) => Math.max(max, Math.abs(row.diff)), 0)
+
   return (
     <div className="category-comparison">
       <ul className="category-comparison__list">
         {visible.map((row) => {
           const change = describeChange(row, { newLabel: 'Nuova', goneLabel: 'Azzerata' })
+          const width = largest > 0 ? Math.max(Math.abs(row.diff) / largest, row.diff === 0 ? 0 : 0.04) * 100 : 0
           return (
             <li key={row.categoryId} className="category-comparison__row">
               <span className="category-comparison__emoji" aria-hidden="true">{row.category.emoji}</span>
               <span className="category-comparison__body">
-                <span className="category-comparison__label">{row.category.label}</span>
-                <span className="category-comparison__values">
-                  <span>{beforeLabel} {formatCurrency(row.before)}</span>
+                <span className="category-comparison__top">
+                  <span className="category-comparison__label">{row.category.label}</span>
+                  <span className={`category-comparison__change category-comparison__change--${change.tone}`}>
+                    <span aria-hidden="true">{change.arrow} </span>
+                    {change.amount ?? change.detail}
+                  </span>
+                </span>
+                <span className="category-comparison__values" aria-label={`${beforeLabel} ${formatCurrency(row.before)}, ${afterLabel} ${formatCurrency(row.after)}`}>
+                  <span>{formatCurrency(row.before)}</span>
                   <span aria-hidden="true"> → </span>
-                  <span>{afterLabel} {formatCurrency(row.after)}</span>
+                  <span className="category-comparison__values-after">{formatCurrency(row.after)}</span>
+                  {change.amount && change.detail && (
+                    <span className="category-comparison__change-detail"> · {change.detail}</span>
+                  )}
                 </span>
-              </span>
-              <span className={`category-comparison__change category-comparison__change--${change.tone}`}>
-                <span className="category-comparison__change-amount">
-                  <span aria-hidden="true">{change.arrow} </span>
-                  {change.amount ?? change.detail}
+                <span className="category-comparison__bar" aria-hidden="true">
+                  <span
+                    className={`category-comparison__bar-fill category-comparison__bar-fill--${change.tone}`}
+                    style={{ width: `${width}%` }}
+                  />
                 </span>
-                {change.amount && change.detail && (
-                  <span className="category-comparison__change-detail">{change.detail}</span>
-                )}
               </span>
             </li>
           )

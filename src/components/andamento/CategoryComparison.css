@@ -8,9 +8,9 @@
 
 .category-comparison__row {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 0;
   border-top: 1px solid rgba(16, 26, 51, 0.06);
 }
 
@@ -21,14 +21,14 @@
 
 .category-comparison__emoji {
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-sm);
   background: var(--color-surface-raised);
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .category-comparison__body {
@@ -36,11 +36,19 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
+}
+
+.category-comparison__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .category-comparison__label {
-  font-size: 14px;
+  min-width: 0;
+  font-size: 13.5px;
   font-weight: 800;
   color: var(--color-text-primary);
   overflow: hidden;
@@ -48,8 +56,19 @@
   white-space: nowrap;
 }
 
+.category-comparison__change {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.category-comparison__change--good { color: var(--color-accent-mint); }
+.category-comparison__change--bad { color: var(--color-accent-coral); }
+.category-comparison__change--flat { color: var(--color-text-tertiary); }
+
 .category-comparison__values {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   line-height: 1.35;
   color: var(--color-text-tertiary);
@@ -59,31 +78,34 @@
   white-space: nowrap;
 }
 
-.category-comparison__change {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  text-align: right;
-}
-
-.category-comparison__change-amount {
-  font-size: 13.5px;
-  font-weight: 800;
-  white-space: nowrap;
+.category-comparison__values-after {
+  color: var(--color-text-secondary);
+  font-weight: 700;
 }
 
 .category-comparison__change-detail {
-  font-size: 11.5px;
   font-weight: 700;
-  opacity: 0.85;
-  white-space: nowrap;
 }
 
-.category-comparison__change--good { color: var(--color-accent-mint); }
-.category-comparison__change--bad { color: var(--color-accent-coral); }
-.category-comparison__change--flat { color: var(--color-text-tertiary); }
+/* La barra disegna la variazione rispetto alla più grande fra le
+   categorie: il colore ripete il segno già scritto (mai l'unico segnale). */
+.category-comparison__bar {
+  margin-top: 4px;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  overflow: hidden;
+}
+
+.category-comparison__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-text-tertiary);
+}
+
+.category-comparison__bar-fill--good { background: var(--color-accent-mint); }
+.category-comparison__bar-fill--bad { background: var(--color-accent-coral); }
 
 .category-comparison__toggle {
   width: 100%;
