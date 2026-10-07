@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { ProgressBar } from '../ProgressBar/ProgressBar.jsx'
 import { formatCurrency } from '../../utils/format.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './BudgetCard.css'
 
 function statusMessage(spentRatio) {
-  if (spentRatio < 70) return 'Sei in linea con il tuo budget!'
-  if (spentRatio < 95) return 'Attenzione, ti stai avvicinando al limite.'
-  return 'Hai superato il budget disponibile.'
+  if (spentRatio < 70) return 'budget.status.ok'
+  if (spentRatio < 95) return 'budget.status.near'
+  return 'budget.status.over'
 }
 
 // On the spent PERCENTAGE, not a fixed euro residuo — a bar fixed at
@@ -40,6 +41,7 @@ function budgetBarState(spentRatio, monthlyBudget) {
 // and displays them, so it doesn't care whether they came from mock
 // expenses or a real API.
 export function BudgetCard({ available, spent, monthlyBudget, period, hidden, onToggleHidden }) {
+  const { t } = useLanguage()
   const spentRatio = monthlyBudget > 0 ? (spent / monthlyBudget) * 100 : 0
 
   // Starts at 0 and jumps to the real ratio one tick after mount, purely so
@@ -56,12 +58,12 @@ export function BudgetCard({ available, spent, monthlyBudget, period, hidden, on
   return (
     <section className="budget-card">
       <div className="budget-card__top">
-        <p className="budget-card__label">Disponibile</p>
+        <p className="budget-card__label">{t('budget.available')}</p>
         <button
           type="button"
           className="budget-card__hide-toggle"
           onClick={onToggleHidden}
-          aria-label={hidden ? 'Mostra importo' : 'Nascondi importo'}
+          aria-label={hidden ? t('budget.show') : t('budget.hide')}
         >
           {hidden ? <EyeOffIcon /> : <EyeIcon />}
         </button>
@@ -74,7 +76,7 @@ export function BudgetCard({ available, spent, monthlyBudget, period, hidden, on
       {/* Il budget è lo stipendio di QUESTO ciclo (utils/salary.js): a inizio
           ciclo, finché non viene inserito, è 0 e lo si dice. */}
       <p className="budget-card__period">
-        {monthlyBudget > 0 ? `Budget mensile ${formatCurrency(monthlyBudget)}` : 'Stipendio di questo ciclo non ancora inserito'} · {period}
+        {monthlyBudget > 0 ? t('budget.monthly', { amount: formatCurrency(monthlyBudget) }) : t('budget.nosalary')} · {period}
       </p>
 
       <div className="budget-card__progress">
@@ -84,7 +86,7 @@ export function BudgetCard({ available, spent, monthlyBudget, period, hidden, on
           {/* Explicit "X spesi di Y", never the old bare "speso di Y" —
               that read as ambiguous (spent how much?). */}
           <span className="budget-card__progress-total">
-            {formatCurrency(spent)} spesi di {formatCurrency(monthlyBudget)}
+            {t('budget.spentof', { spent: formatCurrency(spent), budget: formatCurrency(monthlyBudget) })}
           </span>
         </div>
       </div>
@@ -93,7 +95,7 @@ export function BudgetCard({ available, spent, monthlyBudget, period, hidden, on
         <span className="budget-card__status-icon" aria-hidden="true">
           {barState === 'ok' ? '✓' : '!'}
         </span>
-        {statusMessage(spentRatio)}
+        {t(statusMessage(spentRatio))}
       </p>
     </section>
   )

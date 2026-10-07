@@ -1,5 +1,6 @@
 import { RADAR_STATUS } from '../../utils/radarEngine.js'
 import { formatSignedPercent } from '../../utils/format.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './RadarPreview.css'
 
 const PREVIEW_LIMIT = 3
@@ -7,10 +8,10 @@ const PREVIEW_LIMIT = 3
 // "Rispetto al solito" only makes sense when the insight really is a
 // comparison with the user's own average; everything else (budget,
 // goal, small expenses...) shows the card's own headline metric instead.
-function tileFigures(card) {
+function tileFigures(card, t) {
   const change = card.insight?.changePercent
   if (card.insight?.category && Number.isFinite(change)) {
-    return { value: formatSignedPercent(change), label: 'rispetto al solito' }
+    return { value: formatSignedPercent(change), label: t('radar.preview.usual') }
   }
   return { value: card.metric.value, label: card.metric.label }
 }
@@ -23,6 +24,7 @@ function tileTitle(card) {
 // the same cards, same order, same tones as RadarScreen — just the top
 // few, compressed to one figure each. Nothing is computed here.
 export function RadarPreview({ radar, onOpen = () => {} }) {
+  const { t } = useLanguage()
   const cards = radar.status === RADAR_STATUS.ACTIVE ? radar.cards.slice(0, PREVIEW_LIMIT) : []
 
   return (
@@ -31,11 +33,11 @@ export function RadarPreview({ radar, onOpen = () => {} }) {
         <span className="radar-preview__icon" aria-hidden="true">
           <RadarIcon />
         </span>
-        <h2 className="radar-preview__title">Il mio Radar</h2>
+        <h2 className="radar-preview__title">{t('radar.preview.title')}</h2>
         <button type="button" className="radar-preview__all" onClick={onOpen}>
           {radar.status === RADAR_STATUS.ACTIVE && radar.cards.length > PREVIEW_LIMIT
-            ? `Vedi tutti (${radar.cards.length})`
-            : 'Vedi tutto'}
+            ? t('radar.preview.allcount', { count: radar.cards.length })
+            : t('radar.preview.all')}
           <span aria-hidden="true"> →</span>
         </button>
       </div>
@@ -43,7 +45,7 @@ export function RadarPreview({ radar, onOpen = () => {} }) {
       {cards.length > 0 ? (
         <div className={`radar-preview__tiles radar-preview__tiles--${cards.length}`}>
           {cards.map((card) => {
-            const { value, label } = tileFigures(card)
+            const { value, label } = tileFigures(card, t)
             return (
               <button
                 key={card.id}
@@ -64,8 +66,8 @@ export function RadarPreview({ radar, onOpen = () => {} }) {
       ) : (
         <button type="button" className="radar-preview__empty" onClick={onOpen}>
           {radar.status === RADAR_STATUS.LEARNING
-            ? `🔍 Sto ancora imparando le tue abitudini (${radar.cyclesSeen}/${radar.cyclesNeeded} cicli).`
-            : `✅ ${radar.quietMessage ?? 'Nessuna anomalia da segnalare al momento.'}`}
+            ? t('radar.preview.learning', { seen: radar.cyclesSeen, needed: radar.cyclesNeeded })
+            : `✅ ${radar.quietMessage ?? t('radar.preview.quiet')}`}
         </button>
       )}
     </section>

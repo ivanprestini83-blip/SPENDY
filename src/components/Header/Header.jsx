@@ -1,5 +1,6 @@
 import { APP_TAGLINE } from '../../brand.js'
 import { badgeText, bellLabel } from '../../notifications/notificationState.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './Header.css'
 
 // onOpenNotifications/onOpenSettings default to no-ops so Header renders
@@ -8,6 +9,7 @@ import './Header.css'
 // `unreadCount` is the number of unread notifications: the badge exists
 // only when it is above zero.
 export function Header({ onOpenNotifications = () => {}, onOpenSettings = () => {}, unreadCount = 0 }) {
+  const { language, t } = useLanguage()
   const badge = badgeText(unreadCount)
   return (
     <header className="header">
@@ -22,7 +24,7 @@ export function Header({ onOpenNotifications = () => {}, onOpenSettings = () => 
         <button
           type="button"
           className="header__icon-button"
-          aria-label={bellLabel(unreadCount)}
+          aria-label={bellLabel(unreadCount, language)}
           onClick={onOpenNotifications}
         >
           <BellIcon />
@@ -31,7 +33,7 @@ export function Header({ onOpenNotifications = () => {}, onOpenSettings = () => 
         <button
           type="button"
           className="header__icon-button"
-          aria-label="Impostazioni"
+          aria-label={t('home.header.settings')}
           onClick={onOpenSettings}
         >
           <GearIcon />

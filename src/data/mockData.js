@@ -11,9 +11,9 @@
 // what makes 4 equal-width flex:1 items put it at the true horizontal
 // center of the bar, not just "wherever it falls in the row".
 export const mockNavItems = [
-  { id: 'home', emoji: '🏠', label: 'Home' },
-  { id: 'analytics', emoji: '📊', label: 'Analisi' },
-  { id: 'addTransaction', emoji: '➕', label: 'Aggiungi', isAction: true, isPrimary: true },
-  { id: 'goals', emoji: '🎯', label: 'Obiettivi' },
+  { id: 'home', emoji: '🏠', label: 'Home', labelKey: 'home.nav.home' },
+  { id: 'analytics', emoji: '📊', label: 'Analisi', labelKey: 'home.nav.analytics' },
+  { id: 'addTransaction', emoji: '➕', label: 'Aggiungi', labelKey: 'home.nav.add', isAction: true, isPrimary: true },
+  { id: 'goals', emoji: '🎯', label: 'Obiettivi', labelKey: 'home.nav.goals' },
   { id: 'spendy', emoji: '😈', label: 'Spendy' },
 ]

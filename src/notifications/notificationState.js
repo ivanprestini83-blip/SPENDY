@@ -13,6 +13,8 @@
 // Tutto questo vive nel contenitore dell'ambito (guest / account) insieme al
 // resto dei dati, e non viene mai sincronizzato né esportato nei backup.
 
+import { translate } from '../i18n/translate.js'
+
 export const MAX_NOTIFICATIONS = 50
 export const MAX_KEYS = 300
 
@@ -123,8 +125,11 @@ export function badgeText(count) {
   return count >= 100 ? '99+' : String(count)
 }
 
-export const bellLabel = (count) =>
-  count > 0 ? `Notifiche, ${count} non lette` : 'Notifiche, nessuna nuova notifica'
+// `language` assente → italiano (translate ricade sempre sull'italiano).
+export const bellLabel = (count, language) =>
+  count > 0
+    ? translate(language, 'home.header.notifications.unread', { count })
+    : translate(language, 'home.header.notifications.none')
 
 // ------------------------------------------------------------- dopo il caricamento
 

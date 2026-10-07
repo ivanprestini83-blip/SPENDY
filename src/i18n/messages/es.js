@@ -7,4 +7,92 @@ export default {
       partial: 'La traducción de la app está en curso: algunas pantallas siguen por ahora en italiano.',
     },
   },
+  home: {
+    header: {
+      settings: 'Ajustes',
+      notifications: {
+        none: 'Notificaciones, ninguna notificación nueva',
+        unread: 'Notificaciones, {count} sin leer',
+      },
+    },
+    nav: {
+      home: 'Inicio',
+      analytics: 'Análisis',
+      add: 'Añadir',
+      goals: 'Objetivos',
+    },
+    hero: {
+      label: '{name} te dice',
+      cta: 'Radar',
+      score: 'Puntuación del chiste: {score}/100',
+    },
+    emergency: 'Fondo de emergencia',
+    goals: {
+      moreone: 'y otro objetivo más →',
+      moremany: 'y {count} objetivos más →',
+    },
+    affordability: {
+      title: '¿Me lo puedo permitir?',
+      subtitle: 'Pregúntale a {name} antes de hacer una compra.',
+    },
+  },
+  budget: {
+    available: 'Disponible',
+    show: 'Mostrar importe',
+    hide: 'Ocultar importe',
+    monthly: 'Presupuesto mensual {amount}',
+    nosalary: 'Todavía no has añadido el sueldo de este ciclo',
+    spentof: '{spent} gastados de {budget}',
+    status: {
+      ok: '¡Vas bien con tu presupuesto!',
+      near: 'Atención, te estás acercando al límite.',
+      over: 'Has superado el presupuesto disponible.',
+    },
+    cycle: {
+      label: 'Tu ciclo',
+      legacy: {
+        title: 'Sueldo de los ciclos anteriores',
+        cycles: '{count} ciclos anteriores',
+        explainone: 'Antes de la actualización, SPENDY usaba un único sueldo, sin guardarlo como ingreso de un ciclo: por eso en Evolución {cycles} aparece sin ingresos.',
+        explainmany: 'Antes de la actualización, SPENDY usaba un único sueldo, sin guardarlo como ingreso de un ciclo: por eso en Evolución {cycles} aparecen sin ingresos.',
+        askone: 'Para conservarlo en el historial, escribe el sueldo que recibiste en ese ciclo. No se propone el último sueldo guardado, porque puede ser ya el de un ciclo posterior.',
+        askmany: 'Para conservarlo en el historial, escribe el sueldo que recibiste en cada ciclo. No se propone el último sueldo guardado, porque puede ser ya el de un ciclo posterior.',
+        field: 'Sueldo de {cycle}',
+        placeholder: 'Importe',
+        keep: 'Guardar en el historial',
+        skip: 'No guardar',
+      },
+      fresh: {
+        title: 'Ha empezado un nuevo ciclo',
+        previous: 'El ciclo {cycle} queda guardado en Evolución: ingresos {income}, gastos {spent}.',
+        current: 'El nuevo ciclo ({cycle}) empieza desde 0\u00a0€: los ingresos y el disponible siguen en cero hasta que añadas el nuevo sueldo.',
+        addsalary: 'Añadir el nuevo sueldo',
+        startzero: 'Empezar el ciclo desde 0\u00a0€',
+      },
+    },
+  },
+  expenses: {
+    summary: {
+      today: 'Gastos de hoy',
+      cycle: 'Gastos del mes',
+      countone: '{count} movimiento',
+      countmany: '{count} movimientos',
+      of: 'de {amount}',
+    },
+  },
+  goals: {
+    eta: 'Si sigues así, lo alcanzarás en unos {months} meses.',
+    confirmdelete: '¿Confirmas?',
+    contribute: '+ Añadir',
+  },
+  radar: {
+    preview: {
+      title: 'Mi Radar',
+      all: 'Ver todo',
+      allcount: 'Ver todos ({count})',
+      usual: 'respecto a lo habitual',
+      learning: '🔍 Todavía estoy aprendiendo tus hábitos ({seen}/{needed} ciclos).',
+      quiet: 'No hay ninguna anomalía que señalar por ahora.',
+    },
+  },
 }

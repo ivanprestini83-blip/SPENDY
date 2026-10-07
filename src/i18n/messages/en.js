@@ -7,4 +7,92 @@ export default {
       partial: 'The app is being translated: some screens are still in Italian for now.',
     },
   },
+  home: {
+    header: {
+      settings: 'Settings',
+      notifications: {
+        none: 'Notifications, no new notifications',
+        unread: 'Notifications, {count} unread',
+      },
+    },
+    nav: {
+      home: 'Home',
+      analytics: 'Analytics',
+      add: 'Add',
+      goals: 'Goals',
+    },
+    hero: {
+      label: '{name} says',
+      cta: 'Radar',
+      score: 'Joke score: {score}/100',
+    },
+    emergency: 'Emergency fund',
+    goals: {
+      moreone: 'and one more goal →',
+      moremany: 'and {count} more goals →',
+    },
+    affordability: {
+      title: 'Can I afford it?',
+      subtitle: 'Ask {name} before you buy something.',
+    },
+  },
+  budget: {
+    available: 'Available',
+    show: 'Show amount',
+    hide: 'Hide amount',
+    monthly: 'Monthly budget {amount}',
+    nosalary: 'This cycle’s salary hasn’t been added yet',
+    spentof: '{spent} spent of {budget}',
+    status: {
+      ok: 'You’re within your budget!',
+      near: 'Careful, you’re getting close to the limit.',
+      over: 'You’ve gone over your available budget.',
+    },
+    cycle: {
+      label: 'Your cycle',
+      legacy: {
+        title: 'Salary for previous cycles',
+        cycles: '{count} previous cycles',
+        explainone: 'Before the update, SPENDY used a single salary without saving it as income for a cycle: that’s why in Trends {cycles} has no income.',
+        explainmany: 'Before the update, SPENDY used a single salary without saving it as income for a cycle: that’s why in Trends {cycles} have no income.',
+        askone: 'To keep it in your history, enter the salary you received in that cycle. Your last saved salary isn’t suggested, because it may already belong to a later cycle.',
+        askmany: 'To keep it in your history, enter the salary you received in each cycle. Your last saved salary isn’t suggested, because it may already belong to a later cycle.',
+        field: 'Salary for {cycle}',
+        placeholder: 'Amount',
+        keep: 'Keep in history',
+        skip: 'Don’t keep',
+      },
+      fresh: {
+        title: 'A new cycle has started',
+        previous: 'The {cycle} cycle stays saved in Trends: income {income}, spending {spent}.',
+        current: 'The new cycle ({cycle}) starts from €0: income and available stay at zero until you add your new salary.',
+        addsalary: 'Add your new salary',
+        startzero: 'Start the cycle from €0',
+      },
+    },
+  },
+  expenses: {
+    summary: {
+      today: 'Spent today',
+      cycle: 'Spent this month',
+      countone: '{count} transaction',
+      countmany: '{count} transactions',
+      of: 'of {amount}',
+    },
+  },
+  goals: {
+    eta: 'At this rate, you’ll reach it in about {months} months.',
+    confirmdelete: 'Confirm?',
+    contribute: '+ Add',
+  },
+  radar: {
+    preview: {
+      title: 'My Radar',
+      all: 'See all',
+      allcount: 'See all ({count})',
+      usual: 'vs. usual',
+      learning: '🔍 I’m still learning your habits ({seen}/{needed} cycles).',
+      quiet: 'Nothing unusual to report right now.',
+    },
+  },
 }

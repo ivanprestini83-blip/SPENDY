@@ -6,6 +6,7 @@ import { parseAmountInput, isValidAmount } from '../../utils/amounts.js'
 import {
   SALARY_CATEGORY_ID, extraIncomes, legacySalaryCycles, needsCycleConfirmation, needsLegacySalaryHistory, salaryForPeriod,
 } from '../../utils/salary.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './CycleStartCard.css'
 
 // In cima alla Home quando serve una risposta sul ciclo. Non cancella né
@@ -25,6 +26,7 @@ import './CycleStartCard.css'
 //    in Andamento con i suoi numeri; il nuovo parte da 0 finché l'utente non
 //    inserisce il nuovo stipendio.
 export function CycleStartCard() {
+  const { t } = useLanguage()
   const today = useAppStore((s) => s.today)
   const incomes = useAppStore((s) => s.incomes)
   const expenses = useAppStore((s) => s.expenses)
@@ -45,7 +47,7 @@ export function CycleStartCard() {
   const legacyCycles = showLegacy ? legacySalaryCycles({ expenses, incomes, today, cycleStartDay }) : []
   const legacyLabel = legacyCycles.length === 1
     ? formatCycleLabel(legacyCycles[0], cycleStartDay)
-    : `${legacyCycles.length} cicli precedenti`
+    : t('budget.cycle.legacy.cycles', { count: legacyCycles.length })
   const fieldName = (range) => `legacySalary:${range.start}`
 
   // Ogni ciclo riceve SOLO l'importo scritto nel suo campo; un campo vuoto
@@ -68,28 +70,26 @@ export function CycleStartCard() {
   const previousSpent = totalForPeriod(expenses, previous)
 
   return (
-    <section className="cycle-start" aria-label="Il tuo ciclo">
+    <section className="cycle-start" aria-label={t('budget.cycle.label')}>
       {showLegacy && (
         <form className="cycle-start__part" onSubmit={handleKeepLegacy}>
-          <p className="cycle-start__title">Stipendio dei cicli precedenti</p>
+          <p className="cycle-start__title">{t('budget.cycle.legacy.title')}</p>
           <p className="cycle-start__text">
-            Prima dell&apos;aggiornamento SPENDY usava un unico stipendio, senza salvarlo come entrata di un ciclo: per questo in
-            Andamento {legacyLabel} {legacyCycles.length === 1 ? 'risulta' : 'risultano'} senza entrate.
+            {t(legacyCycles.length === 1 ? 'budget.cycle.legacy.explainone' : 'budget.cycle.legacy.explainmany', { cycles: legacyLabel })}
           </p>
           <p className="cycle-start__text">
-            Per conservarlo nello storico, scrivi lo stipendio che avevi ricevuto in {legacyCycles.length === 1 ? 'quel ciclo' : 'ciascun ciclo'}.
-            Non viene proposto l&apos;ultimo stipendio salvato, perché può essere già quello di un ciclo successivo.
+            {t(legacyCycles.length === 1 ? 'budget.cycle.legacy.askone' : 'budget.cycle.legacy.askmany')}
           </p>
           {legacyCycles.map((range) => (
             <label key={range.start} className="cycle-start__field">
-              <span>Stipendio di {formatCycleLabel(range, cycleStartDay)}</span>
-              <input name={fieldName(range)} type="number" inputMode="decimal" placeholder="Importo" defaultValue="" />
+              <span>{t('budget.cycle.legacy.field', { cycle: formatCycleLabel(range, cycleStartDay) })}</span>
+              <input name={fieldName(range)} type="number" inputMode="decimal" placeholder={t('budget.cycle.legacy.placeholder')} defaultValue="" />
             </label>
           ))}
           <div className="cycle-start__actions">
-            <button type="submit" className="cycle-start__primary">Conserva nello storico</button>
+            <button type="submit" className="cycle-start__primary">{t('budget.cycle.legacy.keep')}</button>
             <button type="button" className="cycle-start__link" onClick={() => useAppStore.getState().completeLegacySalaryHistory()}>
-              Non conservare
+              {t('budget.cycle.legacy.skip')}
             </button>
           </div>
         </form>
@@ -97,12 +97,12 @@ export function CycleStartCard() {
 
       {showCycle && (
         <div className="cycle-start__part">
-          <p className="cycle-start__title">È iniziato un nuovo ciclo</p>
+          <p className="cycle-start__title">{t('budget.cycle.fresh.title')}</p>
           <p className="cycle-start__text">
-            Il ciclo {formatCycleLabel(previous, cycleStartDay)} resta salvato in Andamento: entrate {money(previousIncome)}, spese {money(previousSpent)}.
+            {t('budget.cycle.fresh.previous', { cycle: formatCycleLabel(previous, cycleStartDay), income: money(previousIncome), spent: money(previousSpent) })}
           </p>
           <p className="cycle-start__text">
-            Il nuovo ciclo ({formatCycleLabel(current, cycleStartDay)}) parte da 0 €: entrate e disponibile restano a zero finché non inserisci il nuovo stipendio.
+            {t('budget.cycle.fresh.current', { cycle: formatCycleLabel(current, cycleStartDay) })}
           </p>
           <div className="cycle-start__actions">
             <button
@@ -113,10 +113,10 @@ export function CycleStartCard() {
                 useAppStore.getState().openModal('quickAdd', { type: 'income', categoryId: SALARY_CATEGORY_ID })
               }}
             >
-              Inserisci il nuovo stipendio
+              {t('budget.cycle.fresh.addsalary')}
             </button>
             <button type="button" className="cycle-start__link" onClick={() => useAppStore.getState().confirmCycleStart(current.start)}>
-              Inizia il ciclo da 0 €
+              {t('budget.cycle.fresh.startzero')}
             </button>
           </div>
         </div>

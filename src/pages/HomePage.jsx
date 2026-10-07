@@ -18,6 +18,7 @@ import { CycleStartCard } from '../components/budget/CycleStartCard.jsx'
 import { ExpenseSummaryCards } from '../components/budget/ExpenseSummaryCards.jsx'
 import { AffordabilityCTA } from '../components/affordability/AffordabilityCTA.jsx'
 import { GoalCard } from '../components/goals/GoalCard.jsx'
+import { useLanguage } from '../i18n/useLanguage.js'
 import './HomePage.css'
 
 // "6 mensilità" — matches EmergencyFundScreen's own target so the
@@ -37,6 +38,7 @@ const EMERGENCY_FUND_TARGET_MONTHS = 6
 // mutates, this component re-renders, buildFinancialData/getSpendyCoach
 // just recompute from the latest numbers.
 export function HomePage() {
+  const { t } = useLanguage()
   const today = useAppStore((state) => state.today)
   // L'ultimo stipendio inserito: solo per l'obiettivo del fondo emergenza
   // (logica invariata, monthlyBudget × mesi).
@@ -139,7 +141,7 @@ export function HomePage() {
   // own dedicated screen (EmergencyFundScreen), reached from here.
   const emergencyFundGoal = {
     emoji: '🚨',
-    label: 'Fondo emergenza',
+    label: t('home.emergency'),
     saved: emergencyFundSaved,
     target: lastSalary * EMERGENCY_FUND_TARGET_MONTHS,
     etaMonths: null,
@@ -197,7 +199,7 @@ export function HomePage() {
           <GoalCard goal={featuredGoal} />
           {goals.length > 1 && (
             <span className="home-page__goals-more">
-              {goals.length === 2 ? 'e un altro obiettivo →' : `e altri ${goals.length - 1} obiettivi →`}
+              {goals.length === 2 ? t('home.goals.moreone') : t('home.goals.moremany', { count: goals.length - 1 })}
             </span>
           )}
         </button>

@@ -223,7 +223,7 @@ section('7. Home, Spendy, Radar, Spese, notifiche: lo stipendio del ciclo')
   const rules = read('src/notifications/notificationRules.js')
   check('notificationRules: soglie sullo stipendio del ciclo', rules.includes('currentCycleSalary(state.incomes') && !/state\.monthlyBudget/.test(rules))
   check('AndamentoScreen non passa più monthlyBudget', !read('src/components/andamento/AndamentoScreen.jsx').includes('monthlyBudget'))
-  check('BudgetCard: a inizio ciclo dice che lo stipendio non è ancora inserito', read('src/components/budget/BudgetCard.jsx').includes('Stipendio di questo ciclo non ancora inserito'))
+  check('BudgetCard: a inizio ciclo dice che lo stipendio non è ancora inserito', read('src/components/budget/BudgetCard.jsx').includes("t('budget.nosalary')") && read('src/i18n/messages/it.js').includes("nosalary: 'Stipendio di questo ciclo non ancora inserito'"))
   check('fondo emergenza: logica invariata (monthlyBudget × mesi)', read('src/components/goals/EmergencyFundScreen.jsx').includes('const target = monthlyBudget * EMERGENCY_FUND_TARGET_MONTHS'))
 }
 

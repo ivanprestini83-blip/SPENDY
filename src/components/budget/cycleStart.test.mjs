@@ -30,6 +30,13 @@ const STORE_FAKE = `
 const FAKE_MODULES = {
   '../../store/useAppStore.js': STORE_FAKE,
   './CycleStartCard.css': 'export default {}',
+  // La lingua dallo stesso store finto, con il translate vero (dizionari veri).
+  '../../i18n/useLanguage.js': `
+  import { translate } from '/src/i18n/translate.js'
+  export const useLanguage = () => {
+    const language = globalThis.__cycleTest.store.getState().language
+    return { language, t: (key, params) => translate(language, key, params) }
+  }`,
   react: `export const useState = (initial) => globalThis.__cycleTest.useState(initial)`,
 }
 const harnessPlugin = {

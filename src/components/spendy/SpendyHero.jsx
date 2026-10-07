@@ -1,4 +1,5 @@
 import { MASCOT_NAME } from '../../brand.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import { spendyStates, spendyToneByState } from './spendyStates.js'
 import { getSpendyHeroLayout } from './spendyHeroLayouts.js'
 import './SpendyHero.css'
@@ -47,6 +48,7 @@ export function SpendyHero({
   messageScore = null,
   onTalk = () => {},
 }) {
+  const { t } = useLanguage()
   const composition = getSpendyHeroLayout(state, position ?? layout)
   const src = image ?? spendyStates[state] ?? spendyStates.happy
   const accent = ACCENT_BY_TONE[tone] ?? spendyToneByState[state] ?? 'violet'
@@ -62,7 +64,7 @@ export function SpendyHero({
     <section
       className={`spendy-hero spendy-hero--${composition.position} spendy-hero--${state} spendy-hero--anim-${motion}`}
       style={style}
-      aria-label={`${MASCOT_NAME} ti dice`}
+      aria-label={t('home.hero.label', { name: MASCOT_NAME })}
     >
       <div className="spendy-hero__glow" aria-hidden="true">
         <span className="spendy-hero__spark spendy-hero__spark--a" />
@@ -89,12 +91,12 @@ export function SpendyHero({
           type="button"
           className="spendy-hero__cta"
           onClick={onTalk}
-          title={messageScore != null ? `Punteggio battuta: ${messageScore}/100` : undefined}
+          title={messageScore != null ? t('home.hero.score', { score: messageScore }) : undefined}
         >
           <span className="spendy-hero__cta-icon" aria-hidden="true">
             <ChatIcon />
           </span>
-          Radar
+          {t('home.hero.cta')}
           <span className="spendy-hero__cta-arrow" aria-hidden="true">→</span>
         </button>
       </div>
