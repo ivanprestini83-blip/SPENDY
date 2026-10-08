@@ -4,6 +4,7 @@ import { getCategory } from '../../data/categories.js'
 import './EditExpenseModal.css'
 import { isValidAmount } from '../../utils/amounts.js'
 import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
+import { useLanguage } from '../../i18n/useLanguage.js'
 
 // Reachable by tapping any row in ExpensesPage's list — "modificare
 // cifra o giorno" on a transaction already entered, or undo it entirely
@@ -11,6 +12,7 @@ import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
 // are the only thing that changes the list; nothing here duplicates
 // addExpense's own logic.
 export function EditExpenseModal({ expense, onClose }) {
+  const { t } = useLanguage()
   const editExpense = useAppStore((state) => state.editExpense)
   const deleteExpense = useAppStore((state) => state.deleteExpense)
 
@@ -40,10 +42,10 @@ export function EditExpenseModal({ expense, onClose }) {
   return (
     <div className="edit-expense">
       <div className="edit-expense__header">
-        <button type="button" className="edit-expense__back" onClick={onClose} aria-label="Chiudi">
+        <button type="button" className="edit-expense__back" onClick={onClose} aria-label={t('expenses.edit.close')}>
           ✕
         </button>
-        <p className="edit-expense__title">Modifica spesa</p>
+        <p className="edit-expense__title">{t('expenses.edit.title')}</p>
       </div>
 
       <div className="edit-expense__body">
@@ -53,7 +55,7 @@ export function EditExpenseModal({ expense, onClose }) {
         </div>
 
         <label className="edit-expense__field">
-          <span>Importo</span>
+          <span>{t('expenses.edit.amount')}</span>
           <div className="edit-expense__amount-input">
             <span>€</span>
             <input
@@ -67,12 +69,12 @@ export function EditExpenseModal({ expense, onClose }) {
         <AmountLimitHint value={amountValue} />
 
         <label className="edit-expense__field">
-          <span>Data</span>
+          <span>{t('expenses.edit.date')}</span>
           <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
         </label>
 
         <button type="button" className="edit-expense__save" disabled={!canSave} onClick={handleSave}>
-          Salva modifiche
+          {t('expenses.edit.save')}
         </button>
 
         <button
@@ -80,7 +82,7 @@ export function EditExpenseModal({ expense, onClose }) {
           className={`edit-expense__delete${confirmingDelete ? ' edit-expense__delete--confirm' : ''}`}
           onClick={handleDelete}
         >
-          {confirmingDelete ? 'Tocca di nuovo per confermare' : '🗑️ Elimina spesa'}
+          {confirmingDelete ? t('expenses.edit.confirm') : t('expenses.edit.delete')}
         </button>
       </div>
     </div>

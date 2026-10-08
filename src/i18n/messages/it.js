@@ -82,6 +82,30 @@ export default {
       countmany: '{count} transazioni',
       of: 'su {amount}',
     },
+    page: {
+      periods: 'Periodo',
+      today: 'Oggi',
+      cycle: 'Ciclo',
+      prev: 'Ciclo precedente',
+      next: 'Ciclo successivo',
+      pastcycle: 'Spese del ciclo {cycle}',
+      incomes: 'Vedi le entrate',
+      add: '+ Aggiungi spesa',
+      emptytoday: 'Nessuna spesa oggi.',
+      emptycycle: 'Nessuna spesa in questo ciclo.',
+    },
+    edit: {
+      close: 'Chiudi',
+      title: 'Modifica spesa',
+      amount: 'Importo',
+      date: 'Data',
+      save: 'Salva modifiche',
+      delete: '🗑️ Elimina spesa',
+      confirm: 'Tocca di nuovo per confermare',
+    },
+    // Stesso testo di AMOUNT_LIMIT_MESSAGE (utils/amounts.js); l'importo resta
+    // scritto così in ogni lingua finché non arriva la fase di date e numeri.
+    limit: 'Importo massimo: 1.000.000 €',
   },
   goals: {
     eta: 'Se continui così, lo raggiungi in circa {months} mesi.',

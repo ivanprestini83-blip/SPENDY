@@ -5,6 +5,7 @@ import { formatCycleLabel } from '../utils/cycle.js'
 import { currentCycleSalary } from '../utils/salary.js'
 import { formatCurrency } from '../utils/format.js'
 import { getCategory } from '../data/categories.js'
+import { useLanguage } from '../i18n/useLanguage.js'
 import './ExpensesPage.css'
 
 // L'elenco delle spese di UN periodo: oggi, oppure un ciclo (quello in corso
@@ -12,6 +13,7 @@ import './ExpensesPage.css'
 // arriva (useAppStore expensesView); i cicli precedenti restano consultabili
 // e modificabili con le frecce. Filtra soltanto: nessuna spesa viene toccata.
 export function ExpensesPage() {
+  const { t } = useLanguage()
   const today = useAppStore((state) => state.today)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
@@ -32,8 +34,8 @@ export function ExpensesPage() {
   const sorted = [...period.items].sort((a, b) => (a.date < b.date ? 1 : -1))
   const hasOlder = period.range !== null && expenses.some((expense) => expense.date < period.range.start)
 
-  let label = 'Spese di oggi'
-  if (view === 'cycle') label = cycleOffset === 0 ? 'Spese di questo mese' : `Spese del ciclo ${formatCycleLabel(period.range, cycleStartDay)}`
+  let label = t('expenses.summary.today')
+  if (view === 'cycle') label = cycleOffset === 0 ? t('expenses.summary.cycle') : t('expenses.page.pastcycle', { cycle: formatCycleLabel(period.range, cycleStartDay) })
 
   const choose = (next) => {
     setView(next)
@@ -42,8 +44,8 @@ export function ExpensesPage() {
 
   return (
     <div className="expenses-page">
-      <div className="expenses-page__periods" role="tablist" aria-label="Periodo">
-        {[['today', 'Oggi'], ['cycle', 'Ciclo']].map(([value, text]) => (
+      <div className="expenses-page__periods" role="tablist" aria-label={t('expenses.page.periods')}>
+        {[['today', t('expenses.page.today')], ['cycle', t('expenses.page.cycle')]].map(([value, text]) => (
           <button
             key={value}
             type="button"
@@ -62,7 +64,7 @@ export function ExpensesPage() {
           <button
             type="button"
             className="expenses-page__cycle-arrow"
-            aria-label="Ciclo precedente"
+            aria-label={t('expenses.page.prev')}
             disabled={!hasOlder}
             onClick={() => setCycleOffset((offset) => offset + 1)}
           >
@@ -72,7 +74,7 @@ export function ExpensesPage() {
           <button
             type="button"
             className="expenses-page__cycle-arrow"
-            aria-label="Ciclo successivo"
+            aria-label={t('expenses.page.next')}
             disabled={cycleOffset === 0}
             onClick={() => setCycleOffset((offset) => Math.max(0, offset - 1))}
           >
@@ -87,7 +89,7 @@ export function ExpensesPage() {
           <p className="expenses-page__summary-amount">{formatCurrency(period.total)}</p>
         </div>
         {view === 'cycle' && cycleOffset === 0 && (
-          <p className="expenses-page__summary-budget">su {formatCurrency(monthlyBudget)}</p>
+          <p className="expenses-page__summary-budget">{t('expenses.summary.of', { amount: formatCurrency(monthlyBudget) })}</p>
         )}
       </div>
 
@@ -97,16 +99,16 @@ export function ExpensesPage() {
           arrivare a un'entrata già inserita e correggerne importo o
           data — la bottom nav non ha una voce Entrate. */}
       <button type="button" className="expenses-page__switch" onClick={() => setActiveTab('incomes')}>
-        Vedi le entrate <span aria-hidden="true">→</span>
+        {t('expenses.page.incomes')} <span aria-hidden="true">→</span>
       </button>
 
       <button type="button" className="expenses-page__add" onClick={() => openModal('quickAdd', { type: 'expense' })}>
-        + Aggiungi spesa
+        {t('expenses.page.add')}
       </button>
 
       {sorted.length === 0 && (
         <p className="expenses-page__empty">
-          {view === 'today' ? 'Nessuna spesa oggi.' : 'Nessuna spesa in questo ciclo.'}
+          {view === 'today' ? t('expenses.page.emptytoday') : t('expenses.page.emptycycle')}
         </p>
       )}
 

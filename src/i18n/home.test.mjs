@@ -40,7 +40,9 @@ const COMPONENTS = [
   'src/components/goals/GoalCard.jsx',
   'src/components/affordability/AffordabilityCTA.jsx',
 ]
-const USES = ['src/notifications/notificationState.js', 'src/data/mockData.js', ...COMPONENTS]
+// Le chiavi `expenses.*` della pagina Spese (Fase 3) sono usate qui.
+const USES = ['src/notifications/notificationState.js', 'src/data/mockData.js', ...COMPONENTS,
+  'src/pages/ExpensesPage.jsx', 'src/components/modals/EditExpenseModal.jsx', 'src/components/AmountLimitHint/AmountLimitHint.jsx']
 // Il sorgente senza commenti: un testo citato in un commento non è a schermo.
 const code = (path) => read(path).replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
