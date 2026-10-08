@@ -2,6 +2,7 @@ import { useAppStore } from '../store/useAppStore.js'
 import { totalForMonth } from '../utils/budgetCalculations.js'
 import { formatCurrency } from '../utils/format.js'
 import { getCategory } from '../data/categories.js'
+import { useLanguage } from '../i18n/useLanguage.js'
 import './ExpensesPage.css'
 
 // The income twin of ExpensesPage — same layout/CSS, listing every
@@ -13,6 +14,7 @@ import './ExpensesPage.css'
 // inserito" needed somewhere to tap INTO in the first place, which this
 // page is.
 export function IncomesPage() {
+  const { t } = useLanguage()
   const today = useAppStore((state) => state.today)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const incomes = useAppStore((state) => state.incomes)
@@ -26,22 +28,23 @@ export function IncomesPage() {
     <div className="expenses-page">
       <div className="expenses-page__summary">
         <div>
-          <p className="expenses-page__summary-label">Entrate di questo ciclo</p>
+          <p className="expenses-page__summary-label">{t('incomes.title')}</p>
           <p className="expenses-page__summary-amount">{formatCurrency(monthTotal)}</p>
         </div>
       </div>
 
       <button type="button" className="expenses-page__switch" onClick={() => setActiveTab('expenses')}>
-        <span aria-hidden="true">←</span> Torna alle spese
+        <span aria-hidden="true">←</span> {t('incomes.back')}
       </button>
 
       <button type="button" className="expenses-page__add" onClick={() => openModal('quickAdd', { type: 'income' })}>
-        + Aggiungi guadagno
+        {t('incomes.add')}
       </button>
 
       {sorted.length === 0 && (
         <p className="expenses-page__empty">
-          Nessuna entrata registrata. Lo stipendio di ogni ciclo si inserisce da "+" → Guadagno → Stipendio.
+          {/* Cita le etichette vere dell'interfaccia, nella lingua scelta. */}
+          {t('incomes.empty', { income: t('quickadd.choose.income'), salary: getCategory('stipendio').label })}
         </p>
       )}
 

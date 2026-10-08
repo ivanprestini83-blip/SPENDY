@@ -1,5 +1,6 @@
 import { Modal } from './Modal.jsx'
 import { useAppStore } from '../../store/useAppStore.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './AddTransactionTypeModal.css'
 
 // Opened by the bottom nav's central "+" — a picker between the two
@@ -7,10 +8,11 @@ import './AddTransactionTypeModal.css'
 // option just opens that same screen with `type` set accordingly —
 // still one entry point, one transaction system underneath.
 export function AddTransactionTypeModal({ onClose }) {
+  const { t } = useLanguage()
   const openModal = useAppStore((state) => state.openModal)
 
   return (
-    <Modal title="Cosa vuoi aggiungere?" onClose={onClose}>
+    <Modal title={t('quickadd.choose.title')} onClose={onClose}>
       <div className="transaction-type__options">
         <button
           type="button"
@@ -18,7 +20,7 @@ export function AddTransactionTypeModal({ onClose }) {
           onClick={() => openModal('quickAdd', { type: 'expense' })}
         >
           <span className="transaction-type__icon" aria-hidden="true">🟢</span>
-          <span className="transaction-type__label">Spesa</span>
+          <span className="transaction-type__label">{t('quickadd.choose.expense')}</span>
         </button>
 
         <button
@@ -27,7 +29,7 @@ export function AddTransactionTypeModal({ onClose }) {
           onClick={() => openModal('quickAdd', { type: 'income' })}
         >
           <span className="transaction-type__icon" aria-hidden="true">🔵</span>
-          <span className="transaction-type__label">Guadagno</span>
+          <span className="transaction-type__label">{t('quickadd.choose.income')}</span>
         </button>
       </div>
     </Modal>

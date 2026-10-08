@@ -4,6 +4,7 @@ import { getCategory } from '../../data/categories.js'
 import './EditExpenseModal.css'
 import { isValidAmount } from '../../utils/amounts.js'
 import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
+import { useLanguage } from '../../i18n/useLanguage.js'
 
 // The income twin of EditExpenseModal — reachable by tapping any row in
 // IncomesPage's list. Only ever opened for a ONE-OFF income (Extra/
@@ -13,6 +14,7 @@ import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
 // Reuses EditExpenseModal's own CSS file — same layout, just a
 // different pair of store actions underneath.
 export function EditIncomeModal({ income, onClose }) {
+  const { t } = useLanguage()
   const editIncome = useAppStore((state) => state.editIncome)
   const deleteIncome = useAppStore((state) => state.deleteIncome)
 
@@ -42,10 +44,10 @@ export function EditIncomeModal({ income, onClose }) {
   return (
     <div className="edit-expense">
       <div className="edit-expense__header">
-        <button type="button" className="edit-expense__back" onClick={onClose} aria-label="Chiudi">
+        <button type="button" className="edit-expense__back" onClick={onClose} aria-label={t('common.close')}>
           ✕
         </button>
-        <p className="edit-expense__title">Modifica guadagno</p>
+        <p className="edit-expense__title">{t('incomes.edit.title')}</p>
       </div>
 
       <div className="edit-expense__body">
@@ -55,7 +57,7 @@ export function EditIncomeModal({ income, onClose }) {
         </div>
 
         <label className="edit-expense__field">
-          <span>Importo</span>
+          <span>{t('expenses.edit.amount')}</span>
           <div className="edit-expense__amount-input">
             <span>€</span>
             <input
@@ -69,12 +71,12 @@ export function EditIncomeModal({ income, onClose }) {
         <AmountLimitHint value={amountValue} />
 
         <label className="edit-expense__field">
-          <span>Data</span>
+          <span>{t('expenses.edit.date')}</span>
           <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
         </label>
 
         <button type="button" className="edit-expense__save" disabled={!canSave} onClick={handleSave}>
-          Salva modifiche
+          {t('expenses.edit.save')}
         </button>
 
         <button
@@ -82,7 +84,7 @@ export function EditIncomeModal({ income, onClose }) {
           className={`edit-expense__delete${confirmingDelete ? ' edit-expense__delete--confirm' : ''}`}
           onClick={handleDelete}
         >
-          {confirmingDelete ? 'Tocca di nuovo per confermare' : '🗑️ Elimina guadagno'}
+          {confirmingDelete ? t('expenses.edit.confirm') : t('incomes.edit.delete')}
         </button>
       </div>
     </div>

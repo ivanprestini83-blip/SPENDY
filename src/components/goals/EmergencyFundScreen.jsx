@@ -6,6 +6,7 @@ import { formatCurrency } from '../../utils/format.js'
 import './EmergencyFundScreen.css'
 import { isValidAmount } from '../../utils/amounts.js'
 import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
+import { useLanguage } from '../../i18n/useLanguage.js'
 
 // "fino ad arrivare ad una cifra di 4 o 6 mensilità" — 6 is the target
 // this screen aims for; the 10-20% figure below is what Spendy suggests
@@ -17,39 +18,40 @@ const SUGGESTED_SAVE_RATE = [10, 20]
 // generic Obiettivi list — "quando premo fondo emergenza deve solo
 // vedersi fondo emergenza", with Spendy's own encouragement about saving
 // before spending, not a progress-bar-and-nothing-else card.
-function encouragement(saved, target, monthlyBudget) {
+function encouragement(saved, target, monthlyBudget, t) {
   if (monthlyBudget <= 0) {
     return {
       state: 'advisor',
-      text: 'Impostami prima il tuo guadagno mensile — così calcolo un obiettivo su misura, non a caso.',
+      text: t('emergency.coach.nosalary'),
     }
   }
   const progress = target > 0 ? (saved / target) * 100 : 0
   if (progress >= 100) {
     return {
       state: 'celebrating',
-      text: `Fondo emergenza completo: ${EMERGENCY_FUND_TARGET_MONTHS} mensilità al sicuro. Ora puoi dormire sonni davvero tranquilli. 🎉`,
+      text: t('emergency.coach.complete', { months: EMERGENCY_FUND_TARGET_MONTHS }),
     }
   }
   if (progress >= 50) {
     return {
       state: 'happy',
-      text: 'Sei a metà strada. Ogni euro messo via oggi è un problema in meno il giorno che ti servirà davvero.',
+      text: t('emergency.coach.half'),
     }
   }
   if (saved > 0) {
     return {
       state: 'attentive',
-      text: `Ottimo inizio. Provaci a metterne via il ${SUGGESTED_SAVE_RATE[0]}-${SUGGESTED_SAVE_RATE[1]}% del guadagno ogni mese, PRIMA di spendere il resto — non dopo.`,
+      text: t('emergency.coach.started', { min: SUGGESTED_SAVE_RATE[0], max: SUGGESTED_SAVE_RATE[1] }),
     }
   }
   return {
     state: 'advisor',
-    text: `Battuta seria, per una volta: risparmia prima di spendere, non il contrario. Anche solo il ${SUGGESTED_SAVE_RATE[0]}% del tuo guadagno mensile, messo via da subito, ti costruisce un cuscinetto vero per le emergenze — non un "se avanza qualcosa". 😉`,
+    text: t('emergency.coach.start', { min: SUGGESTED_SAVE_RATE[0] }),
   }
 }
 
 export function EmergencyFundScreen({ onClose }) {
+  const { t } = useLanguage()
   const monthlyBudget = useAppStore((state) => state.monthlyBudget)
   const emergencyFundSaved = useAppStore((state) => state.emergencyFundSaved)
   const emergencyFundContributions = useAppStore((state) => state.emergencyFundContributions)
@@ -68,7 +70,7 @@ export function EmergencyFundScreen({ onClose }) {
 
   const target = monthlyBudget * EMERGENCY_FUND_TARGET_MONTHS
   const progress = target > 0 ? (emergencyFundSaved / target) * 100 : 0
-  const coach = encouragement(emergencyFundSaved, target, monthlyBudget)
+  const coach = encouragement(emergencyFundSaved, target, monthlyBudget, t)
 
   const amountValue = parseFloat(amount.replace(',', '.'))
   const canAdd = isValidAmount(amountValue)
@@ -105,10 +107,10 @@ export function EmergencyFundScreen({ onClose }) {
   return (
     <div className="emergency-fund-screen">
       <div className="emergency-fund-screen__header">
-        <button type="button" className="emergency-fund-screen__back" onClick={onClose} aria-label="Chiudi">
+        <button type="button" className="emergency-fund-screen__back" onClick={onClose} aria-label={t('common.close')}>
           ←
         </button>
-        <p className="emergency-fund-screen__title">🚨 Fondo emergenza</p>
+        <p className="emergency-fund-screen__title">🚨 {t('home.emergency')}</p>
       </div>
 
       <div className="emergency-fund-screen__body">
@@ -120,15 +122,15 @@ export function EmergencyFundScreen({ onClose }) {
           <p className="emergency-fund-screen__saved">{formatCurrency(emergencyFundSaved)}</p>
           <p className="emergency-fund-screen__target">
             {target > 0
-              ? `su ${formatCurrency(target)} · obiettivo ${EMERGENCY_FUND_TARGET_MONTHS} mensilità`
-              : 'Imposta il guadagno mensile per calcolare il tuo obiettivo'}
+              ? t('emergency.target', { amount: formatCurrency(target), months: EMERGENCY_FUND_TARGET_MONTHS })
+              : t('emergency.nosalary')}
           </p>
         </div>
 
         {target > 0 && <ProgressBar value={progress} color="gold" />}
 
         <label className="emergency-fund-screen__field">
-          <span>Aggiungi al fondo</span>
+          <span>{t('emergency.addlabel')}</span>
           <div className="emergency-fund-screen__input">
             <span>€</span>
             <input
@@ -143,15 +145,15 @@ export function EmergencyFundScreen({ onClose }) {
         <AmountLimitHint value={amountValue} />
 
         <button type="button" className="emergency-fund-screen__cta" disabled={!canAdd} onClick={handleAdd}>
-          Aggiungi al fondo emergenza
+          {t('emergency.add')}
         </button>
 
         {emergencyFundContributions.length > 0 && (
           <div className="emergency-fund-screen__history">
             <div className="emergency-fund-screen__history-head">
-              <span>Versamenti</span>
+              <span>{t('emergency.history')}</span>
               <button type="button" className="emergency-fund-screen__undo" onClick={handleUndoLast}>
-                ↩️ Annulla ultimo
+                ↩️ {t('emergency.undo')}
               </button>
             </div>
 
@@ -174,8 +176,8 @@ export function EmergencyFundScreen({ onClose }) {
                       value={editDate}
                       onChange={(event) => setEditDate(event.target.value)}
                     />
-                    <button type="button" onClick={saveEdit} aria-label="Salva">✓</button>
-                    <button type="button" onClick={cancelEdit} aria-label="Annulla">✕</button>
+                    <button type="button" onClick={saveEdit} aria-label={t('common.save')}>✓</button>
+                    <button type="button" onClick={cancelEdit} aria-label={t('common.cancel')}>✕</button>
                   </li>
                 ) : (
                   <li key={contribution.id} className="emergency-fund-screen__history-item">
@@ -183,13 +185,13 @@ export function EmergencyFundScreen({ onClose }) {
                     <span className="emergency-fund-screen__history-amount">
                       {formatCurrency(contribution.amount)}
                     </span>
-                    <button type="button" onClick={() => startEdit(contribution)} aria-label="Modifica">
+                    <button type="button" onClick={() => startEdit(contribution)} aria-label={t('common.edit')}>
                       ✏️
                     </button>
                     <button
                       type="button"
                       onClick={() => deleteEmergencyFundContribution(contribution.id)}
-                      aria-label="Elimina"
+                      aria-label={t('common.delete')}
                     >
                       🗑️
                     </button>

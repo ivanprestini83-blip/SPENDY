@@ -468,4 +468,93 @@ export default {
       showall: 'Mostra tutte ({count})',
     },
   },
+  // Fase 4B-2: Obiettivi, Fondo emergenza, Aggiungi spesa/guadagno, Entrate.
+  // Importi e date arrivano già formattati nei parametri.
+  goalspage: {
+    title: 'I tuoi obiettivi',
+    new: '+ Nuovo obiettivo',
+    modal: {
+      title: 'Nuovo obiettivo',
+      name: 'Nome',
+      nameplaceholder: 'Es. Vacanza, Nuovo laptop…',
+      target: 'Importo obiettivo',
+      date: 'Data obiettivo',
+      saved: 'Importo già disponibile',
+      create: 'Crea obiettivo',
+    },
+    contribute: {
+      amount: 'Importo da aggiungere',
+      progress: 'Hai risparmiato {saved} su {target}.',
+      submit: "Aggiungi all'obiettivo",
+    },
+  },
+  emergency: {
+    coach: {
+      nosalary: 'Impostami prima il tuo guadagno mensile — così calcolo un obiettivo su misura, non a caso.',
+      complete: 'Fondo emergenza completo: {months} mensilità al sicuro. Ora puoi dormire sonni davvero tranquilli. 🎉',
+      half: 'Sei a metà strada. Ogni euro messo via oggi è un problema in meno il giorno che ti servirà davvero.',
+      started: 'Ottimo inizio. Provaci a metterne via il {min}-{max}% del guadagno ogni mese, PRIMA di spendere il resto — non dopo.',
+      start: 'Battuta seria, per una volta: risparmia prima di spendere, non il contrario. Anche solo il {min}% del tuo guadagno mensile, messo via da subito, ti costruisce un cuscinetto vero per le emergenze — non un "se avanza qualcosa". 😉',
+    },
+    target: 'su {amount} · obiettivo {months} mensilità',
+    nosalary: 'Imposta il guadagno mensile per calcolare il tuo obiettivo',
+    addlabel: 'Aggiungi al fondo',
+    add: 'Aggiungi al fondo emergenza',
+    history: 'Versamenti',
+    undo: 'Annulla ultimo',
+  },
+  quickadd: {
+    choose: {
+      title: 'Cosa vuoi aggiungere?',
+      expense: 'Spesa',
+      income: 'Guadagno',
+    },
+    title: {
+      category: 'Nuova categoria',
+      expense: 'Nuova spesa',
+      income: 'Nuovo guadagno',
+    },
+    pinhint: 'Tieni premuta una tua categoria per portarla in cima',
+    deletecategory: 'Elimina categoria {name}',
+    addcategory: 'Aggiungi categoria',
+    name: 'Nome categoria',
+    nameplaceholder: 'Es. Parrucchiere',
+    icon: 'Icona',
+    iconplaceholder: 'Es. 💇',
+    create: 'Crea categoria',
+    prompt: {
+      expense: 'Quanto hai speso?',
+      income: 'Quanto hai guadagnato?',
+    },
+    details: {
+      show: 'Altri dettagli',
+      hide: 'Nascondi altri dettagli',
+    },
+    note: 'Nota (opzionale)',
+    category: 'Categoria',
+    // Gruppi del selettore di icone: NON sono i nomi delle categorie.
+    emoji: {
+      popolari: 'Popolari',
+      finanza: 'Finanza',
+      casa: 'Casa',
+      cibo: 'Cibo',
+      trasporti: 'Trasporti',
+      sport: 'Sport',
+      animali: 'Animali',
+      viaggi: 'Viaggi',
+      shopping: 'Shopping',
+      salute: 'Salute',
+      svago: 'Svago',
+    },
+  },
+  incomes: {
+    title: 'Entrate di questo ciclo',
+    back: 'Torna alle spese',
+    add: '+ Aggiungi guadagno',
+    empty: 'Nessuna entrata registrata. Lo stipendio di ogni ciclo si inserisce da "+" → {income} → {salary}.',
+    edit: {
+      title: 'Modifica guadagno',
+      delete: '🗑️ Elimina guadagno',
+    },
+  },
 }

@@ -5,6 +5,7 @@ import { useAppStore } from '../../store/useAppStore.js'
 import './modalForm.css'
 import { isValidAmount } from '../../utils/amounts.js'
 import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
+import { useLanguage } from '../../i18n/useLanguage.js'
 
 function monthsUntil(targetDateStr, todayStr) {
   const [ty, tm] = targetDateStr.split('-').map(Number)
@@ -14,6 +15,7 @@ function monthsUntil(targetDateStr, todayStr) {
 }
 
 export function NewGoalModal({ onClose }) {
+  const { t } = useLanguage()
   const addGoal = useAppStore((state) => state.addGoal)
   const today = useAppStore((state) => state.today)
 
@@ -40,17 +42,17 @@ export function NewGoalModal({ onClose }) {
   }
 
   return (
-    <Modal title="Nuovo obiettivo" onClose={onClose}>
+    <Modal title={t('goalspage.modal.title')} onClose={onClose}>
       <FormField
-        label="Nome"
+        label={t('goalspage.modal.name')}
         type="text"
-        placeholder="Es. Vacanza, Nuovo laptop…"
+        placeholder={t('goalspage.modal.nameplaceholder')}
         value={label}
         onChange={(event) => setLabel(event.target.value)}
       />
 
       <FormField
-        label="Importo obiettivo"
+        label={t('goalspage.modal.target')}
         type="number"
         inputMode="decimal"
         placeholder="€ 0,00"
@@ -60,14 +62,14 @@ export function NewGoalModal({ onClose }) {
       <AmountLimitHint value={targetValue} />
 
       <FormField
-        label="Data obiettivo"
+        label={t('goalspage.modal.date')}
         type="date"
         value={targetDate}
         onChange={(event) => setTargetDate(event.target.value)}
       />
 
       <FormField
-        label="Importo già disponibile"
+        label={t('goalspage.modal.saved')}
         type="number"
         inputMode="decimal"
         placeholder="€ 0,00"
@@ -77,7 +79,7 @@ export function NewGoalModal({ onClose }) {
       <AmountLimitHint value={savedValue} />
 
       <button type="button" className="modal-form__submit" disabled={!canSave} onClick={handleSave}>
-        Crea obiettivo
+        {t('goalspage.modal.create')}
       </button>
     </Modal>
   )

@@ -6,10 +6,12 @@ import { formatCurrency } from '../../utils/format.js'
 import './modalForm.css'
 import { isValidAmount } from '../../utils/amounts.js'
 import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
+import { useLanguage } from '../../i18n/useLanguage.js'
 
 // Opened from a GoalCard's "+ Aggiungi" (see GoalsSection.jsx) — the one
 // place `saved` on a goal ever changes, via the store's contributeToGoal.
 export function ContributeToGoalModal({ goal, onClose }) {
+  const { t } = useLanguage()
   const contributeToGoal = useAppStore((state) => state.contributeToGoal)
   const [amount, setAmount] = useState('')
 
@@ -25,7 +27,7 @@ export function ContributeToGoalModal({ goal, onClose }) {
   return (
     <Modal title={`${goal.emoji} ${goal.label}`} onClose={onClose}>
       <FormField
-        label="Importo da aggiungere"
+        label={t('goalspage.contribute.amount')}
         type="number"
         inputMode="decimal"
         placeholder="€ 0,00"
@@ -35,11 +37,11 @@ export function ContributeToGoalModal({ goal, onClose }) {
       <AmountLimitHint value={amountValue} />
 
       <p className="modal-form__hint">
-        Hai risparmiato {formatCurrency(goal.saved)} su {formatCurrency(goal.target)}.
+        {t('goalspage.contribute.progress', { saved: formatCurrency(goal.saved), target: formatCurrency(goal.target) })}
       </p>
 
       <button type="button" className="modal-form__submit" disabled={!canSave} onClick={handleSave}>
-        Aggiungi all'obiettivo
+        {t('goalspage.contribute.submit')}
       </button>
     </Modal>
   )

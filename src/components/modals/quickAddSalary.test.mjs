@@ -22,6 +22,13 @@ const FAKE_MODULES = {
   '../../store/useAppStore.js': `
     export const useAppStore = (selector) => selector(globalThis.__qa.store)`,
   './QuickAddScreen.css': 'export default {}',
+  // La lingua dallo stesso store finto, con il translate vero (dizionari veri).
+  '../../i18n/useLanguage.js': `
+    import { translate } from '/src/i18n/translate.js'
+    export const useLanguage = () => {
+      const language = globalThis.__qa.store.language
+      return { language, t: (key, params) => translate(language, key, params) }
+    }`,
   './AmountLimitHint.css': 'export default {}',
 }
 

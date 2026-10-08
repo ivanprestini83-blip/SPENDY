@@ -6,6 +6,7 @@ import './QuickAddScreen.css'
 import { isValidAmount } from '../../utils/amounts.js'
 import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
 import { SALARY_CATEGORY_ID, lastKnownSalary } from '../../utils/salary.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
 
 // "tenendole premute" — how long a press on a custom category tile has
 // to hold before it counts as a long-press (pin/unpin) instead of a tap
@@ -30,6 +31,7 @@ const LONG_PRESS_MOVE_TOLERANCE_PX = 10
 // HomePage/AnalyticsPage/SpendyPage already recompute everything from
 // the store on every render, so nothing here needs to "push" to them.
 export function QuickAddScreen({ type, initialCategoryId = null, onClose }) {
+  const { t } = useLanguage()
   const today = useAppStore((state) => state.today)
   const monthlyBudget = useAppStore((state) => state.monthlyBudget)
   const incomes = useAppStore((state) => state.incomes)
@@ -170,12 +172,12 @@ export function QuickAddScreen({ type, initialCategoryId = null, onClose }) {
           type="button"
           className="quick-add__back"
           onClick={step === 'pick' ? onClose : step === 'newCategory' ? () => setStep('pick') : handleBackFromAmount}
-          aria-label={step === 'pick' ? 'Chiudi' : 'Torna indietro'}
+          aria-label={step === 'pick' ? t('common.close') : t('common.back')}
         >
           {step === 'pick' ? '✕' : '←'}
         </button>
         <p className="quick-add__title">
-          {step === 'newCategory' ? 'Nuova categoria' : isExpense ? 'Nuova spesa' : 'Nuovo guadagno'}
+          {step === 'newCategory' ? t('quickadd.title.category') : isExpense ? t('quickadd.title.expense') : t('quickadd.title.income')}
         </p>
       </div>
 
@@ -183,7 +185,7 @@ export function QuickAddScreen({ type, initialCategoryId = null, onClose }) {
         <div className="quick-add__grid">
           {ownCustomCategories.length > 0 && (
             <p className="quick-add__grid-hint">
-              📌 Tieni premuta una tua categoria per portarla in cima
+              📌 {t('quickadd.pinhint')}
             </p>
           )}
 
@@ -218,7 +220,7 @@ export function QuickAddScreen({ type, initialCategoryId = null, onClose }) {
                 <button
                   type="button"
                   className="quick-add__tile-delete"
-                  aria-label={`Elimina categoria ${cat.label}`}
+                  aria-label={t('quickadd.deletecategory', { name: cat.label })}
                   onClick={() => deleteCustomCategory(cat.id)}
                 >
                   ✕
@@ -229,7 +231,7 @@ export function QuickAddScreen({ type, initialCategoryId = null, onClose }) {
 
           <button type="button" className="quick-add__tile quick-add__tile--new" onClick={() => setStep('newCategory')}>
             <span className="quick-add__tile-emoji" aria-hidden="true">＋</span>
-            <span className="quick-add__tile-label">Aggiungi categoria</span>
+            <span className="quick-add__tile-label">{t('quickadd.addcategory')}</span>
           </button>
         </div>
       )}
@@ -237,20 +239,20 @@ export function QuickAddScreen({ type, initialCategoryId = null, onClose }) {
       {step === 'newCategory' && (
         <div className="quick-add__new-category">
           <label className="quick-add__field">
-            <span>Nome categoria</span>
+            <span>{t('quickadd.name')}</span>
             <input
               type="text"
-              placeholder="Es. Parrucchiere"
+              placeholder={t('quickadd.nameplaceholder')}
               value={newName}
               onChange={(event) => setNewName(event.target.value)}
             />
           </label>
 
           <label className="quick-add__field">
-            <span>Icona</span>
+            <span>{t('quickadd.icon')}</span>
             <input
               type="text"
-              placeholder="Es. 💇"
+              placeholder={t('quickadd.iconplaceholder')}
               value={newEmoji}
               onChange={(event) => setNewEmoji(event.target.value)}
               maxLength={4}
@@ -268,8 +270,8 @@ export function QuickAddScreen({ type, initialCategoryId = null, onClose }) {
                   type="button"
                   className={`quick-add__emoji-tab${group.id === emojiGroupId ? ' quick-add__emoji-tab--active' : ''}`}
                   onClick={() => setEmojiGroupId(group.id)}
-                  aria-label={group.label}
-                  title={group.label}
+                  aria-label={t(`quickadd.emoji.${group.id}`)}
+                  title={t(`quickadd.emoji.${group.id}`)}
                 >
                   {group.icon}
                 </button>
@@ -296,7 +298,7 @@ export function QuickAddScreen({ type, initialCategoryId = null, onClose }) {
             disabled={!newName.trim() || !newEmoji.trim()}
             onClick={handleCreateCategory}
           >
-            Crea categoria
+            {t('quickadd.create')}
           </button>
         </div>
       )}
@@ -308,7 +310,7 @@ export function QuickAddScreen({ type, initialCategoryId = null, onClose }) {
             <span className="quick-add__picked-label">{category.label}</span>
           </div>
 
-          <p className="quick-add__prompt">{isExpense ? 'Quanto hai speso?' : 'Quanto hai guadagnato?'}</p>
+          <p className="quick-add__prompt">{isExpense ? t('quickadd.prompt.expense') : t('quickadd.prompt.income')}</p>
 
           <div className="quick-add__amount-input">
             <span>€</span>
@@ -325,17 +327,17 @@ export function QuickAddScreen({ type, initialCategoryId = null, onClose }) {
           <AmountLimitHint value={amountValue} />
 
           <button type="button" className="quick-add__confirm" disabled={!canConfirm} onClick={handleConfirm}>
-            Conferma
+            {t('common.confirm')}
           </button>
 
           <button type="button" className="quick-add__details-toggle" onClick={() => setShowDetails((value) => !value)}>
-            {showDetails ? 'Nascondi altri dettagli' : 'Altri dettagli'}
+            {showDetails ? t('quickadd.details.hide') : t('quickadd.details.show')}
           </button>
 
           {showDetails && (
             <div className="quick-add__details">
               <label className="quick-add__field">
-                <span>Nota (opzionale)</span>
+                <span>{t('quickadd.note')}</span>
                 <input
                   type="text"
                   placeholder={category.label}
@@ -345,12 +347,12 @@ export function QuickAddScreen({ type, initialCategoryId = null, onClose }) {
               </label>
 
               <label className="quick-add__field">
-                <span>Data</span>
+                <span>{t('expenses.edit.date')}</span>
                 <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
               </label>
 
               <label className="quick-add__field">
-                <span>Categoria</span>
+                <span>{t('quickadd.category')}</span>
                 <select value={categoryOverride || category.id} onChange={(event) => setCategoryOverride(event.target.value)}>
                   {gridCategories.map((cat) => (
                     <option key={cat.id} value={cat.id}>
