@@ -37,31 +37,37 @@
 // can produce a reaction. No trigger → null → "€20 normale" stays silent,
 // exactly as specified.
 import { categoryComparison } from './budgetCalculations.js'
-import {
-  SPESA_100,
-  SPESA_INUTILE,
-  CATEGORIA_ECCESSIVA_RISTORANTI,
-  CATEGORIA_ECCESSIVA_SHOPPING,
-  CATEGORIA_ECCESSIVA_AUTO,
-  BUDGET_SUPERATO,
-  SPESA_ENORME_500,
-  SPESA_ENORME_1000,
-  SPESA_RIPETUTA,
-  AUMENTO_ANOMALO,
-  OBIETTIVO_DANNEGGIATO,
-  VACATION_ONLY_PHRASE,
-  BUONA_SCELTA,
-  RISPARMIO,
-  RARE_SPECIALI,
-} from '../data/spendyReactionLibrary.js'
+import { REACTION_LIBRARY } from '../data/spendyReactionLibrary.js'
 
 // Combined pools — "quando ci sono più frasi valide" applies within a
 // single priority step too: step 8 draws from BOTH the ">100€" bucket
 // and the "apparently useless expense" bucket (neither is tied to a
 // specific narrower condition of its own in the priority list), and
 // step 9 draws from both positive buckets, for a richer rotation.
-const HUNDRED_PLUS_POOL = [...SPESA_100, ...SPESA_INUTILE]
-const POSITIVE_EVENT_POOL = [...BUONA_SCELTA, ...RISPARMIO]
+//
+// One set of pools per language, built from that language's library: every
+// language has the same phrases in the same order, so the selection below
+// (same rng, same history rules) picks the same reaction in each language.
+// Unknown language → Italian.
+function buildPools(L) {
+  return {
+    SPESA_ENORME_1000: L.SPESA_ENORME_1000,
+    SPESA_ENORME_500: L.SPESA_ENORME_500,
+    OBIETTIVO_DANNEGGIATO: L.OBIETTIVO_DANNEGGIATO,
+    OBIETTIVO_NO_VACANZA: L.OBIETTIVO_DANNEGGIATO.filter((text) => text !== L.VACATION_ONLY_PHRASE),
+    BUDGET_SUPERATO: L.BUDGET_SUPERATO,
+    CATEGORIA_ECCESSIVA_RISTORANTI: L.CATEGORIA_ECCESSIVA_RISTORANTI,
+    CATEGORIA_ECCESSIVA_SHOPPING: L.CATEGORIA_ECCESSIVA_SHOPPING,
+    CATEGORIA_ECCESSIVA_AUTO: L.CATEGORIA_ECCESSIVA_AUTO,
+    SPESA_RIPETUTA: L.SPESA_RIPETUTA,
+    AUMENTO_ANOMALO: L.AUMENTO_ANOMALO,
+    HUNDRED_PLUS: [...L.SPESA_100, ...L.SPESA_INUTILE],
+    POSITIVE_EVENT: [...L.BUONA_SCELTA, ...L.RISPARMIO],
+    RARE_SPECIALI: L.RARE_SPECIALI,
+  }
+}
+const POOLS = Object.fromEntries(Object.entries(REACTION_LIBRARY).map(([lang, L]) => [lang, buildPools(L)]))
+const poolsFor = (lang) => POOLS[lang] ?? POOLS.it
 
 // --- Tunable thresholds — named so the cascade reads like the spec ---
 const MEGA_1000_AT = 1000 // €
@@ -100,9 +106,9 @@ function findDamagedGoal(goals, amount) {
 }
 
 function categoryBucketFor(categoryId) {
-  if (categoryId === 'ristoranti') return CATEGORIA_ECCESSIVA_RISTORANTI
-  if (categoryId === 'shopping') return CATEGORIA_ECCESSIVA_SHOPPING
-  if (categoryId === 'carburante' || categoryId === 'trasporti') return CATEGORIA_ECCESSIVA_AUTO
+  if (categoryId === 'ristoranti') return 'CATEGORIA_ECCESSIVA_RISTORANTI'
+  if (categoryId === 'shopping') return 'CATEGORIA_ECCESSIVA_SHOPPING'
+  if (categoryId === 'carburante' || categoryId === 'trasporti') return 'CATEGORIA_ECCESSIVA_AUTO'
   return null
 }
 
@@ -141,28 +147,51 @@ function pickFromPool(pool, jokeHistory, key, rng) {
 // rare/speciali una probabilità molto più bassa" — kept out of the
 // gentler steps (goal damage, positive event) whose own tone would clash
 // with the rare bucket's sterner voice.
-function buildResult({ bucket, state, reason, insightCategoryId = null, rare = false, jokeHistory, rng }) {
+//
+// `bucket` is a pool NAME (see buildPools) and `pools` the current
+// language's pools. Which pool and which position were picked is
+// remembered (REACTION_REF), so the same reaction can be shown again in
+// another language without drawing a new one.
+const REACTION_REF = new WeakMap()
+
+function pickInto({ state, ...rest }, pools, poolName, jokeHistory, key, rng) {
+  const pool = pools[poolName]
+  const message = pickFromPool(pool, jokeHistory, key, rng)
+  const reaction = { state, message, ...rest }
+  REACTION_REF.set(reaction, { poolName, index: pool.indexOf(message) })
+  return reaction
+}
+
+function buildResult({ bucket, pools, state, reason, insightCategoryId = null, rare = false, jokeHistory, rng }) {
   if (rare && rng() < RARE_SUBSTITUTION_PROBABILITY) {
     const rareKey = topicKeyFor(null, 'rare_special')
-    return {
+    return pickInto({
       state,
-      message: pickFromPool(RARE_SPECIALI, jokeHistory, rareKey, rng),
       reason,
       insight: { type: 'rare_special', categoryId: null, category: null },
       messageScore: 100,
       secondaryInsightText: null,
-    }
+    }, pools, 'RARE_SPECIALI', jokeHistory, rareKey, rng)
   }
 
   const key = topicKeyFor(insightCategoryId, reason)
-  return {
+  return pickInto({
     state,
-    message: pickFromPool(bucket, jokeHistory, key, rng),
     reason,
     insight: { type: reason, categoryId: insightCategoryId, category: null },
     messageScore: 100,
     secondaryInsightText: null,
-  }
+  }, pools, bucket, jokeHistory, key, rng)
+}
+
+// The same reaction (same pool, same position) in another language.
+function inLanguage(reaction, lang) {
+  const ref = REACTION_REF.get(reaction)
+  const text = ref ? poolsFor(lang)[ref.poolName]?.[ref.index] : null
+  if (!text || text === reaction.message) return reaction
+  const translated = { ...reaction, message: text }
+  REACTION_REF.set(translated, ref)
+  return translated
 }
 
 // "Una nuova spesa = massimo una reaction visibile."
@@ -202,7 +231,8 @@ export function evaluateExpenseReaction(args) {
 
   const key = reactionEventKey(args.expenses ?? [], args.today, result.reason)
   const alreadyShown = shownReactionByEvent.get(key)
-  if (alreadyShown) return alreadyShown
+  // Same event after a language change: the same reaction, translated.
+  if (alreadyShown) return inLanguage(alreadyShown, args.lang)
 
   shownReactionByEvent.set(key, result)
   if (shownReactionByEvent.size > SHOWN_REACTION_MEMORY) {
@@ -220,8 +250,10 @@ function selectExpenseReaction({
   financialData = null,
   jokeHistory = [],
   rng = Math.random,
+  lang = 'it',
 }) {
   if (!today) return null
+  const pools = poolsFor(lang)
 
   const available = financialData?.available ?? 0
   const overBudget = monthlyBudget > 0 && available < 0
@@ -232,10 +264,10 @@ function selectExpenseReaction({
   // 1 & 2. Mega expense — absolute euro amounts, independent of budget size.
   if (triggerExpense) {
     if (triggerExpense.amount >= MEGA_1000_AT) {
-      return buildResult({ bucket: SPESA_ENORME_1000, state: 'concerned', reason: 'mega_expense_1000', rare: true, jokeHistory, rng })
+      return buildResult({ bucket: 'SPESA_ENORME_1000', pools, state: 'concerned', reason: 'mega_expense_1000', rare: true, jokeHistory, rng })
     }
     if (triggerExpense.amount >= MEGA_500_AT) {
-      return buildResult({ bucket: SPESA_ENORME_500, state: 'concerned', reason: 'mega_expense_500', rare: true, jokeHistory, rng })
+      return buildResult({ bucket: 'SPESA_ENORME_500', pools, state: 'concerned', reason: 'mega_expense_500', rare: true, jokeHistory, rng })
     }
 
     // 3. Goal damaged — only a notable expense meaningfully eating into
@@ -243,15 +275,15 @@ function selectExpenseReaction({
     const damagedGoal = findDamagedGoal(goals, triggerExpense.amount)
     if (damagedGoal) {
       const isVacationGoal = /vacanza/i.test(damagedGoal.label)
-      const pool = isVacationGoal ? OBIETTIVO_DANNEGGIATO : OBIETTIVO_DANNEGGIATO.filter((text) => text !== VACATION_ONLY_PHRASE)
-      return buildResult({ bucket: pool, state: 'ironic', reason: 'goal_damaged', insightCategoryId: damagedGoal.id, jokeHistory, rng })
+      const pool = isVacationGoal ? 'OBIETTIVO_DANNEGGIATO' : 'OBIETTIVO_NO_VACANZA'
+      return buildResult({ bucket: pool, pools, state: 'ironic', reason: 'goal_damaged', insightCategoryId: damagedGoal.id, jokeHistory, rng })
     }
   }
 
   // 4. Budget exceeded — the one step that fires even with no fresh
   // expense today, same as the "steady state" it replaces.
   if (overBudget) {
-    return buildResult({ bucket: BUDGET_SUPERATO, state: 'concerned', reason: 'budget_exceeded', rare: true, jokeHistory, rng })
+    return buildResult({ bucket: 'BUDGET_SUPERATO', pools, state: 'concerned', reason: 'budget_exceeded', rare: true, jokeHistory, rng })
   }
 
   if (!triggerExpense) return null
@@ -265,23 +297,23 @@ function selectExpenseReaction({
   if (hasCategoryHistory && categoryRow.changePercent >= CATEGORY_SEVERE_AT) {
     const bucket = categoryBucketFor(categoryId)
     if (bucket) {
-      return buildResult({ bucket, state: 'concerned', reason: 'category_severe', insightCategoryId: categoryId, rare: true, jokeHistory, rng })
+      return buildResult({ bucket, pools, state: 'concerned', reason: 'category_severe', insightCategoryId: categoryId, rare: true, jokeHistory, rng })
     }
   }
 
   // 6. Repeated expense — same category, several times in a short window.
   if (countRecentSameCategory(expenses, categoryId, today) >= REPEAT_THRESHOLD) {
-    return buildResult({ bucket: SPESA_RIPETUTA, state: 'ironic', reason: 'repeated_expense', insightCategoryId: categoryId, jokeHistory, rng })
+    return buildResult({ bucket: 'SPESA_RIPETUTA', pools, state: 'ironic', reason: 'repeated_expense', insightCategoryId: categoryId, jokeHistory, rng })
   }
 
   // 7. Anomalous increase — any category, moderate threshold.
   if (hasCategoryHistory && categoryRow.changePercent >= CATEGORY_ANOMALOUS_AT) {
-    return buildResult({ bucket: AUMENTO_ANOMALO, state: 'attentive', reason: 'anomalous_increase', insightCategoryId: categoryId, jokeHistory, rng })
+    return buildResult({ bucket: 'AUMENTO_ANOMALO', pools, state: 'attentive', reason: 'anomalous_increase', insightCategoryId: categoryId, jokeHistory, rng })
   }
 
   // 8. €100+ — the mandatory floor. Strictly greater than 100.
   if (triggerExpense.amount > HUNDRED_PLUS_AT) {
-    return buildResult({ bucket: HUNDRED_PLUS_POOL, state: 'ironic', reason: 'expense_over_100', rare: true, jokeHistory, rng })
+    return buildResult({ bucket: 'HUNDRED_PLUS', pools, state: 'ironic', reason: 'expense_over_100', rare: true, jokeHistory, rng })
   }
 
   // 9. Positive event — this category is running meaningfully BELOW its
@@ -289,7 +321,7 @@ function selectExpenseReaction({
   // happens to still be comfortable" (which would fire constantly and
   // break "€20 normale -> nessuna reazione").
   if (hasCategoryHistory && categoryRow.changeAmount < 0 && Math.abs(categoryRow.changePercent) >= CATEGORY_ANOMALOUS_AT) {
-    return buildResult({ bucket: POSITIVE_EVENT_POOL, state: 'happy', reason: 'positive_event', insightCategoryId: categoryId, jokeHistory, rng })
+    return buildResult({ bucket: 'POSITIVE_EVENT', pools, state: 'happy', reason: 'positive_event', insightCategoryId: categoryId, jokeHistory, rng })
   }
 
   // 10. Nothing applies.

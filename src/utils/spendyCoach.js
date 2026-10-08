@@ -31,6 +31,10 @@
 //                  means "dal 27 al 27" instead of always the calendar month
 //   jokeHistory    [{ key, text, shownAt }] — jokes already shown, per
 //                  "categoryId:type" key, so the same one never repeats
+//   lang           'it' | 'en' | 'es' | 'fr' — the language Spendy speaks
+//                  (phrases, HumorLibrary voice, reaction library); missing
+//                  or unknown → Italian. Changes only the words, never which
+//                  tier fires or which joke/reaction is picked.
 //
 // TIER 2 — "SISTEMA INTELLIGENTE DI REAZIONI DELLA VOLPE": every reaction
 // to a freshly-registered expense (>100€ mandatory, mega expenses,
@@ -48,6 +52,7 @@ import { pickBestJoke } from './jokeEvaluator.js'
 import { rankInsightsByImportance } from './importantEventSelector.js'
 import { evaluateExpenseReaction } from './expenseReactionEngine.js'
 import { getCycleTiming } from './cycle.js'
+import { translate } from '../i18n/translate.js'
 
 export const SPENDY_STATES = {
   HAPPY: 'happy',
@@ -67,31 +72,15 @@ const BUDGET_CONCERNED_AT = 85
 // vero all'inizio, falso nell'ultimo giorno. Le soglie restano quelle sopra:
 // cambia solo cosa dice Spendy, non quando avvisa. Senza fase nota, la frase
 // neutra (nessuna affermazione sul tempo).
-const BUDGET_WARNING_MESSAGES = {
-  concerned: {
-    early: '🚨 Il budget ha alzato le mani: siamo praticamente al tappeto e il ciclo è appena cominciato.',
-    middle: '🚨 Il budget ha alzato le mani: siamo praticamente al tappeto e il ciclo non è ancora finito.',
-    final_days: '🚨 Il budget è quasi al tappeto: tieni duro, mancano pochi giorni alla fine del ciclo.',
-    last_day: '🚨 Il budget è quasi al tappeto, ma oggi è l’ultimo giorno del ciclo: domani si riparte.',
-    neutral: '🚨 Il budget ha alzato le mani: siamo praticamente al tappeto.',
-  },
-  attentive: {
-    early: '👀 Il budget sta già sudando: abbiamo superato i tre quarti e la strada è ancora lunga.',
-    middle: '👀 Il budget sta sudando: oltre i tre quarti, e il ciclo non è ancora finito.',
-    final_days: '👀 Oltre i tre quarti del budget, ma mancano pochi giorni alla fine del ciclo: si può chiudere bene.',
-    last_day: '👀 Ultimo giorno del ciclo: oltre i tre quarti del budget, ma domani si riparte.',
-    neutral: '👀 Il budget sta sudando: abbiamo superato i tre quarti.',
-  },
-}
-
+// I testi sono nei dizionari (coach.warning.<livello>.<fase>), uno per lingua.
 const PHASE_GROUP = {
   new_cycle: 'early', start: 'early', first_half: 'early',
   mid: 'middle', second_half: 'middle',
-  final_days: 'final_days', last_day: 'last_day',
+  final_days: 'finaldays', last_day: 'lastday',
 }
 
-function budgetWarningMessage(level, phase) {
-  return BUDGET_WARNING_MESSAGES[level][PHASE_GROUP[phase] ?? 'neutral']
+function budgetWarningMessage(level, phase, lang) {
+  return translate(lang, `coach.warning.${level}.${PHASE_GROUP[phase] ?? 'neutral'}`)
 }
 
 // La fase del ciclo: da buildFinancialData (financialData.cycle) o, se manca,
@@ -160,6 +149,7 @@ function pickBehaviorInsightJoke(behaviorContext, filterInsight = () => true, ra
     // lista arrivava fino a questa funzione e si fermava.
     goals = [],
     config = BEHAVIOR_ENGINE_CONFIG,
+    lang = 'it',
   } = behaviorContext
 
   const rawInsights = analyzeBehavior({ expenses, today, monthlyBudget, financialData, cycleStartDay, goals, config }).filter(filterInsight)
@@ -178,7 +168,7 @@ function pickBehaviorInsightJoke(behaviorContext, filterInsight = () => true, ra
     const key = getInsightTopicKey(insight)
     const keyHistory = jokeHistory.filter((entry) => entry.key === key)
 
-    const candidates = generateJokeCandidates(insight)
+    const candidates = generateJokeCandidates(insight, lang)
     const best = pickBestJoke(candidates, insight, keyHistory)
     if (!best) continue
 
@@ -235,31 +225,33 @@ export function getInsightTopicKey(insight) {
 // sentence to fall back on (there's no CoachEngine tier text for
 // "recurring_low" etc. the way there is for a category spike), so this
 // builds one from the insight's own fields instead.
-function describeInsight(insight) {
+function describeInsight(insight, lang) {
   const label = insight.category?.label
+  const t = (key, params) => translate(lang, `coach.insight.${key}`, params)
+  const amounts = { category: label, current: Math.round(insight.current), baseline: Math.round(insight.baseline) }
   switch (insight.type) {
     case 'recurring_high':
     case 'category_spike':
     case 'category_trend_up':
-      return label ? `${label}: ${Math.round(insight.current)} € invece dei soliti ${Math.round(insight.baseline)} €.` : null
+      return label ? t('high', amounts) : null
     case 'recurring_low':
     case 'category_drop':
     case 'category_trend_down':
-      return label ? `${label}: solo ${Math.round(insight.current)} € invece dei soliti ${Math.round(insight.baseline)} €.` : null
+      return label ? t('low', amounts) : null
     case 'amount_above_average':
-      return label ? `È la spesa più alta del ciclo in ${label.toLowerCase()}.` : null
+      return label ? t('above', { category: label.toLowerCase() }) : null
     case 'amount_below_average':
-      return label ? `Una spesa ben sotto la media per ${label.toLowerCase()}.` : null
+      return label ? t('below', { category: label.toLowerCase() }) : null
     case 'savings_vs_usual':
-      return `${Math.round(Math.abs(insight.changeAmount))} € in meno del solito in questo ciclo.`
+      return t('savings', { amount: Math.round(Math.abs(insight.changeAmount)) })
     case 'unusual_purchase':
-      return label ? `Prima spesa in ${label.toLowerCase()} da diversi cicli.` : null
+      return label ? t('unusual', { category: label.toLowerCase() }) : null
     case 'unusual_frequency':
-      return label ? `Frequenza fuori dal solito in ${label.toLowerCase()} in questo ciclo.` : null
+      return label ? t('frequency', { category: label.toLowerCase() }) : null
     case 'positive_streak':
-      return 'Diversi cicli di fila sotto budget.'
+      return t('positivestreak')
     case 'negative_streak':
-      return 'Diversi cicli di fila sopra la soglia di attenzione.'
+      return t('negativestreak')
     default:
       return null
   }
@@ -272,6 +264,7 @@ export function getSpendyCoach(financialData, behaviorContext = null) {
     topDecreasingCategory = null,
     goals = [],
   } = financialData ?? {}
+  const lang = behaviorContext?.lang
 
   // 0. No income set yet — every tier below assumes a real monthlyBudget
   // to react to; with none, there's nothing genuine to compute (0 spent
@@ -281,7 +274,7 @@ export function getSpendyCoach(financialData, behaviorContext = null) {
   if (!monthlyBudget || monthlyBudget <= 0) {
     return {
       state: SPENDY_STATES.ADVISOR,
-      message: '🦊 Sono in attesa... cosa stai aspettando? Imposta il tuo guadagno mensile e si parte!',
+      message: translate(lang, 'coach.waiting'),
       reason: 'awaiting_income',
       priority: 0,
       insight: null,
@@ -296,7 +289,7 @@ export function getSpendyCoach(financialData, behaviorContext = null) {
   if (reachedGoal) {
     return {
       state: SPENDY_STATES.CELEBRATING,
-      message: `🎉 Obiettivo "${reachedGoal.label}" raggiunto! Questa volta offro io... virtualmente 😂`,
+      message: translate(lang, 'coach.goalreached', { goal: reachedGoal.label }),
       reason: 'goal_reached',
       priority: 1,
       insight: null,
@@ -318,6 +311,7 @@ export function getSpendyCoach(financialData, behaviorContext = null) {
     goals,
     financialData,
     jokeHistory: behaviorContext?.jokeHistory ?? [],
+    lang,
   })
   if (expenseReaction) {
     return { ...expenseReaction, priority: 2 }
@@ -328,7 +322,7 @@ export function getSpendyCoach(financialData, behaviorContext = null) {
   // unconditionally). Tries the joke pipeline first, falling back to the
   // descriptive sentence if nothing valid comes back.
   if (spentRatio >= BUDGET_CONCERNED_AT) {
-    const descriptiveMessage = budgetWarningMessage('concerned', cyclePhaseOf(financialData, behaviorContext))
+    const descriptiveMessage = budgetWarningMessage('concerned', cyclePhaseOf(financialData, behaviorContext), lang)
     const behaviorResult = pickBehaviorInsightJoke(
       behaviorContext,
       (insight) => insight.type === BEHAVIOR_TYPES.BUDGET_HIGH,
@@ -347,7 +341,7 @@ export function getSpendyCoach(financialData, behaviorContext = null) {
   // 4. Category/budget warning — noticeable but not yet alarming. Same
   // joke-first / descriptive-fallback treatment as tier 3.
   if (spentRatio >= BUDGET_ATTENTIVE_AT) {
-    const descriptiveMessage = budgetWarningMessage('attentive', cyclePhaseOf(financialData, behaviorContext))
+    const descriptiveMessage = budgetWarningMessage('attentive', cyclePhaseOf(financialData, behaviorContext), lang)
     const behaviorResult = pickBehaviorInsightJoke(
       behaviorContext,
       (insight) => insight.type === BEHAVIOR_TYPES.BUDGET_RISING,
@@ -377,8 +371,8 @@ export function getSpendyCoach(financialData, behaviorContext = null) {
     const droppedPercent = Math.round(Math.abs(topDecreasingCategory.changePercent))
     const closestGoal = findClosestOpenGoal(goals)
     const descriptiveMessage = closestGoal
-      ? `Hai ridotto le spese ${topDecreasingCategory.category.label} del ${droppedPercent}%. Potresti spostare ${savedAmount} € verso "${closestGoal.label}".`
-      : `Hai ridotto le spese ${topDecreasingCategory.category.label} del ${droppedPercent}%. Ottimo lavoro!`
+      ? translate(lang, 'coach.drop.goal', { category: topDecreasingCategory.category.label, percent: droppedPercent, amount: savedAmount, goal: closestGoal.label })
+      : translate(lang, 'coach.drop.plain', { category: topDecreasingCategory.category.label, percent: droppedPercent })
 
     const behaviorResult = pickBehaviorInsightJoke(
       behaviorContext,
@@ -412,14 +406,14 @@ export function getSpendyCoach(financialData, behaviorContext = null) {
       priority: 6,
       insight: behaviorResult.insight,
       messageScore: behaviorResult.joke.score,
-      secondaryInsightText: describeInsight(behaviorResult.insight),
+      secondaryInsightText: describeInsight(behaviorResult.insight, lang),
     }
   }
 
   // 7. Happy — the default: nothing above fired
   return {
     state: SPENDY_STATES.HAPPY,
-    message: '😎 Bravo! Per ora sei sotto budget in questo ciclo.',
+    message: translate(lang, 'coach.ontrack'),
     reason: 'on_track',
     priority: 7,
     insight: null,

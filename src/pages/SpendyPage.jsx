@@ -5,6 +5,7 @@ import { currentCycleSalary } from '../utils/salary.js'
 import { getSpendyCoach, getInsightTopicKey } from '../utils/spendyCoach.js'
 import { buildRadar, RADAR_STATUS } from '../utils/radarEngine.js'
 import { SpendyCharacterWithMessage } from '../components/spendy/SpendyCharacterWithMessage.jsx'
+import { useLanguage } from '../i18n/useLanguage.js'
 import './SpendyPage.css'
 
 // Same coach engine as HomePage (buildFinancialData -> getSpendyCoach) —
@@ -20,6 +21,7 @@ import './SpendyPage.css'
 // fire here too, instead of this page being stuck on the flat
 // percentage-only tiers HomePage isn't limited to.
 export function SpendyPage() {
+  const { language } = useLanguage()
   const today = useAppStore((state) => state.today)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
@@ -33,13 +35,13 @@ export function SpendyPage() {
   const recordSpendyJoke = useAppStore((state) => state.recordSpendyJoke)
 
   const financialData = buildFinancialData({ today, monthlyBudget, expenses, incomes, goals, cycleStartDay })
-  const coach = getSpendyCoach(financialData, { expenses, today, monthlyBudget, cycleStartDay, goals, jokeHistory, financialData })
+  const coach = getSpendyCoach(financialData, { expenses, today, monthlyBudget, cycleStartDay, goals, jokeHistory, financialData, lang: language })
   // Il pulsante Radar non apre piu' il confronto di UNA categoria: apre
   // la schermata Radar, che mostra la classifica completa di cio' che
   // Spendy ha notato (vedi components/radar/RadarScreen.jsx). Qui serve
   // solo sapere QUANTE segnalazioni ci sono, per poterlo scrivere sul
   // pulsante e per non invitare l'utente ad aprire una lista vuota.
-  const radar = buildRadar({ expenses, goals, today, monthlyBudget, cycleStartDay, financialData, jokeHistory })
+  const radar = buildRadar({ expenses, goals, today, monthlyBudget, cycleStartDay, financialData, jokeHistory, lang: language })
   const radarCount = radar.cards.length
   const hasSomethingToShow = radar.status === RADAR_STATUS.ACTIVE
 

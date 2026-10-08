@@ -1,5 +1,6 @@
 import { BEHAVIOR_ENGINE_CONFIG, BEHAVIOR_TYPES, analyzeBehavior } from './behaviorEngine.js'
 import { rankInsightsByImportance, computeImportance } from './importantEventSelector.js'
+import { translate } from '../i18n/translate.js'
 import { generateJokeCandidates } from './humorEngine.js'
 import { pickBestJoke } from './jokeEvaluator.js'
 import { getInsightTopicKey } from './spendyCoach.js'
@@ -130,14 +131,18 @@ const TONE_DOT = {
 //   modal  → openModal(target)
 //   detail → apre il dettaglio della scheda stessa
 export const RADAR_ACTIONS = {
-  EXPENSES: { id: 'expenses', label: 'Vedi le spese', kind: 'tab', target: 'expenses' },
-  ANALYTICS: { id: 'analytics', label: 'Vedi andamento', kind: 'tab', target: 'analytics' },
-  CATEGORY: { id: 'category', label: 'Vedi categoria', kind: 'tab', target: 'analytics' },
-  GOALS: { id: 'goals', label: 'Vedi obiettivo', kind: 'tab', target: 'goals' },
-  BUDGET: { id: 'budget', label: 'Vai al budget', kind: 'modal', target: 'settings' },
-  AFFORDABILITY: { id: 'affordability', label: 'Posso permettermelo?', kind: 'modal', target: 'affordability' },
-  DETAIL: { id: 'detail', label: 'Analizza', kind: 'detail', target: null },
+  EXPENSES: { id: 'expenses', labelKey: 'radarcard.action.expenses', kind: 'tab', target: 'expenses' },
+  ANALYTICS: { id: 'analytics', labelKey: 'radarcard.action.analytics', kind: 'tab', target: 'analytics' },
+  CATEGORY: { id: 'category', labelKey: 'radarcard.action.category', kind: 'tab', target: 'analytics' },
+  GOALS: { id: 'goals', labelKey: 'radarcard.action.goals', kind: 'tab', target: 'goals' },
+  BUDGET: { id: 'budget', labelKey: 'radarcard.action.budget', kind: 'modal', target: 'settings' },
+  AFFORDABILITY: { id: 'affordability', labelKey: 'radarcard.action.affordability', kind: 'modal', target: 'affordability' },
+  DETAIL: { id: 'detail', labelKey: 'radarcard.action.detail', kind: 'detail', target: null },
 }
+
+// L'etichetta di un'azione nella lingua scelta. Le azioni restano gli oggetti
+// qui sopra (le schede le confrontano per identità); il testo è a parte.
+export const radarActionLabel = (action, lang) => (action ? translate(lang, action.labelKey) : null)
 
 const round = (value) => Math.round(value)
 const percentText = (value) => `${value > 0 ? '+' : ''}${round(value)}%`
@@ -146,191 +151,207 @@ const percentText = (value) => `${value > 0 ? '+' : ''}${round(value)}%`
 //
 // Una funzione per famiglia di insight: titolo, dato principale,
 // confronto, spiegazione, consiglio, azione. Tutti i numeri vengono
-// dall'insight (o dai suoi `facts`), mai ricalcolati qui.
+// dall'insight (o dai suoi `facts`), mai ricalcolati qui. I testi sono nei
+// dizionari (radarcard.*), nella lingua di `ctx.lang`; importi e
+// percentuali arrivano già formattati, come prima.
 
-function categoryTitle(insight) {
-  return (insight.category?.label ?? 'Spese').toUpperCase()
+const textIn = (ctx) => (key, params) => translate(ctx?.lang, `radarcard.${key}`, params)
+
+// Il nome della categoria in minuscolo, come nelle frasi di sempre.
+const categoryName = (insight, t) => insight.category?.label?.toLowerCase() ?? t('thiscategory')
+
+function categoryTitle(insight, t) {
+  return (insight.category?.label ?? t('title.spending')).toUpperCase()
 }
 
-function narrateCategoryHigh(insight) {
+function narrateCategoryHigh(insight, ctx) {
+  const t = textIn(ctx)
   return {
-    title: categoryTitle(insight),
-    metric: { value: formatCurrency(insight.current), label: 'questo ciclo' },
+    title: categoryTitle(insight, t),
+    metric: { value: formatCurrency(insight.current), label: t('metric.thiscycle') },
     comparison: {
-      text: `${percentText(insight.changePercent)} rispetto alla tua media`,
+      text: t('comparison.vsaverage', { percent: percentText(insight.changePercent) }),
       direction: 'up',
-      baselineText: `La tua media è ${formatCurrency(insight.baseline)}.`,
+      baselineText: t('baseline.average', { amount: formatCurrency(insight.baseline) }),
     },
-    explanation: `Negli ultimi cicli spendevi intorno a ${formatCurrency(insight.baseline)} in ${insight.category?.label?.toLowerCase() ?? 'questa categoria'}. Questo ciclo sei a ${formatCurrency(insight.current)}.`,
-    advice: `È la categoria su cui, se vuoi rientrare, recuperi più facilmente.`,
+    explanation: t('explanation.high', { baseline: formatCurrency(insight.baseline), category: categoryName(insight, t), current: formatCurrency(insight.current) }),
+    advice: t('advice.high'),
     action: RADAR_ACTIONS.CATEGORY,
   }
 }
 
-function narrateCategoryLow(insight) {
+function narrateCategoryLow(insight, ctx) {
+  const t = textIn(ctx)
   return {
-    title: categoryTitle(insight),
-    metric: { value: formatCurrency(insight.current), label: 'questo ciclo' },
+    title: categoryTitle(insight, t),
+    metric: { value: formatCurrency(insight.current), label: t('metric.thiscycle') },
     comparison: {
-      text: `${percentText(insight.changePercent)} rispetto alla tua media`,
+      text: t('comparison.vsaverage', { percent: percentText(insight.changePercent) }),
       direction: 'down',
-      baselineText: `La tua media è ${formatCurrency(insight.baseline)}.`,
+      baselineText: t('baseline.average', { amount: formatCurrency(insight.baseline) }),
     },
-    explanation: `Di solito qui spendi ${formatCurrency(insight.baseline)}. Questo ciclo sei a ${formatCurrency(insight.current)}: ${formatCurrency(Math.abs(insight.changeAmount))} in meno.`,
-    advice: 'Se la tieni così, sono soldi che puoi spostare su un obiettivo.',
+    explanation: t('explanation.low', { baseline: formatCurrency(insight.baseline), current: formatCurrency(insight.current), diff: formatCurrency(Math.abs(insight.changeAmount)) }),
+    advice: t('advice.low'),
     action: RADAR_ACTIONS.GOALS,
   }
 }
 
-function narrateAmountAboveAverage(insight) {
+function narrateAmountAboveAverage(insight, ctx) {
+  const t = textIn(ctx)
   return {
-    title: categoryTitle(insight),
-    metric: { value: formatCurrency(insight.current), label: 'una sola spesa' },
+    title: categoryTitle(insight, t),
+    metric: { value: formatCurrency(insight.current), label: t('metric.single') },
     comparison: {
-      text: `${percentText(insight.changePercent)} rispetto alla spesa tipica`,
+      text: t('comparison.vstypical', { percent: percentText(insight.changePercent) }),
       direction: 'up',
-      baselineText: `Di solito in ${insight.category?.label?.toLowerCase() ?? 'questa categoria'} spendi ${formatCurrency(insight.baseline)} per volta.`,
+      baselineText: t('baseline.pertime', { category: categoryName(insight, t), amount: formatCurrency(insight.baseline) }),
     },
-    explanation: `Una singola spesa da ${formatCurrency(insight.current)}, contro le ${formatCurrency(insight.baseline)} che spendi di solito per volta in questa categoria.`,
+    explanation: t('explanation.above', { current: formatCurrency(insight.current), baseline: formatCurrency(insight.baseline) }),
     advice: null,
     action: RADAR_ACTIONS.EXPENSES,
   }
 }
 
-function narrateSmallExpenses(insight) {
+function narrateSmallExpenses(insight, ctx) {
+  const t = textIn(ctx)
   const { count, total, average, categoryLabel } = insight.facts
   return {
-    title: 'PICCOLE SPESE',
-    metric: { value: `${count} acquisti`, label: formatCurrency(total) },
+    title: t('title.small'),
+    metric: { value: t('metric.purchases', { count }), label: formatCurrency(total) },
     comparison: {
-      text: `${formatCurrency(average)} in media l'uno`,
+      text: t('comparison.average', { amount: formatCurrency(average) }),
       direction: 'up',
-      baselineText: categoryLabel ? `Soprattutto in ${categoryLabel.toLowerCase()}.` : null,
+      baselineText: categoryLabel ? t('baseline.mostly', { category: categoryLabel.toLowerCase() }) : null,
     },
     explanation: categoryLabel
-      ? `${count} spese sotto i 15 €, per un totale di ${formatCurrency(total)}. La maggior parte in ${categoryLabel.toLowerCase()}.`
-      : `${count} spese sotto i 15 €, per un totale di ${formatCurrency(total)}.`,
-    advice: 'Le piccole spese non si notano una per una: si notano a fine ciclo.',
+      ? t('explanation.smallcategory', { count, total: formatCurrency(total), category: categoryLabel.toLowerCase() })
+      : t('explanation.small', { count, total: formatCurrency(total) }),
+    advice: t('advice.small'),
     action: RADAR_ACTIONS.EXPENSES,
   }
 }
 
-function narrateFrequency(insight) {
+function narrateFrequency(insight, ctx) {
+  const t = textIn(ctx)
   const up = insight.changeAmount > 0
   return {
-    title: categoryTitle(insight),
-    metric: { value: `${round(insight.current)} acquisti`, label: 'questo ciclo' },
+    title: categoryTitle(insight, t),
+    metric: { value: t('metric.purchases', { count: round(insight.current) }), label: t('metric.thiscycle') },
     comparison: {
-      text: `${up ? '+' : ''}${round(insight.changeAmount)} rispetto al solito`,
+      text: t('comparison.vsusual', { change: `${up ? '+' : ''}${round(insight.changeAmount)}` }),
       direction: up ? 'up' : 'down',
-      baselineText: `Di solito sono ${round(insight.baseline)}.`,
+      baselineText: t('baseline.usually', { count: round(insight.baseline) }),
     },
-    explanation: `Qui conta la frequenza, non l'importo: ${round(insight.current)} acquisti contro i ${round(insight.baseline)} abituali.`,
+    explanation: t('explanation.frequency', { current: round(insight.current), baseline: round(insight.baseline) }),
     advice: null,
     action: RADAR_ACTIONS.EXPENSES,
   }
 }
 
-function narrateUnusualPurchase(insight) {
+function narrateUnusualPurchase(insight, ctx) {
+  const t = textIn(ctx)
   return {
-    title: categoryTitle(insight),
-    metric: { value: formatCurrency(insight.current), label: 'dopo diversi cicli di silenzio' },
+    title: categoryTitle(insight, t),
+    metric: { value: formatCurrency(insight.current), label: t('metric.silence') },
     comparison: null,
-    explanation: `Non spendevi in ${insight.category?.label?.toLowerCase() ?? 'questa categoria'} da diversi cicli.`,
+    explanation: t('explanation.unusual', { category: categoryName(insight, t) }),
     advice: null,
     action: RADAR_ACTIONS.EXPENSES,
   }
 }
 
 function narrateBudget(insight, ctx) {
+  const t = textIn(ctx)
   const { budget, spent, remaining, percent } = insight.facts
   const exceeded = insight.type === BEHAVIOR_TYPES.BUDGET_EXCEEDED
 
   return {
-    title: 'BUDGET',
+    title: t('title.budget'),
     metric: {
       value: exceeded ? formatCurrency(Math.abs(remaining)) : formatCurrency(remaining),
-      label: exceeded ? 'oltre il budget' : 'ancora disponibili',
+      label: exceeded ? t('metric.over') : t('metric.left'),
     },
     comparison: {
-      text: `${round(percent)}% utilizzato`,
+      text: t('comparison.used', { percent: round(percent) }),
       direction: exceeded ? 'up' : 'flat',
-      baselineText: `${formatCurrency(spent)} spesi su ${formatCurrency(budget)}.`,
+      baselineText: t('baseline.spentof', { spent: formatCurrency(spent), budget: formatCurrency(budget) }),
     },
     explanation: exceeded
-      ? `Hai speso ${formatCurrency(spent)} a fronte di un budget di ${formatCurrency(budget)}: sei oltre di ${formatCurrency(Math.abs(remaining))}.`
-      : `Hai usato il ${round(percent)}% del budget e ti restano ${formatCurrency(remaining)} fino alla fine del ciclo${ctx.cycleEndLabel ? ` (${ctx.cycleEndLabel})` : ''}.`,
-    advice: exceeded
-      ? 'Da qui a fine ciclo, ogni spesa pesa il doppio.'
-      : 'Prima di una spesa importante, chiedimelo: faccio due conti al volo.',
+      ? t('explanation.budgetover', { spent: formatCurrency(spent), budget: formatCurrency(budget), over: formatCurrency(Math.abs(remaining)) })
+      : t(ctx.cycleEndLabel ? 'explanation.budgetleftuntil' : 'explanation.budgetleft', { percent: round(percent), left: formatCurrency(remaining), cycleEnd: ctx.cycleEndLabel }),
+    advice: exceeded ? t('advice.budgetover') : t('advice.budgetleft'),
     action: exceeded ? RADAR_ACTIONS.BUDGET : RADAR_ACTIONS.AFFORDABILITY,
   }
 }
 
-function narrateBudgetRespected(insight) {
+function narrateBudgetRespected(insight, ctx) {
+  const t = textIn(ctx)
   const { budget, spent, remaining, percent } = insight.facts
   return {
-    title: 'BUDGET',
-    metric: { value: formatCurrency(remaining), label: 'ancora disponibili' },
+    title: t('title.budget'),
+    metric: { value: formatCurrency(remaining), label: t('metric.left') },
     comparison: {
-      text: `solo ${round(percent)}% utilizzato`,
+      text: t('comparison.usedonly', { percent: round(percent) }),
       direction: 'down',
-      baselineText: `${formatCurrency(spent)} spesi su ${formatCurrency(budget)}.`,
+      baselineText: t('baseline.spentof', { spent: formatCurrency(spent), budget: formatCurrency(budget) }),
     },
-    explanation: `Sei al ${round(percent)}% del budget: per ora c’è un buon margine.`,
+    explanation: t('explanation.respected', { percent: round(percent) }),
     advice: null,
     action: RADAR_ACTIONS.ANALYTICS,
   }
 }
 
-function narrateSavings(insight) {
+function narrateSavings(insight, ctx) {
+  const t = textIn(ctx)
   const saved = Math.abs(insight.changeAmount)
   return {
-    title: 'RISPARMIO',
-    metric: { value: formatCurrency(saved), label: 'in meno del solito' },
+    title: t('title.savings'),
+    metric: { value: formatCurrency(saved), label: t('metric.lessusual') },
     comparison: {
-      text: `${percentText(insight.changePercent)} rispetto alla tua media`,
+      text: t('comparison.vsaverage', { percent: percentText(insight.changePercent) }),
       direction: 'down',
-      baselineText: `Di solito a questo punto sei a ${formatCurrency(insight.baseline)}.`,
+      baselineText: t('baseline.atthispoint', { amount: formatCurrency(insight.baseline) }),
     },
-    explanation: `Questo ciclo hai speso ${formatCurrency(insight.current)} contro i ${formatCurrency(insight.baseline)} abituali.`,
-    advice: `${formatCurrency(saved)} che potresti spostare su un obiettivo, invece di lasciarli scivolare via.`,
+    explanation: t('explanation.savings', { current: formatCurrency(insight.current), baseline: formatCurrency(insight.baseline) }),
+    advice: t('advice.savings', { amount: formatCurrency(saved) }),
     action: RADAR_ACTIONS.GOALS,
   }
 }
 
-function narrateStreak(insight) {
+function narrateStreak(insight, ctx) {
+  const t = textIn(ctx)
   const positive = insight.type === BEHAVIOR_TYPES.POSITIVE_STREAK
   return {
-    title: positive ? 'COSTANZA' : 'ATTENZIONE',
-    metric: { value: `${insight.samples} cicli`, label: positive ? 'di fila sotto controllo' : 'di fila sopra soglia' },
+    title: positive ? t('title.streakgood') : t('title.streakbad'),
+    metric: { value: t('metric.cycles', { count: insight.samples }), label: positive ? t('metric.streakgood') : t('metric.streakbad') },
     comparison: {
-      text: positive ? 'sempre sotto il 70% del budget' : 'sempre oltre l’85% del budget',
+      text: positive ? t('comparison.streakgood') : t('comparison.streakbad'),
       direction: positive ? 'down' : 'up',
       baselineText: null,
     },
     explanation: positive
-      ? `Da ${insight.samples} cicli chiudi sempre sotto il 70% del budget. Non è fortuna, è un'abitudine.`
-      : `Da ${insight.samples} cicli superi l'85% del budget. Non è un episodio, è una tendenza.`,
-    advice: positive ? null : 'Vale la pena guardare quale categoria pesa di più.',
+      ? t('explanation.streakgood', { count: insight.samples })
+      : t('explanation.streakbad', { count: insight.samples }),
+    advice: positive ? null : t('advice.streakbad'),
     action: RADAR_ACTIONS.ANALYTICS,
   }
 }
 
-function narrateGoalProgress(insight) {
+function narrateGoalProgress(insight, ctx) {
+  const t = textIn(ctx)
   const { goalLabel, saved, target, percent, missing } = insight.facts
   return {
-    title: 'OBIETTIVO',
+    title: t('title.goal'),
     metric: { value: `${round(percent)}%`, label: goalLabel },
     comparison: {
       text: `${formatCurrency(saved)} / ${formatCurrency(target)}`,
       // Non 'up': l'avanzamento di un obiettivo non è né un aumento da
       // temere né un calo da festeggiare, ha un colore tutto suo.
       direction: 'goal',
-      baselineText: `Mancano ${formatCurrency(missing)}.`,
+      baselineText: t('baseline.missing', { amount: formatCurrency(missing) }),
     },
-    explanation: `"${goalLabel}": hai messo da parte ${formatCurrency(saved)} sui ${formatCurrency(target)} che ti servono.`,
-    advice: `Mancano ${formatCurrency(missing)}.`,
+    explanation: t('explanation.goal', { goal: goalLabel, saved: formatCurrency(saved), target: formatCurrency(target) }),
+    advice: t('baseline.missing', { amount: formatCurrency(missing) }),
     action: RADAR_ACTIONS.GOALS,
   }
 }
@@ -415,6 +436,7 @@ export function buildRadarCard(insight, ctx) {
     explanation: narration.explanation,
     advice: narration.advice,
     action: narration.action,
+    actionLabel: radarActionLabel(narration.action, ctx?.lang),
     insight,
   }
 }
@@ -428,17 +450,10 @@ export function countCyclesWithData(expenses, today, cycleStartDay, config = BEH
   return cycles.filter((range) => expenses.some((expense) => isWithinRange(expense.date, range))).length
 }
 
-const QUIET_MESSAGES = [
-  'Ho controllato tutto. Per ora non vedo niente di preoccupante.',
-  'Radar acceso, nessun allarme. Continua così.',
-  'Ho guardato due volte: è tutto in ordine.',
-  'Niente di strano nei tuoi conti. Quasi mi annoio.',
-  'Nessuna anomalia. Ti terrò d’occhio lo stesso, per abitudine.',
-  'Tutto tranquillo da questa parte. Il bello è proprio questo.',
-]
+const QUIET_MESSAGES = ['one', 'two', 'three', 'four', 'five', 'six'].map((key) => `radarcard.quiet.${key}`)
 
-export function pickQuietMessage(rng = Math.random) {
-  return QUIET_MESSAGES[Math.floor(rng() * QUIET_MESSAGES.length)]
+export function pickQuietMessage(rng = Math.random, lang = 'it') {
+  return translate(lang, QUIET_MESSAGES[Math.floor(rng() * QUIET_MESSAGES.length)])
 }
 
 // L'unico punto d'ingresso: dati dentro, schede fuori.
@@ -503,6 +518,6 @@ export function buildRadar({
     cards: [],
     cyclesSeen,
     cyclesNeeded: config.minimumHistoricalSamples,
-    quietMessage: status === RADAR_STATUS.QUIET ? pickQuietMessage(rng) : null,
+    quietMessage: status === RADAR_STATUS.QUIET ? pickQuietMessage(rng, lang) : null,
   }
 }

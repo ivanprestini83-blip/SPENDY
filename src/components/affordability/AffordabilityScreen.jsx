@@ -3,6 +3,7 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { totalForMonth } from '../../utils/budgetCalculations.js'
 import { currentCycleSalary } from '../../utils/salary.js'
 import { evaluateAffordability } from '../../utils/affordability.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './AffordabilityScreen.css'
 
 const LEVEL_EMOJI = { green: '🟢', yellow: '🟡', red: '🔴' }
@@ -12,6 +13,7 @@ const LEVEL_EMOJI = { green: '🟢', yellow: '🟡', red: '🔴' }
 // room. No AI involved: evaluateAffordability only ever looks at numbers
 // already in the store.
 export function AffordabilityScreen({ onClose }) {
+  const { language } = useLanguage()
   const today = useAppStore((state) => state.today)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
@@ -29,7 +31,7 @@ export function AffordabilityScreen({ onClose }) {
 
   const handleAsk = () => {
     const amountValue = parseFloat(amount.replace(',', '.'))
-    setResult(evaluateAffordability({ amount: amountValue, availableBudget, goals }))
+    setResult(evaluateAffordability({ amount: amountValue, availableBudget, goals, lang: language }))
   }
 
   return (

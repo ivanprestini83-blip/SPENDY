@@ -1,6 +1,7 @@
 import { Modal } from './Modal.jsx'
 import { SpendyCharacterWithMessage } from '../spendy/SpendyCharacterWithMessage.jsx'
 import { formatCurrency } from '../../utils/format.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './RadarDetailModal.css'
 
 function spendyTake(changePercent) {
@@ -28,6 +29,7 @@ export function RadarDetailModal({ card = null, insight = null, previousLabel, c
 }
 
 function RadarCardDetail({ card, onClose, onAction }) {
+  const { t } = useLanguage()
   return (
     <Modal title={card.title} onClose={onClose}>
       <div className="radar-detail__spendy">
@@ -62,14 +64,15 @@ function RadarCardDetail({ card, onClose, onAction }) {
           {/* La priorità non è un numero decorativo: è lo stesso punteggio
               con cui il Radar ha deciso di mettere questa scheda dove
               l'hai trovata, quindi mostrarlo spiega anche l'ordine. */}
-          Importanza {card.priority}/100 fra tutto quello che ho guardato.
+          {/* Stessa lingua del consiglio che segue (Fase 4A). */}
+          {t('radarcard.importance', { priority: card.priority })}
           {card.advice ? ` ${card.advice}` : ''}
         </p>
       </div>
 
       {card.action && onAction && (
         <button type="button" className="radar-detail__action" onClick={onAction}>
-          {card.action.label}
+          {card.actionLabel}
           <span aria-hidden="true"> →</span>
         </button>
       )}

@@ -6,6 +6,7 @@ import { requestAndStoreVoice } from './spendyVoiceRequest.js'
 import { getSpendyVoiceDevConfig } from './devTools.js'
 import { useAppStore } from '../store/useAppStore.js'
 import { aiNotification } from '../notifications/notificationRules.js'
+import { normalizeLanguage } from '../i18n/languages.js'
 
 // Il ponte tra il flusso di Spendy AI e la Home.
 //
@@ -29,7 +30,13 @@ export function useSpendyVoice({ coach, financialData, expenses, today, monthlyB
     coach, financialData, expenses, today, monthlyBudget, cycleStartDay, goals,
   })
   // Spendy AI spenta (scelta dell'utente, default): solo frasi locali.
-  const aiEnabled = useAppStore((state) => state.spendyAIEnabled === true)
+  // Il server di Spendy AI risponde solo in italiano: con l'app in un'altra
+  // lingua si usa la frase locale (c'è sempre, nella lingua scelta) invece di
+  // chiedere una frase italiana. La preferenza salvata non cambia: tornando
+  // all'italiano l'AI riprende come prima. (Fase 4A del multilingue.)
+  const aiChosen = useAppStore((state) => state.spendyAIEnabled === true)
+  const italian = useAppStore((state) => normalizeLanguage(state.language) === 'it')
+  const aiEnabled = aiChosen && italian
   const decision = decideSpendyVoiceFor({ aiEnabled, coach, meta, today, cache, limits: dev.limits })
   const voice = resolveSpendyVoice({ decision, coach, cache })
 
@@ -47,7 +54,7 @@ export function useSpendyVoice({ coach, financialData, expenses, today, monthlyB
       if (useAppStore.getState().scopeId === requestScope) setCache(next)
       // Una risposta importante resta ritrovabile nel centro notifiche. Lo store
       // la scarta se nel frattempo l'ambito attivo non è più quello della richiesta.
-      const notification = aiNotification({ result, meta, today })
+      const notification = aiNotification({ result, meta, today, lang: useAppStore.getState().language })
       if (notification) useAppStore.getState().addNotification(requestScope, notification)
       inFlight.current = null
     })

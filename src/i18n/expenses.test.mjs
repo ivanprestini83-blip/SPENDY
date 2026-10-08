@@ -3,7 +3,7 @@
 //
 // Monta l'App VERA (Vite, CSS escluso) sullo store vero e un DOM minimo
 // (fakeDom.mjs), cambia lingua SENZA rimontare e guarda il testo che l'utente
-// vedrebbe. Restano come sono (fasi successive): nomi delle categorie,
+// vedrebbe. Restano come sono (fasi successive): nomi delle categorie create dall'utente,
 // descrizioni, importi, date e nomi dei mesi.
 
 import { readFileSync } from 'node:fs'
@@ -172,7 +172,8 @@ try {
       check(`   ${lang}: nessun testo italiano rimasto nella pagina`, left.length === 0, left.join(' | '))
     }
     check(`   ${lang}: nessun segnaposto {…} non sostituito`, !/\{\w+\}/.test(html()))
-    check(`   ${lang}: importi, categorie e descrizioni restano quelli dei dati`, text(page()).includes('30,00 €') && text(page()).includes('inizio-ciclo') && text(page()).includes('Carburante'))
+    // Fase 4A: il nome di una categoria PREDEFINITA segue la lingua (nei dati c'è solo l'id).
+    check(`   ${lang}: importi e descrizioni restano quelli dei dati, la categoria predefinita è "${tr('categories.carburante')}"`, text(page()).includes('30,00 €') && text(page()).includes('inizio-ciclo') && text(page()).includes(tr('categories.carburante')))
     shown.push(html())
   }
   check('totale del ciclo precedente identico in ogni lingua', new Set(Object.values(totals)).size === 1 && totals.it === '134,00 €', JSON.stringify(totals))

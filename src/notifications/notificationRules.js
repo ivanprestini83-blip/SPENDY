@@ -19,6 +19,7 @@ import { getInsightTopicKey } from '../utils/spendyCoach.js'
 import { BEHAVIOR_TYPES } from '../utils/behaviorEngine.js'
 import { VOICE_LIMITS } from '../ai/spendyVoicePolicy.js'
 import { isUserScope } from '../store/scope.js'
+import { translate } from '../i18n/translate.js'
 
 export const NOTIFICATION_THRESHOLDS = {
   budgetNear: 90,
@@ -31,14 +32,20 @@ export const NOTIFICATION_THRESHOLDS = {
 
 // Le destinazioni sono quelle già in uso nell'app: stesse forme di RADAR_ACTIONS
 // (kind tab/modal + target), eseguite da setActiveTab / openModal.
-const action = (a) => ({ kind: a.kind, target: a.target, label: a.label })
+//
+// Una notifica si salva come testo nel momento in cui nasce: titolo, messaggio
+// ed etichetta dell'azione sono nella lingua scelta in QUEL momento
+// (`state.language`; assente → italiano). Le notifiche già salvate non si
+// riscrivono mai.
 const ACTIONS = {
-  home: { kind: 'tab', target: 'home', label: 'Vai alla Home' },
-  goals: action(RADAR_ACTIONS.GOALS),
-  radar: { kind: 'modal', target: 'radar', label: 'Apri il Radar' },
-  settings: { kind: 'modal', target: 'settings', label: 'Apri Impostazioni' },
-  spendy: { kind: 'tab', target: 'spendy', label: 'Apri Spendy' },
+  home: { kind: 'tab', target: 'home', labelKey: 'notifications.action.home' },
+  goals: { kind: RADAR_ACTIONS.GOALS.kind, target: RADAR_ACTIONS.GOALS.target, labelKey: RADAR_ACTIONS.GOALS.labelKey },
+  radar: { kind: 'modal', target: 'radar', labelKey: 'notifications.action.radar' },
+  settings: { kind: 'modal', target: 'settings', labelKey: 'notifications.action.settings' },
+  spendy: { kind: 'tab', target: 'spendy', labelKey: 'notifications.action.spendy' },
 }
+const actionIn = (name, lang) => ({ kind: ACTIONS[name].kind, target: ACTIONS[name].target, label: translate(lang, ACTIONS[name].labelKey) })
+const textIn = (lang) => (key, params) => translate(lang, `notifications.${key}`, params)
 
 // ------------------------------------------------------------------ utilità
 
@@ -85,13 +92,14 @@ export function budgetNotifications(prev, next) {
   const after = spentRatioOf(next)
   const { budgetNear, budgetOver } = NOTIFICATION_THRESHOLDS
   const cycle = cycleStartOf(next)
+  const t = textIn(next.language)
 
   // Da sotto il 90% a oltre il 100% in un colpo solo: solo "superato".
   if (before < budgetOver && after >= budgetOver) {
-    return [{ type: 'budget', eventKey: `budget:over:${cycle}`, title: 'Budget', message: 'Budget mensile superato.', action: ACTIONS.home }]
+    return [{ type: 'budget', eventKey: `budget:over:${cycle}`, title: t('budget.title'), message: t('budget.over'), action: actionIn('home', next.language) }]
   }
   if (before < budgetNear && after >= budgetNear && after < budgetOver) {
-    return [{ type: 'budget', eventKey: `budget:near:${cycle}`, title: 'Budget', message: 'Attenzione: hai utilizzato il 90% del budget.', action: ACTIONS.home }]
+    return [{ type: 'budget', eventKey: `budget:near:${cycle}`, title: t('budget.title'), message: t('budget.near'), action: actionIn('home', next.language) }]
   }
   return []
 }
@@ -103,17 +111,18 @@ const percentOf = (goal) => (goal.target > 0 ? (goal.saved / goal.target) * 100 
 export function goalNotifications(prev, next) {
   const { goalHalf, goalDone } = NOTIFICATION_THRESHOLDS
   const before = new Map(prev.goals.map((goal) => [goal.id, goal]))
+  const t = textIn(next.language)
   const out = []
   for (const goal of next.goals) {
     const old = before.get(goal.id)
     if (!old) continue // obiettivo nuovo: non è un traguardo raggiunto
     const from = percentOf(old)
     const to = percentOf(goal)
-    const title = goal.label || 'Obiettivo'
+    const title = goal.label || t('goal.fallback')
     if (from < goalDone && to >= goalDone) {
-      out.push({ type: 'goal', eventKey: `goal:${goal.id}:100`, title, message: 'Obiettivo raggiunto.', action: ACTIONS.goals })
+      out.push({ type: 'goal', eventKey: `goal:${goal.id}:100`, title, message: t('goal.done'), action: actionIn('goals', next.language) })
     } else if (from < goalHalf && to >= goalHalf && to < goalDone) {
-      out.push({ type: 'goal', eventKey: `goal:${goal.id}:50`, title, message: 'Sei arrivato al 50% del tuo obiettivo.', action: ACTIONS.goals })
+      out.push({ type: 'goal', eventKey: `goal:${goal.id}:50`, title, message: t('goal.half'), action: actionIn('goals', next.language) })
     }
   }
   return out
@@ -141,7 +150,7 @@ function importantRadarCards(state) {
   })
   const radar = buildRadar({
     expenses: state.expenses, goals: state.goals, today: state.today, monthlyBudget,
-    cycleStartDay, financialData, jokeHistory: [], rng: () => 0,
+    cycleStartDay, financialData, jokeHistory: [], rng: () => 0, lang: state.language,
   })
   const cards = new Map()
   for (const card of radar.cards) {
@@ -165,14 +174,15 @@ export function radarNotifications(prev, next, now = new Date()) {
   if (fresh.length === 0) return []
   fresh.sort((a, b) => b[1].priority - a[1].priority)
   const [topic, card] = fresh[0]
-  const label = card.insight?.category?.label ?? 'Le tue spese'
-  const detail = card.comparison?.text ?? 'qualcosa è cambiato rispetto al solito'
+  const t = textIn(next.language)
+  const label = card.insight?.category?.label ?? t('radar.category')
+  const detail = card.comparison?.text ?? t('radar.detail')
   return [{
     type: 'radar',
     eventKey: `radar:${topic}:${cycleStartOf(next)}`,
-    title: 'Radar Spendy',
-    message: `${label}: ${detail}.`,
-    action: ACTIONS.radar,
+    title: t('radar.title'),
+    message: t('radar.message', { category: label, detail }),
+    action: actionIn('radar', next.language),
   }]
 }
 
@@ -187,9 +197,9 @@ export function syncErrorNotifications(prev, next, now = new Date()) {
   return [{
     type: 'sync',
     eventKey: `sync:error:${dayOf(now)}`,
-    title: 'Sincronizzazione',
-    message: 'Non siamo riusciti a sincronizzare i tuoi dati. Riproveremo da soli.',
-    action: ACTIONS.settings,
+    title: textIn(next.language)('sync.title'),
+    message: textIn(next.language)('sync.error'),
+    action: actionIn('settings', next.language),
   }]
 }
 
@@ -207,9 +217,9 @@ export function staleOutboxNotifications(state, now = new Date()) {
   return [{
     type: 'sync',
     eventKey: `sync:stale:${oldest.updatedAt}`,
-    title: 'Sincronizzazione',
-    message: 'Alcune modifiche non sono ancora state inviate al cloud da più di 24 ore.',
-    action: ACTIONS.settings,
+    title: textIn(state.language)('sync.title'),
+    message: textIn(state.language)('sync.stale'),
+    action: actionIn('settings', state.language),
   }]
 }
 
@@ -217,12 +227,12 @@ export function staleOutboxNotifications(state, now = new Date()) {
 
 // Solo una risposta che l'AI ha deciso di mostrare E per un evento urgente
 // (stessa soglia con cui la policy di Spendy AI decide che serve fare presto).
-export function aiNotification({ result, meta, today }) {
+export function aiNotification({ result, meta, today, lang }) {
   const response = result?.ok ? result.response : null
   if (!response || response.shouldShow !== true) return null
   if (!meta?.eventKey || !(meta.importance >= VOICE_LIMITS.urgentImportance)) return null
   if (typeof response.message !== 'string' || !response.message.trim()) return null
-  return { type: 'ai', eventKey: `ai:${meta.eventKey}:${today}`, title: 'Spendy', message: response.message, action: ACTIONS.spendy }
+  return { type: 'ai', eventKey: `ai:${meta.eventKey}:${today}`, title: 'Spendy', message: response.message, action: actionIn('spendy', lang) }
 }
 
 // ------------------------------------------------------------ punti d'ingresso

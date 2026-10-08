@@ -291,7 +291,8 @@ const azioniInvalide = tutteLeSchede.filter((card) => {
 check('ogni azione punta a una schermata che esiste davvero', azioniInvalide.length === 0,
   azioniInvalide.map((c) => `${c.type}→${c.action.target}`).join(', '))
 check('ogni scheda ha un\'azione', tutteLeSchede.every((card) => Boolean(card.action)))
-check('ogni azione ha un\'etichetta leggibile', tutteLeSchede.every((card) => card.action.label.length > 3))
+// Fase 4A: l'etichetta (nella lingua scelta) è card.actionLabel; card.action resta l'oggetto di RADAR_ACTIONS.
+check('ogni azione ha un\'etichetta leggibile', tutteLeSchede.every((card) => card.actionLabel.length > 3))
 
 // =====================================================================
 section('14. Cambio lingua')

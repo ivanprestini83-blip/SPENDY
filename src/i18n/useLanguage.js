@@ -1,6 +1,7 @@
 import { useAppStore } from '../store/useAppStore.js'
 import { languageInfo, normalizeLanguage } from './languages.js'
 import { translate } from './translate.js'
+import { setCategoryLanguageSource } from '../data/categories.js'
 
 // L'unica strada per leggere e cambiare la lingua: nessun componente legge o
 // scrive `language` nello store per conto suo.
@@ -9,6 +10,10 @@ import { translate } from './translate.js'
 export const getCurrentLanguage = () => normalizeLanguage(useAppStore.getState().language)
 export const setLanguage = (language) => useAppStore.getState().setLanguage(language)
 export const t = (key, params) => translate(getCurrentLanguage(), key, params)
+
+// I nomi delle categorie predefinite seguono la stessa lingua (data/categories.js
+// non può importare lo store: le si dice da dove leggerla).
+setCategoryLanguageSource(getCurrentLanguage)
 
 // Nei componenti: si ridisegna quando la lingua cambia, senza reload.
 export function useLanguage() {

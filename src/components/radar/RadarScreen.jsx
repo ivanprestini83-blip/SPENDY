@@ -5,6 +5,7 @@ import { currentCycleSalary } from '../../utils/salary.js'
 import { buildRadar, RADAR_STATUS } from '../../utils/radarEngine.js'
 import { SpendyCharacterWithMessage } from '../spendy/SpendyCharacterWithMessage.jsx'
 import { RadarDetailModal } from '../modals/RadarDetailModal.jsx'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './RadarScreen.css'
 
 // RADAR SPENDY — la schermata. Non calcola niente: chiama buildRadar()
@@ -13,6 +14,7 @@ import './RadarScreen.css'
 // proporre — vive nei moduli puri, dove i test la raggiungono senza
 // bisogno di un browser.
 export function RadarScreen({ onClose }) {
+  const { language } = useLanguage()
   const today = useAppStore((state) => state.today)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
@@ -33,7 +35,7 @@ export function RadarScreen({ onClose }) {
 
   const financialData = buildFinancialData({ today, monthlyBudget, expenses, incomes, goals, cycleStartDay })
   const radar = buildRadar({
-    expenses, goals, today, monthlyBudget, cycleStartDay, financialData, jokeHistory,
+    expenses, goals, today, monthlyBudget, cycleStartDay, financialData, jokeHistory, lang: language,
   })
 
   const runAction = (card) => {
@@ -104,7 +106,7 @@ export function RadarScreen({ onClose }) {
                 </button>
 
                 <button type="button" className="radar-card__action" onClick={() => runAction(card)}>
-                  {card.action.label}
+                  {card.actionLabel}
                   <span aria-hidden="true"> →</span>
                 </button>
               </article>

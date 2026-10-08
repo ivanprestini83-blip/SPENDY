@@ -38,7 +38,7 @@ const EMERGENCY_FUND_TARGET_MONTHS = 6
 // mutates, this component re-renders, buildFinancialData/getSpendyCoach
 // just recompute from the latest numbers.
 export function HomePage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const today = useAppStore((state) => state.today)
   // L'ultimo stipendio inserito: solo per l'obiettivo del fondo emergenza
   // (logica invariata, monthlyBudget × mesi).
@@ -73,7 +73,7 @@ export function HomePage() {
   // priority tiers source a richer, non-repeating joke from the
   // BehaviorEngine → HumorEngine → JokeEvaluator pipeline instead of a
   // fixed string; it changes nothing about the tier cascade itself.
-  const coach = getSpendyCoach(financialData, { expenses, today, monthlyBudget, cycleStartDay, goals, jokeHistory, financialData })
+  const coach = getSpendyCoach(financialData, { expenses, today, monthlyBudget, cycleStartDay, goals, jokeHistory, financialData, lang: language })
   const spendyMessage = coach.message
   const spendyInsight = coach.insight
   const spendyMessageScore = coach.messageScore
@@ -97,8 +97,9 @@ export function HomePage() {
       expenses, goals, today, monthlyBudget, cycleStartDay, jokeHistory,
       financialData: buildFinancialData({ today, monthlyBudget, expenses, incomes, goals, cycleStartDay }),
       rng: () => 0,
+      lang: language,
     }),
-    [expenses, goals, today, monthlyBudget, cycleStartDay, incomes, jokeHistory],
+    [expenses, goals, today, monthlyBudget, cycleStartDay, incomes, jokeHistory, language],
   )
 
   // Remember a behavior-engine joke once it's actually shown, so the same

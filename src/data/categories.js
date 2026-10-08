@@ -1,3 +1,27 @@
+import { translate } from '../i18n/translate.js'
+
+// The language the PREDEFINED category names are shown in. This module
+// can't import the store (see the registry comment below), so the i18n
+// layer registers where to read it (src/i18n/useLanguage.js); until then,
+// and in tests that never load it, Italian.
+let readLanguage = () => 'it'
+export function setCategoryLanguageSource(read) {
+  readLanguage = typeof read === 'function' ? read : () => 'it'
+}
+
+// `label` of a predefined category is a getter: the name in the current
+// language (dictionary key categories.<id>), the Italian one as fallback.
+// Data only ever stores the category's id, never this text, so ids,
+// filters, totals, sync and history are untouched. Custom categories
+// (registerCustomCategories) are plain objects and never translated.
+function predefined({ id, label, ...rest }) {
+  const category = Object.defineProperty({ id }, 'label', {
+    enumerable: true,
+    get: () => translate(readLanguage(), `categories.${id}`) || label,
+  })
+  return Object.assign(category, rest)
+}
+
 // Predefined expense categories — each carries its own `subcategories`
 // list (empty today) so a future "manage categories" screen can add to
 // it without changing this shape or anything that reads CATEGORIES.
@@ -20,7 +44,7 @@ export const CATEGORIES = [
   { id: 'istruzione', label: 'Istruzione', emoji: '📚', subcategories: [] },
   { id: 'animali', label: 'Animali', emoji: '🐶', subcategories: [] },
   { id: 'altro', label: 'Altro', emoji: '💰', subcategories: [] },
-]
+].map(predefined)
 
 // Predefined INCOME categories — separate list, deliberately small: a
 // "stipendio" here is special (see useAppStore.setMonthlyBudget — it's
@@ -32,7 +56,7 @@ export const INCOME_CATEGORIES = [
   { id: 'investimenti', label: 'Investimenti', emoji: '📈', subcategories: [] },
   { id: 'regalo', label: 'Regalo', emoji: '🎁', subcategories: [] },
   { id: 'rimborso', label: 'Rimborso', emoji: '🔄', subcategories: [] },
-]
+].map(predefined)
 
 // Custom categories the user creates (see AddCategoryScreen / the store's
 // addCustomCategory) live in the store, not here — this module can't

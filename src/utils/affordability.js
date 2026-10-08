@@ -1,13 +1,18 @@
+import { translate } from '../i18n/translate.js'
+
 // Deliberately simple, non-AI simulation: it only ever looks at numbers
 // already in the store (remaining budget this month + the closest goal),
 // never an external model. See AffordabilityScreen for the disclaimer
-// shown alongside this result.
-export function evaluateAffordability({ amount, availableBudget, goals }) {
+// shown alongside this result. `lang` only picks the words (missing or
+// unknown → Italian): levels and thresholds are the same in every language.
+export function evaluateAffordability({ amount, availableBudget, goals, lang = 'it' }) {
+  const t = (key, params) => translate(lang, `affordability.${key}`, params)
+
   if (!Number.isFinite(amount) || amount <= 0) {
     return {
       level: 'yellow',
-      title: 'Inserisci un importo',
-      message: 'Dimmi quanto vuoi spendere e ti dico cosa ne penso.',
+      title: t('noamount.title'),
+      message: t('noamount.message'),
     }
   }
 
@@ -16,36 +21,36 @@ export function evaluateAffordability({ amount, availableBudget, goals }) {
 
   const closestGoal = [...goals].sort((a, b) => (a.target - a.saved) - (b.target - b.saved))[0]
   const goalHint = closestGoal
-    ? ` Occhio anche a "${closestGoal.label}": ci stai ancora lavorando.`
+    ? ` ${t('goalhint', { goal: closestGoal.label })}`
     : ''
 
   if (remainingAfter < 0) {
     return {
       level: 'red',
-      title: 'Meglio aspettare',
-      message: `Con questa spesa sforeresti il budget di ${Math.round(-remainingAfter)} €.${goalHint}`,
+      title: t('wait'),
+      message: `${t('over', { amount: Math.round(-remainingAfter) })}${goalHint}`,
     }
   }
 
   if (ratio <= 0.3) {
     return {
       level: 'green',
-      title: 'Puoi permettertelo',
-      message: `Ti restano ${Math.round(remainingAfter)} € in questo ciclo: una spesa gestibile.`,
+      title: t('ok.title'),
+      message: t('ok.message', { amount: Math.round(remainingAfter) }),
     }
   }
 
   if (ratio <= 0.7) {
     return {
       level: 'yellow',
-      title: 'Puoi farlo, ma attenzione',
-      message: `Dopo questa spesa ti resterebbero solo ${Math.round(remainingAfter)} € fino alla fine del ciclo.${goalHint}`,
+      title: t('careful.title'),
+      message: `${t('careful.message', { amount: Math.round(remainingAfter) })}${goalHint}`,
     }
   }
 
   return {
     level: 'red',
-    title: 'Meglio aspettare',
-    message: `Questa spesa da sola userebbe quasi tutto il budget rimanente (${Math.round(availableBudget)} €).${goalHint}`,
+    title: t('wait'),
+    message: `${t('most', { amount: Math.round(availableBudget) })}${goalHint}`,
   }
 }

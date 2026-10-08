@@ -1,5 +1,6 @@
-import { APP_NAME, APP_TAGLINE } from '../../brand.js'
+import { APP_NAME, APP_TAGLINE, MASCOT_NAME } from '../../brand.js'
 import { SpendyCharacterWithMessage } from './SpendyCharacterWithMessage.jsx'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './SpendyCoach.css'
 
 // The Home "coach moment" — mascot compact and directly on the section's
@@ -27,6 +28,7 @@ export function SpendyCoach({
   onOpenSpendy = () => {},
   avatarSize = 172,
 }) {
+  const { t } = useLanguage()
   return (
     <section className="spendy-coach">
       <div className="spendy-coach__brand">
@@ -48,9 +50,9 @@ export function SpendyCoach({
         type="button"
         className="spendy-coach__link"
         onClick={onOpenSpendy}
-        title={messageScore != null ? `Punteggio battuta: ${messageScore}/100` : undefined}
+        title={messageScore != null ? t('home.hero.score', { score: messageScore }) : undefined}
       >
-        Vai da Spendy →
+        {t('mascot.open', { name: MASCOT_NAME })}
       </button>
     </section>
   )
