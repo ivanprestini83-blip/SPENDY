@@ -4,6 +4,7 @@ import { buildAndamento } from '../../utils/andamentoEngine.js'
 import { CycleTrendChart } from './CycleTrendChart.jsx'
 import { CycleSummary } from './CycleSummary.jsx'
 import { CycleComparison } from './CycleComparison.jsx'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './AndamentoScreen.css'
 
 // ANDAMENTO — "fammi vedere come sto andando". Il Radar segnala, questa
@@ -15,6 +16,7 @@ import './AndamentoScreen.css'
 // salvato da nessuna parte — è ricalcolato dalle stesse spese/entrate che
 // il sync tiene allineate fra Mac e Samsung.
 export function AndamentoScreen({ onClose }) {
+  const { t } = useLanguage()
   const today = useAppStore((state) => state.today)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
@@ -42,18 +44,18 @@ export function AndamentoScreen({ onClose }) {
   return (
     <div className="andamento-screen">
       <div className="andamento-screen__header">
-        <button type="button" className="andamento-screen__back" onClick={onClose} aria-label="Chiudi">
+        <button type="button" className="andamento-screen__back" onClick={onClose} aria-label={t('common.close')}>
           ←
         </button>
         <div>
           <p className="andamento-screen__title">
-            <span aria-hidden="true">📈</span> Andamento
+            <span aria-hidden="true">📈</span> {t('andamento.title')}
           </p>
           <p className="andamento-screen__subtitle">{current.label}</p>
         </div>
       </div>
 
-      <div className="andamento-screen__tabs" role="tablist" aria-label="Vista">
+      <div className="andamento-screen__tabs" role="tablist" aria-label={t('andamento.view')}>
         <button
           type="button"
           role="tab"
@@ -61,7 +63,7 @@ export function AndamentoScreen({ onClose }) {
           className={`andamento-screen__tab${view === 'overview' ? ' andamento-screen__tab--active' : ''}`}
           onClick={() => setView('overview')}
         >
-          Come sto andando
+          {t('andamento.tab.overview')}
         </button>
         <button
           type="button"
@@ -70,7 +72,7 @@ export function AndamentoScreen({ onClose }) {
           className={`andamento-screen__tab${view === 'compare' ? ' andamento-screen__tab--active' : ''}`}
           onClick={() => setView('compare')}
         >
-          Confronta periodi
+          {t('andamento.tab.compare')}
         </button>
       </div>
 
@@ -85,10 +87,9 @@ export function AndamentoScreen({ onClose }) {
         {view === 'compare' && (cycles.length < 2 ? (
           <div className="andamento-screen__empty">
             <p className="andamento-screen__empty-emoji" aria-hidden="true">⚖️</p>
-            <p className="andamento-screen__empty-title">Per ora c&apos;è un solo periodo.</p>
+            <p className="andamento-screen__empty-title">{t('andamento.single.title')}</p>
             <p className="andamento-screen__empty-text">
-              Il confronto si accende appena hai spese o entrate in due cicli diversi. Il primo
-              termina alla fine di {current.label}.
+              {t('andamento.single.text', { cycle: current.label })}
             </p>
           </div>
         ) : (

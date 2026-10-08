@@ -2,6 +2,7 @@ import { formatCurrency } from '../../utils/format.js'
 import { getCategoryColor } from '../../data/categoryColors.js'
 import { ProgressBar } from '../ProgressBar/ProgressBar.jsx'
 import { formatPercent } from './andamentoFormat.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './CycleSummary.css'
 
 const TOP_CATEGORIES = 5
@@ -18,6 +19,7 @@ function budgetColor(budgetUsed) {
 // andando?" e le categorie che pesano di più. Riceve un ciclo già
 // calcolato da buildAndamento, non fa conti suoi.
 export function CycleSummary({ cycle }) {
+  const { t } = useLanguage()
   const topCategories = cycle.categories.slice(0, TOP_CATEGORIES)
   const inRed = cycle.savings < 0
 
@@ -25,39 +27,39 @@ export function CycleSummary({ cycle }) {
     <section className="cycle-summary" aria-live="polite">
       <div className="cycle-summary__head">
         <p className="cycle-summary__title">{cycle.label}</p>
-        {cycle.isCurrent && <span className="cycle-summary__badge">In corso</span>}
+        {cycle.isCurrent && <span className="cycle-summary__badge">{t('andamento.status.current')}</span>}
       </div>
 
       <div className="cycle-summary__grid">
         <div className="cycle-summary__metric">
-          <span className="cycle-summary__metric-label">Entrate</span>
+          <span className="cycle-summary__metric-label">{t('andamento.metric.income')}</span>
           <span className="cycle-summary__metric-value">{formatCurrency(cycle.income)}</span>
           {cycle.extraIncome > 0 && (
-            <span className="cycle-summary__metric-note">di cui {formatCurrency(cycle.extraIncome)} extra</span>
+            <span className="cycle-summary__metric-note">{t('andamento.summary.extra', { amount: formatCurrency(cycle.extraIncome) })}</span>
           )}
         </div>
 
         <div className="cycle-summary__metric">
-          <span className="cycle-summary__metric-label">Spese</span>
+          <span className="cycle-summary__metric-label">{t('andamento.metric.spent')}</span>
           <span className="cycle-summary__metric-value">{formatCurrency(cycle.spent)}</span>
           <span className="cycle-summary__metric-note">
-            {cycle.expenseCount === 1 ? '1 spesa' : `${cycle.expenseCount} spese`}
+            {t(cycle.expenseCount === 1 ? 'andamento.expensesone' : 'andamento.expensesmany', { count: cycle.expenseCount })}
           </span>
         </div>
 
         <div className={`cycle-summary__metric cycle-summary__metric--${inRed ? 'bad' : 'good'}`}>
-          <span className="cycle-summary__metric-label">Risparmio</span>
+          <span className="cycle-summary__metric-label">{t('andamento.metric.savings')}</span>
           <span className="cycle-summary__metric-value">
             {inRed ? `-${formatCurrency(Math.abs(cycle.savings))}` : formatCurrency(cycle.savings)}
           </span>
-          {inRed && <span className="cycle-summary__metric-note">hai speso più di quanto è entrato</span>}
+          {inRed && <span className="cycle-summary__metric-note">{t('andamento.summary.overspent')}</span>}
         </div>
 
         <div className="cycle-summary__metric">
-          <span className="cycle-summary__metric-label">Budget utilizzato</span>
+          <span className="cycle-summary__metric-label">{t('andamento.metric.budget')}</span>
           <span className="cycle-summary__metric-value">{formatPercent(cycle.budgetUsed)}</span>
           {cycle.budgetUsed === null ? (
-            <span className="cycle-summary__metric-note">stipendio non registrato in questo ciclo</span>
+            <span className="cycle-summary__metric-note">{t('andamento.summary.nosalary')}</span>
           ) : (
             <ProgressBar
               value={cycle.budgetUsed}
@@ -69,9 +71,9 @@ export function CycleSummary({ cycle }) {
       </div>
 
       <div className="cycle-summary__categories">
-        <p className="cycle-summary__section-title">Dove sono andati</p>
+        <p className="cycle-summary__section-title">{t('andamento.summary.where')}</p>
         {topCategories.length === 0 ? (
-          <p className="cycle-summary__empty">Nessuna spesa in questo periodo.</p>
+          <p className="cycle-summary__empty">{t('andamento.noexpenses')}</p>
         ) : (
           <ul className="cycle-summary__list">
             {topCategories.map((row) => (
@@ -93,7 +95,8 @@ export function CycleSummary({ cycle }) {
         )}
         {cycle.categories.length > TOP_CATEGORIES && (
           <p className="cycle-summary__more">
-            + altre {cycle.categories.length - TOP_CATEGORIES} categorie (le trovi in Analisi)
+            {/* Cita la scheda della barra in basso con il suo nome tradotto. */}
+            {t(cycle.categories.length - TOP_CATEGORIES === 1 ? 'andamento.summary.moreone' : 'andamento.summary.moremany', { count: cycle.categories.length - TOP_CATEGORIES, tab: t('home.nav.analytics') })}
           </p>
         )}
       </div>

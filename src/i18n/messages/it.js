@@ -339,4 +339,133 @@ export default {
     regalo: 'Regalo',
     rimborso: 'Rimborso',
   },
+  // Fase 4B: testi comuni a più schermate.
+  common: {
+    close: 'Chiudi',
+    save: 'Salva',
+    cancel: 'Annulla',
+    edit: 'Modifica',
+    delete: 'Elimina',
+    confirm: 'Conferma',
+    back: 'Torna indietro',
+  },
+  // Fase 4B-1: Analisi, Andamento, Confronta periodi. Mesi, date, importi e
+  // percentuali arrivano già formattati nei parametri e non si traducono qui.
+  analytics: {
+    trendsubtitle: 'Come stai andando, ciclo dopo ciclo',
+    prev: 'Periodo precedente',
+    next: 'Periodo successivo',
+    total: 'Totale',
+    empty: 'Nessuna spesa registrata in questo periodo.',
+  },
+  andamento: {
+    title: 'Andamento',
+    view: 'Vista',
+    tab: {
+      overview: 'Come sto andando',
+      compare: 'Confronta periodi',
+    },
+    single: {
+      title: "Per ora c'è un solo periodo.",
+      text: 'Il confronto si accende appena hai spese o entrate in due cicli diversi. Il primo termina alla fine di {cycle}.',
+    },
+    status: {
+      current: 'In corso',
+      done: 'Completo',
+    },
+    metric: {
+      income: 'Entrate',
+      spent: 'Spese',
+      savings: 'Risparmio',
+      budget: 'Budget utilizzato',
+    },
+    expensesone: '{count} spesa',
+    expensesmany: '{count} spese',
+    noexpenses: 'Nessuna spesa in questo periodo.',
+    summary: {
+      extra: 'di cui {amount} extra',
+      overspent: 'hai speso più di quanto è entrato',
+      nosalary: 'stipendio non registrato in questo ciclo',
+      where: 'Dove sono andati',
+      moreone: "+ un'altra categoria (la trovi in {tab})",
+      moremany: '+ altre {count} categorie (le trovi in {tab})',
+    },
+    trend: {
+      title: 'Spese per ciclo',
+      bar: '{cycle}: spese {spent}, entrate {income}',
+      first: 'Questo è il tuo primo ciclo con dei dati: dal prossimo vedrai come cambia.',
+    },
+    compare: {
+      pickers: 'Scegli i periodi',
+      before: 'Periodo precedente',
+      after: 'Periodo attuale',
+      samecycle: 'Scegli due periodi diversi per vedere cosa è cambiato.',
+      conclusion: 'Conclusione',
+      currentnote: 'Il ciclo attuale è ancora in corso: i numeri possono cambiare.',
+      numbers: 'Confronto in numeri: {before} → {after}',
+      difference: 'Cosa ha fatto la differenza',
+    },
+    // La conclusione è su due righe: la prima (quanto) e la seconda (rispetto
+    // a cosa). Ogni lingua ha le sue coppie complete per meno/più/uguale.
+    verdict: {
+      good: 'Ottimo!',
+      bad: 'Un ciclo più impegnativo',
+      flat: 'Tutto stabile',
+      less: 'Hai speso {amount} in meno',
+      more: 'Hai speso {amount} in più',
+      same: 'Hai speso esattamente come',
+      diffprevious: 'rispetto al ciclo precedente',
+      diffother: 'rispetto a {cycle}',
+      sameprevious: 'rispetto al ciclo precedente',
+      sameother: 'rispetto a {cycle}',
+    },
+    change: {
+      unchanged: 'Invariato',
+      notcomparable: 'Non confrontabile',
+      points: '{points} punti',
+      percentpoints: '{points} punti percentuali',
+      newspent: 'Nuova spesa',
+      newincome: 'Nuove entrate',
+      noincome: 'Nessuna entrata',
+      new: 'Nuova',
+      gone: 'Azzerata',
+    },
+    chart: {
+      spent: 'Andamento delle spese',
+      income: 'Andamento delle entrate',
+      savings: 'Andamento del risparmio',
+      budget: 'Andamento del budget',
+      noincome: '{cycle}: Nessuna entrata registrata',
+      budgetna: 'Budget non confrontabile',
+      nosalaryone: 'Il budget utilizzato si misura sullo stipendio del periodo, e {cycle} non ha uno stipendio registrato.',
+      nosalarytwo: 'Il budget utilizzato si misura sullo stipendio del periodo, e {first} e {second} non hanno uno stipendio registrato.',
+    },
+    sentence: {
+      spent: {
+        down: 'Hai speso meno rispetto al periodo precedente.',
+        up: 'Hai speso di più rispetto al periodo precedente.',
+        same: 'Hai speso quanto nel periodo precedente.',
+      },
+      income: {
+        down: 'Le entrate sono diminuite.',
+        up: 'Le entrate sono aumentate.',
+        same: 'Le entrate sono rimaste uguali.',
+      },
+      savings: {
+        down: 'Hai messo da parte di meno.',
+        up: 'Hai messo da parte di più.',
+        same: 'Hai messo da parte quanto prima.',
+      },
+      budget: {
+        down: 'Hai usato una parte più piccola dello stipendio.',
+        up: 'Hai usato una parte più grande dello stipendio.',
+        same: 'Hai usato la stessa parte dello stipendio.',
+      },
+    },
+    categories: {
+      empty: 'Nessuna spesa in nessuno dei due periodi.',
+      showless: 'Mostra meno',
+      showall: 'Mostra tutte ({count})',
+    },
+  },
 }

@@ -4,6 +4,7 @@ import { formatCurrency } from '../../utils/format.js'
 import { describeChange, describeDiff, formatPercent } from './andamentoFormat.js'
 import { CategoryComparison } from './CategoryComparison.jsx'
 import { MetricChart, MetricChartUnavailable } from './MetricChart.jsx'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './CycleComparison.css'
 
 // Una metrica compatta della griglia 2 × 2: prima → dopo, e sotto la
@@ -35,26 +36,21 @@ function MetricCard({ id, label, before, after, beforeValue, afterValue, change,
 }
 
 // La frase sotto il grafico: solo dal SEGNO della variazione già calcolata dal
-// motore (compareCycles), nessuna soglia o regola nuova.
+// motore (compareCycles), nessuna soglia o regola nuova. Il testo è
+// andamento.sentence.<metrica>.<down|up|same>, nella lingua scelta.
 const directionOf = (diff) => (diff < 0 ? 'down' : diff > 0 ? 'up' : 'same')
-const SENTENCES = {
-  spent: { down: 'Hai speso meno rispetto al periodo precedente.', up: 'Hai speso di più rispetto al periodo precedente.', same: 'Hai speso quanto nel periodo precedente.' },
-  income: { down: 'Le entrate sono diminuite.', up: 'Le entrate sono aumentate.', same: 'Le entrate sono rimaste uguali.' },
-  savings: { down: 'Hai messo da parte di meno.', up: 'Hai messo da parte di più.', same: 'Hai messo da parte quanto prima.' },
-  budget: { down: 'Hai usato una parte più piccola dello stipendio.', up: 'Hai usato una parte più grande dello stipendio.', same: 'Hai usato la stessa parte dello stipendio.' },
-}
 
 const signedMoney = (value) => (value < 0 ? `-${formatCurrency(Math.abs(value))}` : formatCurrency(value))
 
-function budgetChange(budgetUsed) {
+function budgetChange(budgetUsed, t) {
   // Senza uno stipendio in uno dei due cicli il budget utilizzato non esiste
   // (compareCycles restituisce null): la card resta, senza confronto.
-  if (!budgetUsed) return { arrow: '', text: 'Non confrontabile', tone: 'flat', points: null }
+  if (!budgetUsed) return { arrow: '', text: t('andamento.change.notcomparable'), tone: 'flat', points: null }
   const points = Math.round(budgetUsed.diffPoints)
-  if (points === 0) return { arrow: '=', text: 'Invariato', tone: 'flat', points }
+  if (points === 0) return { arrow: '=', text: t('andamento.change.unchanged'), tone: 'flat', points }
   return {
     arrow: points > 0 ? '▲' : '▼',
-    text: `${points > 0 ? '+' : '-'}${Math.abs(points)} punti`,
+    text: t('andamento.change.points', { points: `${points > 0 ? '+' : '-'}${Math.abs(points)}` }),
     tone: points > 0 ? 'bad' : 'good',
     points,
   }
@@ -64,26 +60,31 @@ function budgetChange(budgetUsed) {
 // segno della differenza di spesa), presentata da Spendy. Non è una battuta:
 // le battute passano da HumorEngine, che ragiona su insight comportamentali
 // e non su un confronto scelto a mano dall'utente.
-function verdict({ spent }) {
+//
+// Due righe ("quanto" e "rispetto a cosa") che ogni lingua scrive come una
+// coppia completa: `ref` è la seconda riga giusta per QUESTA conclusione.
+function verdict({ spent }, t) {
   if (spent.diff < 0) {
-    return { tone: 'good', emoji: '💚', title: 'Ottimo!', text: `Hai speso ${formatCurrency(Math.abs(spent.diff))} in meno` }
+    return { tone: 'good', emoji: '💚', title: t('andamento.verdict.good'), text: t('andamento.verdict.less', { amount: formatCurrency(Math.abs(spent.diff)) }), ref: 'diff' }
   }
   if (spent.diff > 0) {
-    return { tone: 'bad', emoji: '🧡', title: 'Un ciclo più impegnativo', text: `Hai speso ${formatCurrency(spent.diff)} in più` }
+    return { tone: 'bad', emoji: '🧡', title: t('andamento.verdict.bad'), text: t('andamento.verdict.more', { amount: formatCurrency(spent.diff) }), ref: 'diff' }
   }
-  return { tone: 'flat', emoji: '⚖️', title: 'Tutto stabile', text: 'Hai speso esattamente come' }
+  return { tone: 'flat', emoji: '⚖️', title: t('andamento.verdict.flat'), text: t('andamento.verdict.same'), ref: 'same' }
 }
 
 function CycleStatus({ cycle }) {
+  const { t } = useLanguage()
   return cycle.isCurrent
-    ? <span className="cycle-comparison__status cycle-comparison__status--current"><span aria-hidden="true">● </span>In corso</span>
-    : <span className="cycle-comparison__status cycle-comparison__status--done"><span aria-hidden="true">✓ </span>Completo</span>
+    ? <span className="cycle-comparison__status cycle-comparison__status--current"><span aria-hidden="true">● </span>{t('andamento.status.current')}</span>
+    : <span className="cycle-comparison__status cycle-comparison__status--done"><span aria-hidden="true">✓ </span>{t('andamento.status.done')}</span>
 }
 
 // Il confronto fra due cicli scelti dall'utente. Il più vecchio fa sempre
 // da riferimento, qualunque sia l'ordine in cui sono stati scelti: così
 // "+12%" vuol dire sempre "rispetto a prima".
 export function CycleComparison({ cycles, firstKey, secondKey, onChangeFirst, onChangeSecond }) {
+  const { t, language } = useLanguage()
   const options = [...cycles].reverse()
   const byKey = (key) => cycles.find((cycle) => cycle.key === key)
   const [before, after] = [firstKey, secondKey].map(byKey).sort((a, b) => (a.key < b.key ? -1 : 1))
@@ -94,22 +95,23 @@ export function CycleComparison({ cycles, firstKey, secondKey, onChangeFirst, on
   const [openMetric, setOpenMetric] = useState(null)
   // "il ciclo precedente" solo se i due cicli sono davvero uno dopo l'altro.
   const consecutive = cycles.indexOf(after) - cycles.indexOf(before) === 1
-  const conclusion = verdict(comparison)
+  const conclusion = verdict(comparison, t)
 
   // Quale dei due selettori è il periodo precedente e quale l'attuale: la
   // stessa regola del confronto (il più vecchio fa da riferimento), quindi
   // segue i periodi davvero scelti, in qualunque ordine.
   const roleOf = (key, position) => {
-    if (sameCycle) return position === 0 ? 'Periodo precedente' : 'Periodo attuale'
-    return key === before.key ? 'Periodo precedente' : 'Periodo attuale'
+    if (sameCycle) return position === 0 ? t('andamento.compare.before') : t('andamento.compare.after')
+    return key === before.key ? t('andamento.compare.before') : t('andamento.compare.after')
   }
 
   // Le quattro metriche: valori del riquadro e dati del grafico, tutti già
   // calcolati da buildAndamento/compareCycles e formattati come prima.
-  const spentChange = describeChange(comparison.spent, { newLabel: 'Nuova spesa' })
-  const incomeChange = describeChange(comparison.income, { higherIsBetter: true, newLabel: 'Nuove entrate', goneLabel: 'Nessuna entrata' })
-  const savingsChange = describeDiff(comparison.savings.diff, { higherIsBetter: true })
-  const budget = budgetChange(comparison.budgetUsed)
+  const spentChange = describeChange(comparison.spent, { lang: language, newLabel: t('andamento.change.newspent') })
+  const incomeChange = describeChange(comparison.income, { higherIsBetter: true, lang: language, newLabel: t('andamento.change.newincome'), goneLabel: t('andamento.change.noincome') })
+  const savingsChange = describeDiff(comparison.savings.diff, { higherIsBetter: true, lang: language })
+  const budget = budgetChange(comparison.budgetUsed, t)
+  const sentence = (metric, diff) => t(`andamento.sentence.${metric}.${directionOf(diff)}`)
   const point = (cycle, value, text) => ({ label: cycle.shortLabel, period: cycle.label, value, text })
   // Un periodo senza alcuna entrata (income 0: niente stipendio né extra
   // registrati — un'entrata registrata è sempre > 0, vedi utils/amounts.js) è
@@ -122,70 +124,73 @@ export function CycleComparison({ cycles, firstKey, secondKey, onChangeFirst, on
   const metrics = [
     {
       id: 'spent',
-      label: 'Spese',
+      label: t('andamento.metric.spent'),
       beforeValue: formatCurrency(before.spent),
       afterValue: formatCurrency(after.spent),
       change: spentChange,
       chart: {
-        title: 'Andamento delle spese',
+        title: t('andamento.chart.spent'),
         color: 'violet',
         points: [point(before, before.spent, formatCurrency(before.spent)), point(after, after.spent, formatCurrency(after.spent))],
         summary: `${spentChange.arrow} ${spentChange.text}`,
         summaryTone: spentChange.tone,
-        sentence: SENTENCES.spent[directionOf(comparison.spent.diff)],
+        sentence: sentence('spent', comparison.spent.diff),
       },
     },
     {
       id: 'income',
-      label: 'Entrate',
+      label: t('andamento.metric.income'),
       beforeValue: incomeText(before),
       afterValue: incomeText(after),
       change: incomeChange,
       chart: {
-        title: 'Andamento delle entrate',
+        title: t('andamento.chart.income'),
         color: 'mint',
         points: [incomePoint(before), incomePoint(after)],
         summary: missingIncome.length > 0 ? null : `${incomeChange.arrow} ${incomeChange.text}`,
         summaryTone: incomeChange.tone,
-        sentence: missingIncome.length > 0 ? null : SENTENCES.income[directionOf(comparison.income.diff)],
-        notes: missingIncome.map((cycle) => `${cycle.label}: Nessuna entrata registrata`),
+        sentence: missingIncome.length > 0 ? null : sentence('income', comparison.income.diff),
+        notes: missingIncome.map((cycle) => t('andamento.chart.noincome', { cycle: cycle.label })),
       },
     },
     {
       id: 'savings',
-      label: 'Risparmio',
+      label: t('andamento.metric.savings'),
       beforeValue: signedMoney(before.savings),
       afterValue: signedMoney(after.savings),
       change: savingsChange,
       chart: {
-        title: 'Andamento del risparmio',
+        title: t('andamento.chart.savings'),
         color: 'mint',
         points: [point(before, before.savings, signedMoney(before.savings)), point(after, after.savings, signedMoney(after.savings))],
         summary: `${savingsChange.arrow} ${savingsChange.text}`,
         summaryTone: savingsChange.tone,
-        sentence: SENTENCES.savings[directionOf(comparison.savings.diff)],
+        sentence: sentence('savings', comparison.savings.diff),
       },
     },
     {
       id: 'budget',
-      label: 'Budget utilizzato',
+      label: t('andamento.metric.budget'),
       beforeValue: formatPercent(before.budgetUsed),
       afterValue: formatPercent(after.budgetUsed),
       change: budget,
       chart: comparison.budgetUsed
         ? {
-          title: 'Andamento del budget',
+          title: t('andamento.chart.budget'),
           color: 'violet',
           points: [point(before, before.budgetUsed, formatPercent(before.budgetUsed)), point(after, after.budgetUsed, formatPercent(after.budgetUsed))],
-          summary: budget.points === 0 ? '= Invariato' : `${budget.arrow} ${budget.points > 0 ? '+' : '-'}${Math.abs(budget.points)} punti percentuali`,
+          summary: budget.points === 0 ? `= ${t('andamento.change.unchanged')}` : `${budget.arrow} ${t('andamento.change.percentpoints', { points: `${budget.points > 0 ? '+' : '-'}${Math.abs(budget.points)}` })}`,
           summaryTone: budget.tone,
-          sentence: SENTENCES.budget[directionOf(budget.points)],
+          sentence: sentence('budget', budget.points),
         }
         : {
           unavailable: true,
-          title: 'Andamento del budget',
-          message: 'Budget non confrontabile',
-          explanation: `Il budget utilizzato si misura sullo stipendio del periodo, e ${missingSalary.map((cycle) => cycle.label).join(' e ')} ${missingSalary.length === 1 ? 'non ha' : 'non hanno'} uno stipendio registrato.`,
+          title: t('andamento.chart.budget'),
+          message: t('andamento.chart.budgetna'),
+          // Uno o due periodi senza stipendio: una frase intera per ciascun caso.
+          explanation: missingSalary.length === 1
+            ? t('andamento.chart.nosalaryone', { cycle: missingSalary[0].label })
+            : t('andamento.chart.nosalarytwo', { first: missingSalary[0].label, second: missingSalary[1].label }),
         },
     },
   ]
@@ -233,37 +238,37 @@ export function CycleComparison({ cycles, firstKey, secondKey, onChangeFirst, on
 
   return (
     <div className="cycle-comparison">
-      <section className="cycle-comparison__pickers" aria-label="Scegli i periodi">
+      <section className="cycle-comparison__pickers" aria-label={t('andamento.compare.pickers')}>
         {picker(roleOf(firstKey, 0), firstKey, onChangeFirst)}
         <span className="cycle-comparison__pickers-arrow" aria-hidden="true">↔</span>
         {picker(roleOf(secondKey, 1), secondKey, onChangeSecond)}
       </section>
 
       {sameCycle ? (
-        <p className="cycle-comparison__notice">Scegli due periodi diversi per vedere cosa è cambiato.</p>
+        <p className="cycle-comparison__notice">{t('andamento.compare.samecycle')}</p>
       ) : (
         <>
-          <section className={`cycle-comparison__verdict cycle-comparison__verdict--${conclusion.tone}`} aria-label="Conclusione">
+          <section className={`cycle-comparison__verdict cycle-comparison__verdict--${conclusion.tone}`} aria-label={t('andamento.compare.conclusion')}>
             <p className="cycle-comparison__verdict-title">
               <span aria-hidden="true">{conclusion.emoji} </span>{conclusion.title}
             </p>
             <p className="cycle-comparison__verdict-text">{conclusion.text}</p>
             <p className="cycle-comparison__verdict-ref">
-              rispetto {consecutive ? 'al ciclo precedente' : `a ${before.label}`}
+              {consecutive ? t(`andamento.verdict.${conclusion.ref}previous`) : t(`andamento.verdict.${conclusion.ref}other`, { cycle: before.label })}
               {consecutive && <span className="cycle-comparison__verdict-period"> ({before.label})</span>}
             </p>
             {after.isCurrent && (
-              <p className="cycle-comparison__note">Il ciclo attuale è ancora in corso: i numeri possono cambiare.</p>
+              <p className="cycle-comparison__note">{t('andamento.compare.currentnote')}</p>
             )}
           </section>
 
-          <section className="cycle-comparison__metrics" aria-label={`Confronto in numeri: ${before.label} → ${after.label}`}>
+          <section className="cycle-comparison__metrics" aria-label={t('andamento.compare.numbers', { before: before.label, after: after.label })}>
             {metrics.map(metricRow)}
           </section>
 
           <section className="cycle-comparison__categories" aria-labelledby="cycle-comparison-categories">
             <p id="cycle-comparison-categories" className="cycle-comparison__section-title">
-              <span aria-hidden="true">🔍 </span>Cosa ha fatto la differenza
+              <span aria-hidden="true">🔍 </span>{t('andamento.compare.difference')}
             </p>
             <CategoryComparison rows={comparison.categories} beforeLabel={before.shortLabel} afterLabel={after.shortLabel} />
           </section>

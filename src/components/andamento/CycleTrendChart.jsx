@@ -1,5 +1,6 @@
 import { formatCurrency } from '../../utils/format.js'
 import { formatCompactAmount } from './andamentoFormat.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './CycleTrendChart.css'
 
 // Oltre sei colonne le etichette dei cicli personalizzati ("27 Ago") non
@@ -13,16 +14,17 @@ const CHART_LIMIT = 6
 // complicate. Ogni colonna è un pulsante: toccarla apre il suo
 // riepilogo.
 export function CycleTrendChart({ cycles, selectedKey, onSelect }) {
+  const { t } = useLanguage()
   const shown = cycles.slice(-CHART_LIMIT)
   const max = Math.max(1, ...shown.map((cycle) => Math.max(cycle.spent, cycle.income)))
 
   return (
-    <section className="trend-chart" aria-label="Spese per ciclo">
+    <section className="trend-chart" aria-label={t('andamento.trend.title')}>
       <div className="trend-chart__head">
-        <p className="trend-chart__title">Spese per ciclo</p>
+        <p className="trend-chart__title">{t('andamento.trend.title')}</p>
         <p className="trend-chart__legend">
-          <span className="trend-chart__legend-swatch trend-chart__legend-swatch--spent" aria-hidden="true" /> Spese
-          <span className="trend-chart__legend-swatch trend-chart__legend-swatch--income" aria-hidden="true" /> Entrate
+          <span className="trend-chart__legend-swatch trend-chart__legend-swatch--spent" aria-hidden="true" /> {t('andamento.metric.spent')}
+          <span className="trend-chart__legend-swatch trend-chart__legend-swatch--income" aria-hidden="true" /> {t('andamento.metric.income')}
         </p>
       </div>
 
@@ -37,7 +39,7 @@ export function CycleTrendChart({ cycles, selectedKey, onSelect }) {
               className={`trend-chart__column${isSelected ? ' trend-chart__column--selected' : ''}`}
               onClick={() => onSelect(cycle.key)}
               aria-pressed={isSelected}
-              aria-label={`${cycle.label}: spese ${formatCurrency(cycle.spent)}, entrate ${formatCurrency(cycle.income)}`}
+              aria-label={t('andamento.trend.bar', { cycle: cycle.label, spent: formatCurrency(cycle.spent), income: formatCurrency(cycle.income) })}
             >
               <span className="trend-chart__amount">{formatCompactAmount(cycle.spent)}</span>
               <span className="trend-chart__plot">
@@ -54,7 +56,7 @@ export function CycleTrendChart({ cycles, selectedKey, onSelect }) {
       </div>
 
       {cycles.length === 1 && (
-        <p className="trend-chart__note">Questo è il tuo primo ciclo con dei dati: dal prossimo vedrai come cambia.</p>
+        <p className="trend-chart__note">{t('andamento.trend.first')}</p>
       )}
     </section>
   )

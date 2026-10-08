@@ -1,5 +1,6 @@
 import { Modal } from './Modal.jsx'
 import { formatCurrency } from '../../utils/format.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './CategoryDetailModal.css'
 
 // Dettaglio di una categoria toccata in Analisi: le spese reali che
@@ -8,6 +9,7 @@ import './CategoryDetailModal.css'
 // la presentazione. Stessa shell Modal del Radar: ✕, Esc o tocco fuori
 // per tornare ad Analisi.
 export function CategoryDetailModal({ detail, periodLabel, onClose }) {
+  const { t } = useLanguage()
   const { category, total, count, days } = detail
 
   return (
@@ -15,12 +17,12 @@ export function CategoryDetailModal({ detail, periodLabel, onClose }) {
       <div className="category-detail__summary">
         <p className="category-detail__total">{formatCurrency(total)}</p>
         <p className="category-detail__meta">
-          {periodLabel} · {count === 1 ? '1 spesa' : `${count} spese`}
+          {periodLabel} · {t(count === 1 ? 'andamento.expensesone' : 'andamento.expensesmany', { count })}
         </p>
       </div>
 
       {days.length === 0 ? (
-        <p className="category-detail__empty">Nessuna spesa in questo periodo.</p>
+        <p className="category-detail__empty">{t('andamento.noexpenses')}</p>
       ) : (
         <div className="category-detail__days">
           {days.map((day) => (

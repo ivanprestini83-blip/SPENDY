@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './Modal.css'
 
 // Shared shell for every modal in the app (AddExpense, NewGoal,
@@ -6,6 +7,7 @@ import './Modal.css'
 // has to reimplement that. Content is passed as children; `title` renders
 // a consistent header with a close button.
 export function Modal({ title, onClose, children }) {
+  const { t } = useLanguage()
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') onClose()
@@ -25,7 +27,7 @@ export function Modal({ title, onClose, children }) {
       >
         <div className="modal-sheet__header">
           <p className="modal-sheet__title">{title}</p>
-          <button type="button" className="modal-sheet__close" onClick={onClose} aria-label="Chiudi">
+          <button type="button" className="modal-sheet__close" onClick={onClose} aria-label={t('common.close')}>
             ✕
           </button>
         </div>

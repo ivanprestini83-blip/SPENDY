@@ -7,6 +7,7 @@ import { getCategoryColor } from '../data/categoryColors.js'
 import { DonutChart } from '../components/analytics/DonutChart.jsx'
 import { CategoryDetailModal } from '../components/modals/CategoryDetailModal.jsx'
 import { buildCategoryDetail } from '../utils/categoryDetail.js'
+import { useLanguage } from '../i18n/useLanguage.js'
 import './AnalyticsPage.css'
 
 // Real spending by category for the SELECTED cycle — current by default,
@@ -18,6 +19,7 @@ import './AnalyticsPage.css'
 // renders (and therefore the donut/legend) update automatically whenever
 // `expenses`/`today`/the selected cycle change.
 export function AnalyticsPage() {
+  const { t } = useLanguage()
   const today = useAppStore((state) => state.today)
   const expenses = useAppStore((state) => state.expenses)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
@@ -58,8 +60,8 @@ export function AnalyticsPage() {
       <button type="button" className="analytics-page__trend" onClick={() => openModal('andamento')}>
         <span className="analytics-page__trend-icon" aria-hidden="true">📈</span>
         <span className="analytics-page__trend-text">
-          <span className="analytics-page__trend-title">Andamento</span>
-          <span className="analytics-page__trend-subtitle">Come stai andando, ciclo dopo ciclo</span>
+          <span className="analytics-page__trend-title">{t('andamento.title')}</span>
+          <span className="analytics-page__trend-subtitle">{t('analytics.trendsubtitle')}</span>
         </span>
         <span className="analytics-page__trend-arrow" aria-hidden="true">→</span>
       </button>
@@ -69,7 +71,7 @@ export function AnalyticsPage() {
           type="button"
           className="analytics-page__period-nav"
           onClick={() => setCyclesBack((n) => n + 1)}
-          aria-label="Periodo precedente"
+          aria-label={t('analytics.prev')}
         >
           ←
         </button>
@@ -79,7 +81,7 @@ export function AnalyticsPage() {
           className="analytics-page__period-nav"
           onClick={() => setCyclesBack((n) => Math.max(0, n - 1))}
           disabled={cyclesBack === 0}
-          aria-label="Periodo successivo"
+          aria-label={t('analytics.next')}
         >
           →
         </button>
@@ -87,7 +89,7 @@ export function AnalyticsPage() {
 
       {monthTotal > 0 ? (
         <>
-          <DonutChart segments={segments} centerLabel="Totale" centerValue={formatCurrency(monthTotal)} />
+          <DonutChart segments={segments} centerLabel={t('analytics.total')} centerValue={formatCurrency(monthTotal)} />
 
           <ul className="analytics-page__legend">
             {rows.map((row) => {
@@ -129,7 +131,7 @@ export function AnalyticsPage() {
           </ul>
         </>
       ) : (
-        <p className="analytics-page__empty">Nessuna spesa registrata in questo periodo.</p>
+        <p className="analytics-page__empty">{t('analytics.empty')}</p>
       )}
 
       {categoryDetail && (

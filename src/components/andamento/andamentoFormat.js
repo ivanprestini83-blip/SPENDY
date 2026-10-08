@@ -1,3 +1,4 @@
+import { translate } from '../../i18n/translate.js'
 import { formatCurrency } from '../../utils/format.js'
 
 // Formattazioni usate solo da Andamento. Gli importi passano comunque da
@@ -33,10 +34,11 @@ export function formatCompactAmount(value) {
 // Come leggere una variazione (vedi computeChange nell'engine).
 // `higherIsBetter` decide il colore: più spese = coral, più risparmio =
 // mint. Il colore non è mai l'unico segnale — c'è sempre la freccia e il
-// segno scritto.
-export function describeChange(change, { higherIsBetter = false, newLabel = 'Nuova', goneLabel = 'Azzerata' } = {}) {
+// segno scritto. `lang` sceglie solo le parole (assente → italiano).
+export function describeChange(change, { higherIsBetter = false, lang, newLabel = translate(lang, 'andamento.change.new'), goneLabel = translate(lang, 'andamento.change.gone') } = {}) {
   const { kind, diff, percent } = change
-  if (kind === 'same') return { arrow: '=', text: 'Invariato', amount: null, detail: 'Invariato', tone: 'flat' }
+  const unchanged = translate(lang, 'andamento.change.unchanged')
+  if (kind === 'same') return { arrow: '=', text: unchanged, amount: null, detail: unchanged, tone: 'flat' }
 
   const good = higherIsBetter ? diff > 0 : diff < 0
   const tone = good ? 'good' : 'bad'
@@ -56,8 +58,8 @@ export function describeChange(change, { higherIsBetter = false, newLabel = 'Nuo
 // Solo la differenza in euro, senza percentuale né "Nuova": serve per il
 // risparmio, che può partire da zero o essere negativo e dove una
 // percentuale non vorrebbe dire niente.
-export function describeDiff(diff, { higherIsBetter = false } = {}) {
-  if (diff === 0) return { arrow: '=', text: 'Invariato', tone: 'flat' }
+export function describeDiff(diff, { higherIsBetter = false, lang } = {}) {
+  if (diff === 0) return { arrow: '=', text: translate(lang, 'andamento.change.unchanged'), tone: 'flat' }
   const good = higherIsBetter ? diff > 0 : diff < 0
   return { arrow: diff > 0 ? '▲' : '▼', text: formatSignedCurrency(diff), tone: good ? 'good' : 'bad' }
 }

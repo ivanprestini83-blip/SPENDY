@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { formatCurrency } from '../../utils/format.js'
 import { describeChange } from './andamentoFormat.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './CategoryComparison.css'
 
 // Le prime cinque bastano per rispondere a "quali categorie stanno
@@ -11,11 +12,12 @@ const VISIBLE_ROWS = 5
 // variazione assoluta: qui si decide solo quante mostrarne e quanto lunga
 // disegnare la barra (proporzionale alla variazione più grande fra tutte).
 export function CategoryComparison({ rows, beforeLabel, afterLabel }) {
+  const { t, language } = useLanguage()
   const [expanded, setExpanded] = useState(false)
   const visible = expanded ? rows : rows.slice(0, VISIBLE_ROWS)
 
   if (rows.length === 0) {
-    return <p className="category-comparison__empty">Nessuna spesa in nessuno dei due periodi.</p>
+    return <p className="category-comparison__empty">{t('andamento.categories.empty')}</p>
   }
 
   const largest = rows.reduce((max, row) => Math.max(max, Math.abs(row.diff)), 0)
@@ -24,7 +26,7 @@ export function CategoryComparison({ rows, beforeLabel, afterLabel }) {
     <div className="category-comparison">
       <ul className="category-comparison__list">
         {visible.map((row) => {
-          const change = describeChange(row, { newLabel: 'Nuova', goneLabel: 'Azzerata' })
+          const change = describeChange(row, { lang: language })
           const width = largest > 0 ? Math.max(Math.abs(row.diff) / largest, row.diff === 0 ? 0 : 0.04) * 100 : 0
           return (
             <li key={row.categoryId} className="category-comparison__row">
@@ -59,7 +61,7 @@ export function CategoryComparison({ rows, beforeLabel, afterLabel }) {
 
       {rows.length > VISIBLE_ROWS && (
         <button type="button" className="category-comparison__toggle" onClick={() => setExpanded((value) => !value)}>
-          {expanded ? 'Mostra meno' : `Mostra tutte (${rows.length})`}
+          {expanded ? t('andamento.categories.showless') : t('andamento.categories.showall', { count: rows.length })}
         </button>
       )}
     </div>

@@ -207,11 +207,12 @@ section('5. Reazioni alle spese: stessa scelta, nella lingua scelta')
   // Senza rng iniettato (come nell'app): una sola reazione per evento, tradotta al cambio lingua.
   const event = [expense(TODAY, 175, 'casa', 'evento-cambio-lingua')]
   const first = react('it', { expenses: event })
-  const itPool = [...pool('it', 'SPESA_100'), ...pool('it', 'SPESA_INUTILE')]
-  const index = itPool.indexOf(first.message)
+  // Scelta casuale come nell'app: di solito "oltre 100 €", a volte (8%) una frase rara.
+  const GROUPS = { over100: (lang) => [...pool(lang, 'SPESA_100'), ...pool(lang, 'SPESA_INUTILE')], rare: (lang) => pool(lang, 'RARE_SPECIALI') }
+  const [group, index] = Object.entries(GROUPS).map(([name, of]) => [name, of('it').indexOf(first.message)]).find(([, i]) => i >= 0) ?? [null, -1]
   const translated = LANGS.map((lang) => react(lang, { expenses: event }))
   check('stesso evento dopo un cambio lingua: la STESSA reazione, tradotta (nessuna nuova estrazione)', index >= 0
-    && translated.every((r, i) => r.message === [...pool(LANGS[i], 'SPESA_100'), ...pool(LANGS[i], 'SPESA_INUTILE')][index]), translated.map((r) => r.message).join(' | '))
+    && translated.every((r, i) => r.message === GROUPS[group](LANGS[i])[index]), translated.map((r) => r.message).join(' | '))
   check('   e tornando all\'italiano, la frase di prima', react('it', { expenses: event }).message === first.message)
 }
 
