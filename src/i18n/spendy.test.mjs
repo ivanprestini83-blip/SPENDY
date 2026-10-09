@@ -470,6 +470,88 @@ try {
   for (const lang of ['en', 'es', 'fr']) check(`chiavi ${lang}: nessun testo italiano lasciato (spendypage.*, radar.preview.quiet)`,
     ['spendypage.blurb', 'spendypage.learning', 'radar.preview.quiet'].every((key) => translate(lang, key) !== translate('it', key)))
   check('SpendyPage.jsx: nessun messaggio del Radar scritto in italiano nel codice', !read('src/pages/SpendyPage.jsx').includes('Sto ancora imparando') && !read('src/pages/SpendyPage.jsx').includes('Nessuna anomalia'))
+  // Schermata Radar Spendy (components/radar/RadarScreen.jsx): titolo, sottotitolo,
+  // stati "sto imparando" (con i cicli contati), "tranquillo" e "attivo", dettaglio scheda.
+  const radarText = () => text(nodes(container).find((n) => cls(n) === 'radar-screen') ?? {})
+  const byClass = (name) => nodes(container).filter((n) => cls(n) === name).map(text)
+  const engineRadar = () => { const st = S(); return buildRadar({ expenses: st.expenses, goals: st.goals, today: st.today, monthlyBudget: 1000, cycleStartDay: 1, financialData: buildFinancialData({ today: st.today, monthlyBudget: 1000, expenses: st.expenses, incomes: [], goals: st.goals, cycleStartDay: 1 }), jokeHistory: [] }) }
+  const spent = (id, month, amount, categoryId) => ({ id, date: `2026-${month}-10`, amount, categoryId, description: categoryId })
+  const ITALIAN_RADAR = ['Ho dato un', 'Sto ancora imparando', 'Per dirti se una spesa', 'Mi servono circa', 'Continua a registrare', 'Nel frattempo non mi invento',
+    'Nessuna anomalia', 'Torna a trovarmi', 'che ho notato', 'Rispetto a cosa', 'Cosa ho notato', 'Perché te lo segnalo',
+    'Non è ancora un problema', 'tienici', 'se continui così', 'trend è deciso', 'rivedere questa categoria']
+  const leftovers = (screenText) => ITALIAN_RADAR.filter((part) => screenText.includes(part))
+  const RADAR_CASES = [
+    ['sto imparando, zero cicli', [], RADAR_STATUS.LEARNING],
+    ['sto imparando, cicli contati', [spent('l-07', '07', 80, 'spesa'), spent('l-08', '08', 90, 'spesa')], RADAR_STATUS.LEARNING],
+    ['tranquillo', ['06', '08', '09'].map((month) => spent(`q-${month}`, month, 600, 'spesa')), RADAR_STATUS.QUIET],
+    ['attivo', [spent('a-06', '06', 50, 'ristoranti'), spent('a-07', '07', 60, 'ristoranti'), spent('a-08', '08', 55, 'ristoranti'), spent('a-09', '09', 300, 'ristoranti')], RADAR_STATUS.ACTIVE],
+  ]
+  for (const [label, expenses, status] of RADAR_CASES) {
+    await act(() => { useAppStore.setState({ today: '2026-09-20', cycleStartDay: 1, expenses, incomes: [salary] }); S().setLanguage('it'); S().openModal('radar') })
+    const engine = engineRadar()
+    check(`Radar (${label}): stato del motore invariato (${status})`, engine.status === status, engine.status)
+    if (label === 'sto imparando, cicli contati') check('   il caso conta davvero dei cicli (non zero)', engine.cyclesSeen > 0 && engine.cyclesSeen < engine.cyclesNeeded, `${engine.cyclesSeen}/${engine.cyclesNeeded}`)
+    for (const lang of ['it', 'en', 'es', 'fr', 'it']) {
+      await act(() => S().setLanguage(lang))
+      const tr = (key, params) => translate(lang, `radarscreen.${key}`, params)
+      const screen = radarText()
+      const ok = [byClass('radar-screen__title')[0] === tr('title'), byClass('radar-screen__subtitle')[0] === tr('subtitle')]
+      if (status === RADAR_STATUS.LEARNING) {
+        const seen = engine.cyclesSeen === 0 ? tr('zero') : engine.cyclesSeen
+        ok.push(screen.includes(tr('learning')), byClass('radar-screen__empty-text')[0] === tr('learningtext', { needed: engine.cyclesNeeded, seen }),
+          byClass('radar-screen__empty-text')[0].includes(String(engine.cyclesNeeded)) && byClass('radar-screen__empty-text')[0].includes(String(seen)),
+          byClass('radar-screen__empty-note')[0] === tr('note'))
+      }
+      if (status === RADAR_STATUS.QUIET) ok.push(byClass('radar-screen__empty-text')[0] === tr('quiet'))
+      if (status === RADAR_STATUS.ACTIVE) {
+        const count = engine.cards.length
+        ok.push(byClass('radar-screen__count')[0] === (count === 1 ? tr('countone') : tr('countmany', { count })))
+      }
+      check(`   ${lang}: testi della schermata nella lingua scelta, subito`, ok.every(Boolean), screen.slice(0, 160))
+      if (lang !== 'it') check(`   ${lang}: nessuna frase italiana della schermata`, leftovers(screen).length === 0, leftovers(screen).join(' | '))
+    }
+    if (status === RADAR_STATUS.ACTIVE) {
+      // Dettaglio di una scheda: i tre titoli di sezione.
+      await act(() => propsOf(nodes(container).find((n) => cls(n) === 'radar-card__main')).onClick({}))
+      for (const lang of ['fr', 'en', 'es', 'it']) {
+        await act(() => S().setLanguage(lang))
+        const titles = byClass('radar-detail__section-title')
+        check(`   dettaglio scheda in ${lang}: titoli delle sezioni tradotti`, ['noticed', 'why'].every((key) => titles.includes(translate(lang, `radarscreen.${key}`)))
+          && titles.every((title) => ['compare', 'noticed', 'why'].some((key) => title === translate(lang, `radarscreen.${key}`))), titles.join(' | '))
+        if (lang !== 'it') check(`   dettaglio ${lang}: nessuna frase italiana`, leftovers(text(container)).length === 0, leftovers(text(container)).join(' | '))
+      }
+    }
+    await act(() => S().closeModal())
+  }
+  // Dettaglio "confronto di una sola categoria" (RadarDetailModal con `insight`):
+  // oggi nessuna schermata lo apre, ma deve parlare la lingua scelta. Stesse
+  // soglie di sempre: < 25% lieve, < 60% medio, altrimenti deciso.
+  {
+    const { RadarDetailModal } = await server.ssrLoadModule('/src/components/modals/RadarDetailModal.jsx')
+    const { getCategory: appCategory } = await server.ssrLoadModule('/src/data/categories.js')
+    const box = dom.createContainer()
+    const boxRoot = createRoot(box, { onCaughtError: (e) => caught.push(e), onUncaughtError: (e) => caught.push(e), onRecoverableError: () => {} })
+    const TAKES = [[10, 'takemild'], [40, 'takemedium'], [80, 'takestrong']]
+    for (const [changePercent, key] of TAKES) {
+      const insight = { category: appCategory('ristoranti'), previous: 100, current: 100 + changePercent, changeAmount: changePercent, changePercent }
+      await act(() => { S().setLanguage('it'); boxRoot.render(h(RadarDetailModal, { insight, previousLabel: 'Ago', currentLabel: 'Set', onClose: () => {} })) })
+      for (const lang of ['it', 'en', 'es', 'fr', 'it']) {
+        await act(() => S().setLanguage(lang))
+        const shown = text(box)
+        const expected = translate(lang, `radarscreen.${key}`)
+        check(`dettaglio categoria (${changePercent}%) in ${lang}: frase di Spendy "${expected.slice(0, 28)}…" e categoria tradotta`,
+          shown.includes(expected) && shown.includes(translate(lang, 'categories.ristoranti').toUpperCase()) && shown.includes(`(${changePercent}%)`)
+          && TAKES.every(([, other]) => other === key || !shown.includes(translate(lang, `radarscreen.${other}`))), shown.slice(0, 160))
+        if (lang !== 'it') check(`   ${lang}: nessuna frase italiana`, leftovers(shown).length === 0, leftovers(shown).join(' | '))
+      }
+    }
+    check('   italiano: le tre frasi di sempre', translate('it', 'radarscreen.takemild') === "Non è ancora un problema, ma tienici d'occhio."
+      && translate('it', 'radarscreen.takemedium') === 'Non è ancora un problema, ma se continui così potresti superare il budget.'
+      && translate('it', 'radarscreen.takestrong') === 'Qui il trend è deciso: potrebbe valere la pena rivedere questa categoria.')
+    await act(() => boxRoot.unmount())
+  }
+  check('RadarScreen.jsx e RadarDetailModal.jsx: nessun testo italiano scritto nel codice',
+    ITALIAN_RADAR.every((part) => !read('src/components/radar/RadarScreen.jsx').includes(part) && !read('src/components/modals/RadarDetailModal.jsx').includes(part)))
   await act(() => { useAppStore.setState(saved4); S().setLanguage('it') })
   check('dati di prova tolti: spese ed entrate di prima', S().expenses === saved4.expenses && S().incomes === saved4.incomes)
   await act(() => S().setActiveTab('home'))

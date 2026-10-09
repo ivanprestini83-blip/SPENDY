@@ -14,7 +14,7 @@ import './RadarScreen.css'
 // proporre — vive nei moduli puri, dove i test la raggiungono senza
 // bisogno di un browser.
 export function RadarScreen({ onClose }) {
-  const { language } = useLanguage()
+  const { language, t } = useLanguage()
   const today = useAppStore((state) => state.today)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
@@ -56,12 +56,12 @@ export function RadarScreen({ onClose }) {
   return (
     <div className="radar-screen">
       <div className="radar-screen__header">
-        <button type="button" className="radar-screen__back" onClick={onClose} aria-label="Chiudi">
+        <button type="button" className="radar-screen__back" onClick={onClose} aria-label={t('common.close')}>
           ←
         </button>
         <div>
-          <p className="radar-screen__title">RADAR SPENDY</p>
-          <p className="radar-screen__subtitle">Ho dato un&apos;occhiata ai tuoi soldi.</p>
+          <p className="radar-screen__title">{t('radarscreen.title')}</p>
+          <p className="radar-screen__subtitle">{t('radarscreen.subtitle')}</p>
         </div>
       </div>
 
@@ -70,8 +70,8 @@ export function RadarScreen({ onClose }) {
           <>
             <p className="radar-screen__count">
               {radar.cards.length === 1
-                ? 'Una cosa che ho notato:'
-                : `${radar.cards.length} cose che ho notato:`}
+                ? t('radarscreen.countone')
+                : t('radarscreen.countmany', { count: radar.cards.length })}
             </p>
 
             {radar.cards.map((card) => (
@@ -83,7 +83,7 @@ export function RadarScreen({ onClose }) {
                   type="button"
                   className="radar-card__main"
                   onClick={() => setDetail(card)}
-                  aria-label={`Dettaglio: ${card.title}`}
+                  aria-label={t('radarscreen.detail', { title: card.title })}
                 >
                   <div className="radar-card__head">
                     <span className="radar-card__dot" aria-hidden="true">{card.dot}</span>
@@ -117,10 +117,7 @@ export function RadarScreen({ onClose }) {
         {radar.status === RADAR_STATUS.QUIET && (
           <div className="radar-screen__empty">
             <SpendyCharacterWithMessage state="happy" message={radar.quietMessage} size={120} />
-            <p className="radar-screen__empty-text">
-              Nessuna anomalia, nessuna categoria fuori controllo, nessun budget in bilico. Torna a
-              trovarmi dopo qualche spesa.
-            </p>
+            <p className="radar-screen__empty-text">{t('radarscreen.quiet')}</p>
           </div>
         )}
 
@@ -128,18 +125,16 @@ export function RadarScreen({ onClose }) {
           <div className="radar-screen__empty">
             <SpendyCharacterWithMessage
               state="attentive"
-              message="Sto ancora imparando le tue abitudini."
+              message={t('radarscreen.learning')}
               size={120}
             />
             <p className="radar-screen__empty-text">
-              Per dirti se una spesa è fuori dal normale devo prima sapere qual è il tuo
-              normale. Mi servono circa {radar.cyclesNeeded} cicli di spese: finora ne ho{' '}
-              {radar.cyclesSeen === 0 ? 'zero' : radar.cyclesSeen}. Continua a registrare le spese e
-              inizio a ragionare.
+              {t('radarscreen.learningtext', {
+                needed: radar.cyclesNeeded,
+                seen: radar.cyclesSeen === 0 ? t('radarscreen.zero') : radar.cyclesSeen,
+              })}
             </p>
-            <p className="radar-screen__empty-note">
-              Nel frattempo non mi invento tendenze che non posso dimostrare.
-            </p>
+            <p className="radar-screen__empty-note">{t('radarscreen.note')}</p>
           </div>
         )}
       </div>

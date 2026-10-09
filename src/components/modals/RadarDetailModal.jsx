@@ -4,14 +4,15 @@ import { formatCurrency } from '../../utils/format.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import './RadarDetailModal.css'
 
-function spendyTake(changePercent) {
+// Stesse soglie di sempre; il testo nella lingua scelta (t di useLanguage).
+function spendyTake(changePercent, t) {
   if (changePercent < 25) {
-    return { state: 'attentive', text: "Non è ancora un problema, ma tienici d'occhio." }
+    return { state: 'attentive', text: t('radarscreen.takemild') }
   }
   if (changePercent < 60) {
-    return { state: 'attentive', text: 'Non è ancora un problema, ma se continui così potresti superare il budget.' }
+    return { state: 'attentive', text: t('radarscreen.takemedium') }
   }
-  return { state: 'concerned', text: 'Qui il trend è deciso: potrebbe valere la pena rivedere questa categoria.' }
+  return { state: 'concerned', text: t('radarscreen.takestrong') }
 }
 
 // Due modi di aprire questo modale, non due modali diversi:
@@ -43,7 +44,7 @@ function RadarCardDetail({ card, onClose, onAction }) {
 
       {card.comparison && (
         <div className="radar-detail__section">
-          <p className="radar-detail__section-title">Rispetto a cosa</p>
+          <p className="radar-detail__section-title">{t('radarscreen.compare')}</p>
           <p className={`radar-detail__comparison radar-detail__comparison--${card.comparison.direction}`}>
             {card.comparison.text}
           </p>
@@ -54,12 +55,12 @@ function RadarCardDetail({ card, onClose, onAction }) {
       )}
 
       <div className="radar-detail__section">
-        <p className="radar-detail__section-title">Cosa ho notato</p>
+        <p className="radar-detail__section-title">{t('radarscreen.noticed')}</p>
         <p className="radar-detail__section-text">{card.explanation}</p>
       </div>
 
       <div className="radar-detail__section">
-        <p className="radar-detail__section-title">Perché te lo segnalo</p>
+        <p className="radar-detail__section-title">{t('radarscreen.why')}</p>
         <p className="radar-detail__section-text">
           {/* La priorità non è un numero decorativo: è lo stesso punteggio
               con cui il Radar ha deciso di mettere questa scheda dove
@@ -87,7 +88,8 @@ function RadarCardDetail({ card, onClose, onAction }) {
 // il chiamante ha già da cycle.js, così questo modale non deve sapere
 // niente di cycleStartDay.
 function CategoryDetail({ insight, previousLabel, currentLabel, onClose }) {
-  const take = spendyTake(insight.changePercent)
+  const { t } = useLanguage()
+  const take = spendyTake(insight.changePercent, t)
 
   return (
     <Modal title={insight.category.label.toUpperCase()} onClose={onClose}>
