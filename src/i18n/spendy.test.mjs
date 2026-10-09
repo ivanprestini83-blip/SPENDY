@@ -435,6 +435,44 @@ try {
     check(`Posso permettermelo? in ${lang}: verdetto "${translate(lang, 'affordability.wait')}"`, title === translate(lang, 'affordability.wait'), title)
     await act(() => S().closeModal())
   }
+  // Pagina Spendy (pulsante Spendy della barra in basso): la presentazione
+  // "Sono Spendy, il tuo coach personale…" segue la lingua, anche cambiandola sulla pagina aperta.
+  await act(() => { S().setLanguage('it'); S().setActiveTab('spendy') })
+  const blurb = () => text(nodes(container).find((n) => cls(n) === 'spendy-page__blurb') ?? {})
+  const ITALIAN_BLURB = 'Sono Spendy, il tuo coach personale per le spese.'
+  check('Pagina Spendy in it: presentazione italiana di sempre', blurb() === translate('it', 'spendypage.blurb') && blurb().startsWith(ITALIAN_BLURB), blurb())
+  for (const [lang, start] of [['en', 'I’m Spendy, your personal'], ['es', 'Soy Spendy, tu coach personal'], ['fr', 'Je suis Spendy, votre coach personnel'], ['it', ITALIAN_BLURB]]) {
+    await act(() => S().setLanguage(lang))
+    check(`   cambio a ${lang} sulla pagina aperta: presentazione in ${lang}, subito`, blurb() === translate(lang, 'spendypage.blurb') && blurb().startsWith(start), blurb())
+    if (lang !== 'it') check(`   ${lang}: nessun resto della frase italiana a schermo`, !text(container).includes('coach personale') && !text(container).includes('Tengo d\'occhio'))
+  }
+  check('SpendyPage.jsx: nessuna presentazione italiana scritta nel codice', !read('src/pages/SpendyPage.jsx').includes('coach personale'))
+  // I due messaggi sotto il pulsante Radar: stesse condizioni di prima (stato del
+  // Radar), testo nella lingua scelta. Dati di prova messi e poi rimessi com'erano.
+  const saved4 = { today: S().today, cycleStartDay: S().cycleStartDay, expenses: S().expenses, incomes: S().incomes }
+  const radarEmpty = () => text(nodes(container).find((n) => cls(n) === 'spendy-page__radar-empty') ?? {})
+  const pageRadar = () => { const st = S(); return buildRadar({ expenses: st.expenses, goals: st.goals, today: st.today, monthlyBudget: 1000, cycleStartDay: 1, financialData: buildFinancialData({ today: st.today, monthlyBudget: 1000, expenses: st.expenses, incomes: [], goals: st.goals, cycleStartDay: 1 }), jokeHistory: [] }).status }
+  const salary = { id: 'stipendio-test', date: '2026-09-01', amount: 1000, categoryId: 'stipendio', description: '' }
+  const STATES = [
+    ['in apprendimento', [], (lang) => translate(lang, 'spendypage.learning'), '🔍 Sto ancora imparando le tue abitudini.', RADAR_STATUS.LEARNING],
+    ['nessuna anomalia', ['06', '08', '09'].map((month) => ({ id: `quiet-${month}`, date: `2026-${month}-10`, amount: 600, categoryId: 'spesa', description: 'spesa' })),
+      (lang) => `✅ ${translate(lang, 'radar.preview.quiet')}`, '✅ Nessuna anomalia da segnalare al momento.', RADAR_STATUS.QUIET],
+  ]
+  for (const [label, expenses, expected, italian, status] of STATES) {
+    await act(() => { useAppStore.setState({ today: '2026-09-20', cycleStartDay: 1, expenses, incomes: [salary] }); S().setLanguage('it'); S().setActiveTab('spendy') })
+    check(`Radar ${label}: condizione invariata (stato ${status})`, pageRadar() === status, pageRadar())
+    check(`   it: testo di sempre "${italian}"`, radarEmpty() === italian, radarEmpty())
+    for (const lang of ['en', 'es', 'fr', 'it']) {
+      await act(() => S().setLanguage(lang))
+      check(`   cambio a ${lang} sulla pagina aperta: messaggio in ${lang}`, radarEmpty() === expected(lang) && (lang === 'it' || radarEmpty() !== italian), radarEmpty())
+    }
+  }
+  for (const lang of ['en', 'es', 'fr']) check(`chiavi ${lang}: nessun testo italiano lasciato (spendypage.*, radar.preview.quiet)`,
+    ['spendypage.blurb', 'spendypage.learning', 'radar.preview.quiet'].every((key) => translate(lang, key) !== translate('it', key)))
+  check('SpendyPage.jsx: nessun messaggio del Radar scritto in italiano nel codice', !read('src/pages/SpendyPage.jsx').includes('Sto ancora imparando') && !read('src/pages/SpendyPage.jsx').includes('Nessuna anomalia'))
+  await act(() => { useAppStore.setState(saved4); S().setLanguage('it') })
+  check('dati di prova tolti: spese ed entrate di prima', S().expenses === saved4.expenses && S().incomes === saved4.incomes)
+  await act(() => S().setActiveTab('home'))
   check('dati invariati da tutti i cambi di lingua (a parte le spese aggiunte dal test)', JSON.stringify(JSON.parse(dataOf(S())).incomes) === JSON.stringify(JSON.parse(before).incomes))
   check('nessun errore di rendering', caught.length === 0, caught[0]?.message)
   await act(() => root.unmount())

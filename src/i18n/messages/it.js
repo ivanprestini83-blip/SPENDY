@@ -467,6 +467,11 @@ export default {
   },
   // Fase 4B-2: Obiettivi, Fondo emergenza, Aggiungi spesa/guadagno, Entrate.
   // Importi e date arrivano già formattati nei parametri.
+  // Pagina Spendy (pulsante Spendy della barra in basso).
+  spendypage: {
+    blurb: "Sono Spendy, il tuo coach personale per le spese. Tengo d'occhio il tuo budget e intervengo al momento giusto — senza giudicarti (troppo).",
+    learning: '🔍 Sto ancora imparando le tue abitudini.',
+  },
   goalspage: {
     title: 'I tuoi obiettivi',
     new: '+ Nuovo obiettivo',

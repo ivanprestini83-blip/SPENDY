@@ -21,7 +21,7 @@ import './SpendyPage.css'
 // fire here too, instead of this page being stuck on the flat
 // percentage-only tiers HomePage isn't limited to.
 export function SpendyPage() {
-  const { language } = useLanguage()
+  const { language, t } = useLanguage()
   const today = useAppStore((state) => state.today)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
@@ -64,10 +64,7 @@ export function SpendyPage() {
         <SpendyCharacterWithMessage state={coach.state} message={coach.message} size={110} />
       </div>
 
-      <p className="spendy-page__blurb">
-        Sono Spendy, il tuo coach personale per le spese. Tengo d'occhio il tuo budget e intervengo al
-        momento giusto — senza giudicarti (troppo).
-      </p>
+      <p className="spendy-page__blurb">{t('spendypage.blurb')}</p>
 
       <button type="button" className="spendy-page__radar" onClick={handleOpenRadar}>
         <span aria-hidden="true">🔥</span> Radar Spendy
@@ -77,8 +74,8 @@ export function SpendyPage() {
       {!hasSomethingToShow && (
         <p className="spendy-page__radar-empty">
           {radar.status === RADAR_STATUS.LEARNING
-            ? '🔍 Sto ancora imparando le tue abitudini.'
-            : '✅ Nessuna anomalia da segnalare al momento.'}
+            ? t('spendypage.learning')
+            : `✅ ${t('radar.preview.quiet')}`}
         </p>
       )}
     </div>

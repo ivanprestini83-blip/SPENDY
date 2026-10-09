@@ -447,6 +447,11 @@ export default {
       showall: 'Mostrar todas ({count})',
     },
   },
+  // Pagina Spendy (pulsante Spendy della barra in basso).
+  spendypage: {
+    blurb: 'Soy Spendy, tu coach personal de gastos. Vigilo tu presupuesto e intervengo en el momento justo — sin juzgarte (demasiado).',
+    learning: '🔍 Todavía estoy aprendiendo tus hábitos.',
+  },
   goalspage: {
     title: 'Tus objetivos',
     new: '+ Nuevo objetivo',
