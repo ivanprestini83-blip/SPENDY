@@ -4,6 +4,7 @@ import { buildAndamento } from '../../utils/andamentoEngine.js'
 import { getCycleTiming } from '../../utils/cycle.js'
 import { CycleTrendChart } from './CycleTrendChart.jsx'
 import { CycleSummary } from './CycleSummary.jsx'
+import { CycleCategories } from './CycleCategories.jsx'
 import { CycleComparison } from './CycleComparison.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import { cycleLabelNames } from '../../i18n/cycleLabelNames.js'
@@ -91,8 +92,11 @@ export function AndamentoScreen({ onClose }) {
       <div className="andamento-screen__body">
         {view === 'overview' && (
           <>
+            {/* Prima la sintesi del periodo scelto, poi il grafico (che sceglie
+                anche lui il periodo) e infine dove sono andati i soldi. */}
+            <CycleSummary cycle={selected} cycles={cycles} onSelect={setSelectedKey} timing={selected.isCurrent ? timing : null} />
             <CycleTrendChart cycles={cycles} selectedKey={selected.key} onSelect={setSelectedKey} />
-            <CycleSummary cycle={selected} timing={selected.isCurrent ? timing : null} />
+            <CycleCategories cycle={selected} />
           </>
         )}
 

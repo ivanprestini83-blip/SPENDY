@@ -31,14 +31,14 @@ const NEW_KEYS = keysOf(MESSAGES.it).filter((key) => AREAS.includes(key.split('.
 const SCREEN_KEYS = NEW_KEYS.filter((key) => !key.startsWith('common.') || key === 'common.close')
 const FILES = [
   'src/pages/AnalyticsPage.jsx', 'src/components/modals/CategoryDetailModal.jsx', 'src/components/modals/Modal.jsx',
-  'src/components/andamento/AndamentoScreen.jsx', 'src/components/andamento/CycleSummary.jsx', 'src/components/andamento/CycleTrendChart.jsx',
+  'src/components/andamento/AndamentoScreen.jsx', 'src/components/andamento/CycleSummary.jsx', 'src/components/andamento/CycleCategories.jsx', 'src/components/andamento/CycleTrendChart.jsx',
   'src/components/andamento/CycleComparison.jsx', 'src/components/andamento/CategoryComparison.jsx', 'src/components/andamento/andamentoFormat.js',
 ]
 
 // =====================================================================
 section('1. Dizionari: nessuna chiave mancante, stessi segnaposto')
 // =====================================================================
-check(`chiavi nuove: ${NEW_KEYS.length} (common ${NEW_KEYS.filter((k) => k.startsWith('common.')).length}, analytics ${NEW_KEYS.filter((k) => k.startsWith('analytics.')).length}, andamento ${NEW_KEYS.filter((k) => k.startsWith('andamento.')).length})`, NEW_KEYS.length === 103)
+check(`chiavi nuove: ${NEW_KEYS.length} (common ${NEW_KEYS.filter((k) => k.startsWith('common.')).length}, analytics ${NEW_KEYS.filter((k) => k.startsWith('analytics.')).length}, andamento ${NEW_KEYS.filter((k) => k.startsWith('andamento.')).length})`, NEW_KEYS.length === 111)
 for (const lang of LANGS) {
   const missing = NEW_KEYS.filter((key) => typeof lookup(MESSAGES[lang], key) !== 'string' || !lookup(MESSAGES[lang], key).trim())
   check(`${lang}: tutte presenti e non vuote`, missing.length === 0, missing.join(', '))
@@ -54,6 +54,8 @@ for (const lang of LANGS) {
   // Famiglie costruite con un nome variabile: le frasi sotto i grafici e la seconda riga della conclusione.
   for (const metric of ['spent', 'income', 'savings', 'budget']) for (const dir of ['down', 'up', 'same']) used.add(`andamento.sentence.${metric}.${dir}`)
   for (const ref of ['diff', 'same']) for (const which of ['previous', 'other']) used.add(`andamento.verdict.${ref}${which}`)
+  // Il ritmo di spesa: andamento.pace.<ok|near|over>.
+  for (const pace of ['ok', 'near', 'over']) used.add(`andamento.pace.${pace}`)
   const orphans = NEW_KEYS.filter((key) => !key.startsWith('common.') && !used.has(key))
   const unknown = [...used].filter((key) => typeof lookup(MESSAGES.it, key) !== 'string')
   check('ogni chiave analytics/andamento è usata dai componenti', orphans.length === 0, orphans.join(', '))
@@ -212,6 +214,7 @@ try {
     await act(() => setLanguage(lang))
     const tr = (key, params) => translate(lang, key, params)
     const summary = text(one(container, 'cycle-summary'))
+    const categories = text(one(container, 'cycle-summary__categories'))
     check(`${lang}: titolo, schede, legenda e riepilogo del ciclo in corso`, S().language === lang
       && text(one(container, 'andamento-screen__title')).includes(tr('andamento.title'))
       && text(tabs()[0]) === tr('andamento.tab.overview') && text(tabs()[1]) === tr('andamento.tab.compare')
@@ -219,7 +222,7 @@ try {
       && text(one(container, 'trend-chart__title')) === tr('andamento.trend.title') && text(one(container, 'trend-chart__legend')).includes(tr('andamento.metric.income'))
       && summary.includes(tr('andamento.status.current')) && summary.includes(tr('andamento.metric.savings')) && summary.includes(tr('andamento.metric.budget'))
       && summary.includes(tr('andamento.summary.extra', { amount: formatCurrency(120) })) && summary.includes(tr('andamento.expensesmany', { count: 2 }))
-      && summary.includes(tr('andamento.summary.where')))
+      && categories.includes(tr('andamento.summary.where')))
     check(`   ${lang}: aria del grafico per ciclo, con importi invariati`, aria(byClass(container, 'trend-chart__column').at(-1)) === tr('andamento.trend.bar', { cycle: L(lang, C), spent: formatCurrency(C.spent), income: formatCurrency(C.income) }))
     overviewTexts[lang] = byClass(container, 'cycle-summary__metric-value').map(text).join('|')
     if (lang !== 'it') check(`   ${lang}: nessun testo italiano rimasto`, leftover(text(container) + html(), lang).length === 0, leftover(text(container) + html(), lang).join(' | '))
@@ -411,12 +414,12 @@ try {
   const salary = (amount) => income('o-sal', 'stipendio', amount, '2026-10-07')
   const spentOf = (amount) => [expense('o-e1', 'spesa', amount, '2026-10-12')]
   const CASES = [
-    ['budget al 25%', base(spentOf(500), [salary(2000)]), 'good', 'ok', 'used'],
-    ['budget al 69,95% (sotto la soglia del 70%)', base(spentOf(1399), [salary(2000)]), 'good', 'ok', 'used'],
-    ['budget al 70% esatto', base(spentOf(1400), [salary(2000)]), 'warn', 'tight', 'used'],
-    ['budget all\'89,95%', base(spentOf(1799), [salary(2000)]), 'warn', 'tight', 'used'],
-    ['budget al 90% esatto (quasi esaurito)', base(spentOf(1800), [salary(2000)]), 'bad', 'near', 'used'],
-    ['budget oltre il 100%, ma entrate extra: risparmio ancora positivo', base(spentOf(2200), [salary(2000), income('o-x', 'extra', 500, '2026-10-09')]), 'bad', 'over', 'used'],
+    ['budget al 25%', base(spentOf(500), [salary(2000)]), 'good', 'ok', 'usedleft'],
+    ['budget al 69,95% (sotto la soglia del 70%)', base(spentOf(1399), [salary(2000)]), 'good', 'ok', 'usedleft'],
+    ['budget al 70% esatto', base(spentOf(1400), [salary(2000)]), 'warn', 'tight', 'usedleft'],
+    ['budget all\'89,95%', base(spentOf(1799), [salary(2000)]), 'warn', 'tight', 'usedleft'],
+    ['budget al 90% esatto (quasi esaurito)', base(spentOf(1800), [salary(2000)]), 'bad', 'near', 'usedleft'],
+    ['budget oltre il 100%, ma entrate extra: risparmio ancora positivo', base(spentOf(2200), [salary(2000), income('o-x', 'extra', 500, '2026-10-09')]), 'bad', 'over', 'usedleft'],
     ['spese oltre le entrate (anche oltre il 100%): prevale "uscite oltre le entrate"', base(spentOf(2500), [salary(2000)]), 'bad', 'overspent', 'overspenttext'],
     ['senza stipendio, solo un extra', base(spentOf(100), [income('o-x', 'extra', 300, '2026-10-09')]), 'flat', 'nosalary', 'spenttext'],
     ['senza stipendio e spese oltre l\'extra: prevale "uscite oltre le entrate"', base(spentOf(400), [income('o-x', 'extra', 300, '2026-10-09')]), 'bad', 'overspent', 'overspenttext'],
@@ -425,7 +428,8 @@ try {
   for (const [label, state, tone, titleKey, textKey] of CASES) {
     await mount(state)
     const cycle = cycleState(state)
-    const params = { percent: fmt.formatPercent(cycle.budgetUsed), amount: formatCurrency(textKey === 'overspenttext' ? Math.abs(cycle.savings) : cycle.spent) }
+    // Con un budget la frase dice quanto è stato usato e quanto resta (il risparmio del ciclo).
+    const params = { percent: fmt.formatPercent(cycle.budgetUsed), amount: formatCurrency(textKey === 'overspenttext' ? Math.abs(cycle.savings) : textKey === 'usedleft' ? cycle.savings : cycle.spent) }
     check(`${label}: sintesi "${translate('it', `andamento.overview.${titleKey}`)}" (${tone})`, overviewTone() === tone, overviewTone())
     for (const lang of LANGS) {
       await act(() => setLanguage(lang))
@@ -436,9 +440,14 @@ try {
       if (lang !== 'it') check(`   ${lang}: nessun testo italiano`, leftover(text(box), lang).length === 0, leftover(text(box), lang).join(' | '))
     }
     await act(() => setLanguage('it'))
-    // Le quattro cifre restano quelle di prima, nello stesso ordine.
-    const expected = [formatCurrency(cycle.income), formatCurrency(cycle.spent), cycle.savings < 0 ? `-${formatCurrency(Math.abs(cycle.savings))}` : formatCurrency(cycle.savings), fmt.formatPercent(cycle.budgetUsed)]
-    check('   le quattro metriche: stessi valori del motore, stesso ordine', byClass(box, 'cycle-summary__metric-value').map(text).join('|') === expected.join('|'), byClass(box, 'cycle-summary__metric-value').map(text).join('|'))
+    // Le tre cifre (spese, entrate, risparmio) e il budget utilizzato: gli stessi valori del motore.
+    const expected = [formatCurrency(cycle.spent), formatCurrency(cycle.income), cycle.savings < 0 ? `-${formatCurrency(Math.abs(cycle.savings))}` : formatCurrency(cycle.savings)]
+    check('   spese, entrate, risparmio e budget: stessi valori del motore', byClass(box, 'cycle-summary__metric-value').map(text).join('|') === expected.join('|')
+      && text(one(box, 'cycle-summary__percent')) === fmt.formatPercent(cycle.budgetUsed), `${byClass(box, 'cycle-summary__metric-value').map(text).join('|')} ${text(one(box, 'cycle-summary__percent'))}`)
+    // Ritmo di spesa: le soglie del messaggio del budget in Home (BudgetCard: < 70 in linea, < 95 vicino al limite, poi al limite).
+    const pace = cycle.budgetUsed === null ? null : cycle.budgetUsed < 70 ? 'ok' : cycle.budgetUsed < 95 ? 'near' : 'over'
+    const paceNode = one(box, 'cycle-summary__pace')
+    check(`   ritmo di spesa: ${pace ?? 'assente (nessuno stipendio)'}`, pace === null ? !paceNode : text(paceNode) === translate('it', `andamento.pace.${pace}`) && cls(paceNode).includes(`cycle-summary__pace--${pace}`))
   }
   check('soglie: 70 e 90 della barra, 100 delle notifiche (nessuna soglia nuova)', NOTIFICATION_THRESHOLDS.budgetOver === 100 && NOTIFICATION_THRESHOLDS.budgetNear === 90
     && read('src/components/andamento/CycleSummary.jsx').includes('NOTIFICATION_THRESHOLDS.budgetOver'))
@@ -454,7 +463,8 @@ try {
       await act(() => setLanguage(lang))
       const tr = (key, p) => translate(lang, `andamento.overview.${key}`, p)
       const left = timing.daysRemaining === 0 ? tr('lastday') : timing.daysRemaining === 1 ? tr('leftone') : tr('leftmany', { count: timing.daysRemaining })
-      check(`   ${lang}: "${text(one(box, 'cycle-summary__days'))}"`, text(one(box, 'cycle-summary__days')) === `${tr('day', { day: timing.dayOfCycle, total: timing.cycleDays })} · ${left}`)
+      check(`   ${lang}: "${text(one(box, 'cycle-summary__days'))}" / "${text(one(box, 'cycle-summary__days-left'))}"`, text(one(box, 'cycle-summary__days')) === tr('day', { day: timing.dayOfCycle, total: timing.cycleDays })
+        && text(one(box, 'cycle-summary__days-left')) === left)
     }
   }
   // Ciclo concluso: badge "Completo", nessun giorno, nessuna frase sul ciclo in corso.
@@ -464,6 +474,18 @@ try {
     await act(() => setLanguage(lang))
     check(`${lang}: ciclo concluso → badge "${translate(lang, 'andamento.status.done')}", nessun giorno`, text(one(box, 'cycle-summary__badge')).includes(translate(lang, 'andamento.status.done'))
       && cls(one(box, 'cycle-summary__badge')).includes('cycle-summary__badge--done') && !one(box, 'cycle-summary__days'))
+  }
+  {
+    await act(() => setLanguage('it'))
+    const past = buildAndamento({ ...MAIN }).cycles.at(-2)
+    check('ciclo concluso: frase al passato, nessun ritmo di spesa', text(one(box, 'cycle-summary__overview-text')) === translate('it', 'andamento.overview.usedleftdone', { percent: fmt.formatPercent(past.budgetUsed), amount: formatCurrency(past.savings) })
+      && !one(box, 'cycle-summary__pace'))
+    // Il menu del periodo e le colonne scelgono lo stesso ciclo.
+    const picker = one(box, 'cycle-summary__picker')
+    check('menu del periodo: tutti i cicli, dal più recente, sul ciclo scelto', nodes(picker).filter((n) => n.localName === 'option').map((o) => o.attributes.get('value')).join() === [...buildAndamento({ ...MAIN }).cycles].reverse().map((c) => c.key).join()
+      && cls(byClass(box, 'trend-chart__column').at(-2)).includes('--selected'))
+    await act(() => propsOf(picker).onChange({ target: { value: buildAndamento({ ...MAIN }).cycles[0].key } }))
+    check('   scelto dal menu: il grafico evidenzia la stessa colonna', cls(byClass(box, 'trend-chart__column')[0]).includes('--selected'))
   }
   await act(() => propsOf(byClass(box, 'trend-chart__column').at(-1)).onClick({}))
   check('di nuovo il ciclo in corso: badge "In corso" e giorni', cls(one(box, 'cycle-summary__badge')).includes('cycle-summary__badge--current') && Boolean(one(box, 'cycle-summary__days')))

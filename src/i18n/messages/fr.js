@@ -372,6 +372,7 @@ export default {
       where: 'Où est passé l’argent',
       moreone: '+ une autre catégorie (à retrouver dans {tab})',
       moremany: '+ {count} autres catégories (à retrouver dans {tab})',
+      period: 'Période à analyser',
     },
     // Sintesi di "Come sto andando" (CycleSummary) e giorni del ciclo in corso.
     overview: {
@@ -382,7 +383,8 @@ export default {
       over: 'Budget dépassé',
       overspent: 'Dépenses supérieures aux revenus',
       nosalary: 'Salaire non enregistré',
-      used: '{percent} du budget utilisé',
+      usedleft: 'Vous avez déjà utilisé {percent} du budget et il vous reste {amount}.',
+      usedleftdone: 'Vous avez utilisé {percent} du budget et il vous est resté {amount}.',
       overspenttext: '{amount} de plus que ce qui est entré',
       spenttext: '{amount} dépensés sur ce cycle',
       day: 'Jour {day} sur {total}',
@@ -390,13 +392,24 @@ export default {
       leftmany: '{count} jours restants',
       lastday: 'dernier jour du cycle',
     },
+    days: {
+      label: 'Jours écoulés',
+    },
+    // "Ritmo di spesa": stesse soglie del messaggio del budget in Home.
+    pace: {
+      label: 'Rythme de dépense',
+      ok: 'Dans les clous',
+      near: 'Proche de la limite',
+      over: 'À la limite',
+    },
     trend: {
       title: 'Dépenses par cycle',
       bar: '{cycle} : dépenses {spent}, revenus {income}',
       first: 'C’est votre premier cycle avec des données : dès le prochain, vous verrez comment ça évolue.',
       hint: 'Touchez un cycle pour le détail',
       over: 'Au-delà des revenus',
-      average: 'moy. {amount}',
+      range: '{count} derniers cycles',
+      rangelabel: 'Nombre de cycles affichés',
     },
     compare: {
       pickers: 'Choisissez les périodes',

@@ -113,7 +113,7 @@
   width: calc(100% - 36px);
   max-width: 444px;
   border-radius: var(--radius-pill);
-  background: rgba(16, 26, 51, 0.055);
+  background: #e9eef8;
 }
 
 .andamento-screen__tab {
@@ -146,13 +146,12 @@
 }
 
 .andamento-screen__tab--active {
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  box-shadow: var(--shadow-float);
+  background: linear-gradient(180deg, #4b91f8, #2f7cf6);
+  color: #fff;
+  box-shadow: 0 8px 18px -10px rgba(47, 124, 246, 0.8);
 }
 
 .andamento-screen__tab--active .andamento-screen__tab-icon {
-  color: var(--color-accent-violet);
   opacity: 1;
 }
 
@@ -160,76 +159,6 @@
 .andamento-screen__back:focus-visible {
   outline: 2px solid var(--color-accent-mint);
   outline-offset: 2px;
-}
-
-.andamento-screen__body {
-  width: 100%;
-  max-width: 480px;
-  margin: 0 auto;
-}
-
-.andamento-screen__header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: calc(16px + env(safe-area-inset-top)) 18px 12px;
-  flex-shrink: 0;
-}
-
-.andamento-screen__back {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  flex-shrink: 0;
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  font-size: 16px;
-  color: var(--color-text-primary);
-}
-
-.andamento-screen__title {
-  font-size: 19px;
-  font-weight: 800;
-  color: var(--color-text-primary);
-}
-
-.andamento-screen__subtitle {
-  margin-top: 2px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--color-text-secondary);
-}
-
-.andamento-screen__tabs {
-  flex-shrink: 0;
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  margin-top: 2px;
-  margin-bottom: 10px;
-  width: calc(100% - 36px);
-  max-width: 444px;
-  border-radius: var(--radius-pill);
-  background: rgba(16, 26, 51, 0.05);
-}
-
-.andamento-screen__tab {
-  flex: 1;
-  min-height: 42px;
-  border-radius: var(--radius-pill);
-  font-size: 13.5px;
-  font-weight: 800;
-  color: var(--color-text-secondary);
-  transition: background 0.15s var(--ease-standard), color 0.15s var(--ease-standard);
-}
-
-.andamento-screen__tab--active {
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  box-shadow: var(--shadow-float);
 }
 
 .andamento-screen__body {

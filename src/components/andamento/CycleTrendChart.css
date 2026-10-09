@@ -1,6 +1,9 @@
 .trend-chart {
+  --trend-plot-height: 150px;
+  --trend-blue: #2f7cf6;
+  --trend-blue-light: #6aaefc;
   flex-shrink: 0;
-  padding: 18px 14px 12px;
+  padding: 18px 16px 14px;
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
@@ -8,33 +11,243 @@
 
 .trend-chart__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
-  gap: 4px 10px;
-  flex-wrap: wrap;
-  padding: 0 4px;
+  gap: 10px;
+}
+
+.trend-chart__heading {
+  min-width: 0;
 }
 
 .trend-chart__title {
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 800;
+  letter-spacing: -0.01em;
   color: var(--color-text-primary);
 }
 
 .trend-chart__hint {
+  margin-top: 2px;
   font-size: 11.5px;
   font-weight: 600;
   color: var(--color-text-tertiary);
 }
 
-/* Legenda a pillole: ogni voce è un'etichetta a sé, va a capo pulita su
-   schermi stretti invece di diventare una riga di testo spezzata. */
+/* "Ultimi 6 cicli ▾": la stessa pillola del menu del periodo. */
+.trend-chart__range {
+  flex-shrink: 0;
+  min-height: 38px;
+  padding: 0 30px 0 14px;
+  border: 1px solid rgba(16, 26, 51, 0.08);
+  border-radius: var(--radius-pill);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2310182b' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E")
+      no-repeat right 12px center,
+    var(--color-surface);
+  box-shadow: var(--shadow-float);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.trend-chart__range:focus-visible {
+  outline: 2px solid var(--color-accent-mint);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------- asse e colonne */
+
+.trend-chart__body {
+  margin-top: 16px;
+  padding-top: 22px;
+  display: flex;
+  gap: 6px;
+}
+
+/* I valori dell'asse, allineati alle linee della griglia (stesso numero,
+   stessa spaziatura, distribuiti sull'altezza del grafico). */
+.trend-chart__axis {
+  flex-shrink: 0;
+  width: 34px;
+  height: var(--trend-plot-height);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.trend-chart__axis > span {
+  height: 0;
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.trend-chart__scroller {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Con dodici cicli le colonne mantengono una larghezza leggibile e
+   scorrono; l'asse resta fermo a sinistra. */
+.trend-chart__body--scroll .trend-chart__scroller {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  margin-top: -22px;
+  padding-top: 22px;
+}
+
+.trend-chart__body--scroll .trend-chart__scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.trend-chart__columns {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.trend-chart__body--scroll .trend-chart__column {
+  min-width: 46px;
+}
+
+.trend-chart__grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--trend-plot-height);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.trend-chart__grid > span {
+  height: 0;
+  border-top: 1px dashed rgba(16, 26, 51, 0.08);
+}
+
+.trend-chart__grid > span:last-child {
+  border-top: 1px solid rgba(16, 26, 51, 0.14);
+}
+
+/* Ogni colonna è un bersaglio touch alto e largo quanto lo spazio
+   disponibile, non solo la barra. */
+.trend-chart__column {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px 4px;
+  border-radius: var(--radius-sm);
+  transition: transform 0.15s var(--ease-standard);
+}
+
+.trend-chart__column:active {
+  transform: scale(0.96);
+}
+
+.trend-chart__column:focus-visible {
+  outline: 2px solid var(--color-accent-mint);
+  outline-offset: 1px;
+}
+
+.trend-chart__plot {
+  position: relative;
+  width: 100%;
+  max-width: 44px;
+  height: var(--trend-plot-height);
+}
+
+.trend-chart__income,
+.trend-chart__spent {
+  position: absolute;
+  bottom: 0;
+  border-radius: 10px 10px 3px 3px;
+  transition: height 0.5s var(--ease-standard);
+}
+
+/* Quanto è entrato: una traccia leggera, non deve competere con le spese. */
+.trend-chart__income {
+  left: 0;
+  right: 0;
+  background: rgba(18, 184, 134, 0.07);
+  border: 1px dashed rgba(18, 184, 134, 0.35);
+  border-bottom: none;
+}
+
+.trend-chart__spent {
+  left: 6px;
+  right: 6px;
+  background: linear-gradient(180deg, var(--trend-blue-light), var(--trend-blue));
+  opacity: 0.72;
+}
+
+.trend-chart__column--selected .trend-chart__spent {
+  opacity: 1;
+  box-shadow: 0 8px 16px -8px rgba(47, 124, 246, 0.7);
+}
+
+/* Speso più di quanto è entrato: la barra diventa coral. */
+.trend-chart__spent--over {
+  background: linear-gradient(180deg, #ff9a96, var(--color-accent-coral));
+}
+
+.trend-chart__column--selected .trend-chart__spent--over {
+  box-shadow: 0 8px 16px -8px rgba(244, 100, 95, 0.7);
+}
+
+/* Il valore della colonna scelta, sopra la barra. */
+.trend-chart__tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-text-primary);
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.trend-chart__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.trend-chart__label--current,
+.trend-chart__column--selected .trend-chart__label {
+  color: var(--color-text-primary);
+  font-weight: 800;
+}
+
+/* ----------------------------------------------------------- legenda */
+
 .trend-chart__legend {
   margin-top: 10px;
-  padding: 0 4px;
+  padding-left: 40px;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: 4px 14px;
 }
 
 .trend-chart__legend-item {
@@ -54,187 +267,9 @@
   border-radius: 3px;
 }
 
-.trend-chart__legend-swatch--income {
-  background: var(--color-accent-mint-soft);
-  border: 1px solid rgba(18, 184, 134, 0.4);
-}
-
-.trend-chart__legend-swatch--spent {
-  background: var(--color-accent-violet);
-}
-
-.trend-chart__legend-swatch--over {
-  background: var(--color-accent-coral);
-}
-
-.trend-chart__legend-sign {
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1;
-  color: var(--color-accent-mint);
-}
-
-/* ------------------------------------------------------------- colonne */
-
-/* Le misure verticali sono fisse (importo 16px + 6px di spazio sopra un
-   grafico di 136px) così la griglia, disegnata una volta sola dietro a
-   tutte le colonne, cade esattamente sull'area delle barre. */
-.trend-chart__columns {
-  --trend-plot-top: 30px;
-  --trend-plot-height: 136px;
-  position: relative;
-  margin-top: 12px;
-  display: flex;
-  align-items: stretch;
-  gap: 4px;
-}
-
-.trend-chart__grid {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: var(--trend-plot-top);
-  height: var(--trend-plot-height);
-  z-index: 1;
-  pointer-events: none;
-  border-top: 1px dashed rgba(16, 26, 51, 0.07);
-  border-bottom: 1px solid rgba(16, 26, 51, 0.1);
-  background: linear-gradient(rgba(16, 26, 51, 0.06), rgba(16, 26, 51, 0.06)) center / 100% 1px no-repeat;
-}
-
-.trend-chart__average {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 0;
-  border-top: 1.5px dashed rgba(109, 92, 240, 0.55);
-}
-
-.trend-chart__average-label {
-  position: absolute;
-  left: 2px;
-  bottom: 3px;
-  padding: 1px 6px;
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 1px 4px rgba(16, 26, 51, 0.08);
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--color-accent-violet);
-  white-space: nowrap;
-}
-
-/* Ogni colonna è un bersaglio touch alto e largo quanto lo spazio
-   disponibile, non solo la barra: su un telefono si tocca la colonna,
-   non il millimetro colorato. */
-.trend-chart__column {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 2px 8px;
-  border-radius: var(--radius-sm);
-  transition: background 0.15s var(--ease-standard), transform 0.15s var(--ease-standard);
-}
-
-.trend-chart__column:active {
-  transform: scale(0.96);
-}
-
-.trend-chart__column:focus-visible {
-  outline: 2px solid var(--color-accent-mint);
-  outline-offset: 1px;
-}
-
-.trend-chart__column--selected {
-  background: var(--color-accent-violet-soft);
-}
-
-.trend-chart__amount {
-  height: 16px;
-  font-size: 11.5px;
-  font-weight: 800;
-  line-height: 16px;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.trend-chart__column--selected .trend-chart__amount {
-  color: var(--color-accent-violet);
-}
-
-.trend-chart__plot {
-  position: relative;
-  width: 100%;
-  max-width: 36px;
-  height: var(--trend-plot-height);
-}
-
-.trend-chart__income,
-.trend-chart__spent {
-  position: absolute;
-  bottom: 0;
-  border-radius: 9px 9px 4px 4px;
-  transition: height 0.5s var(--ease-standard);
-}
-
-.trend-chart__income {
-  left: 0;
-  right: 0;
-  background: var(--color-accent-mint-soft);
-  border: 1px solid rgba(18, 184, 134, 0.24);
-}
-
-.trend-chart__spent {
-  left: 5px;
-  right: 5px;
-  background: linear-gradient(180deg, #9d91ff, var(--color-accent-violet));
-  opacity: 0.5;
-}
-
-.trend-chart__column--selected .trend-chart__spent {
-  opacity: 1;
-  box-shadow: 0 6px 14px -6px rgba(109, 92, 240, 0.6);
-}
-
-/* Speso più di quanto è entrato: la barra diventa coral. Non è l'unico
-   segnale — sotto c'è il risparmio col suo segno. */
-.trend-chart__spent--over {
-  background: linear-gradient(180deg, #ff9a96, var(--color-accent-coral));
-}
-
-.trend-chart__column--selected .trend-chart__spent--over {
-  box-shadow: 0 6px 14px -6px rgba(244, 100, 95, 0.6);
-}
-
-.trend-chart__label {
-  margin-top: 2px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--color-text-tertiary);
-  white-space: nowrap;
-}
-
-.trend-chart__label--current,
-.trend-chart__column--selected .trend-chart__label {
-  color: var(--color-text-primary);
-  font-weight: 800;
-}
-
-.trend-chart__savings {
-  margin-top: -3px;
-  font-size: 11px;
-  font-weight: 800;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.trend-chart__savings--good { color: var(--color-accent-mint); }
-.trend-chart__savings--bad { color: var(--color-accent-coral); }
-.trend-chart__savings--flat { color: var(--color-text-tertiary); }
+.trend-chart__legend-swatch--spent { background: var(--trend-blue); }
+.trend-chart__legend-swatch--income { background: rgba(18, 184, 134, 0.1); border: 1px dashed rgba(18, 184, 134, 0.6); }
+.trend-chart__legend-swatch--over { background: var(--color-accent-coral); }
 
 .trend-chart__note {
   margin-top: 10px;
@@ -246,18 +281,18 @@
   text-align: center;
 }
 
-@media (max-width: 359px) {
-  .trend-chart { padding: 16px 10px 10px; }
+@media (max-width: 379px) {
+  .trend-chart { padding: 16px 12px 12px; }
+  .trend-chart__title { font-size: 16px; }
+  .trend-chart__axis { width: 28px; }
   .trend-chart__columns { gap: 2px; }
-  .trend-chart__amount,
   .trend-chart__label { font-size: 10.5px; }
-  .trend-chart__savings { font-size: 10px; }
+  .trend-chart__legend { padding-left: 34px; }
 }
 
 @media (min-width: 600px) {
-  .trend-chart { padding: 20px 18px 14px; }
-  .trend-chart__columns { --trend-plot-height: 160px; gap: 8px; }
-  .trend-chart__plot { max-width: 44px; }
+  .trend-chart { --trend-plot-height: 180px; padding: 20px 20px 16px; }
+  .trend-chart__columns { gap: 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

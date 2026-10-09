@@ -370,6 +370,7 @@ export default {
       where: 'A dónde se ha ido',
       moreone: '+ otra categoría (la encontrarás en {tab})',
       moremany: '+ otras {count} categorías (las encontrarás en {tab})',
+      period: 'Periodo a analizar',
     },
     // Sintesi di "Come sto andando" (CycleSummary) e giorni del ciclo in corso.
     overview: {
@@ -380,7 +381,8 @@ export default {
       over: 'Presupuesto superado',
       overspent: 'Gastos por encima de los ingresos',
       nosalary: 'Sueldo no registrado',
-      used: '{percent} del presupuesto usado',
+      usedleft: 'Ya has usado el {percent} del presupuesto y aún tienes {amount} disponibles.',
+      usedleftdone: 'Usaste el {percent} del presupuesto y te quedaron {amount}.',
       overspenttext: '{amount} más de lo que ha entrado',
       spenttext: '{amount} gastados en este ciclo',
       day: 'Día {day} de {total}',
@@ -388,13 +390,24 @@ export default {
       leftmany: 'quedan {count} días',
       lastday: 'último día del ciclo',
     },
+    days: {
+      label: 'Días transcurridos',
+    },
+    // "Ritmo di spesa": stesse soglie del messaggio del budget in Home.
+    pace: {
+      label: 'Ritmo de gasto',
+      ok: 'Vas bien',
+      near: 'Cerca del límite',
+      over: 'En el límite',
+    },
     trend: {
       title: 'Gastos por ciclo',
       bar: '{cycle}: gastos {spent}, ingresos {income}',
       first: 'Este es tu primer ciclo con datos: a partir del siguiente verás cómo cambia.',
       hint: 'Toca un ciclo para ver el detalle',
       over: 'Por encima de los ingresos',
-      average: 'media {amount}',
+      range: 'Últimos {count} ciclos',
+      rangelabel: 'Cuántos ciclos mostrar',
     },
     compare: {
       pickers: 'Elige los periodos',

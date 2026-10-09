@@ -370,6 +370,7 @@ export default {
       where: 'Where it went',
       moreone: '+ one more category (find it in {tab})',
       moremany: '+ {count} more categories (find them in {tab})',
+      period: 'Period to analyse',
     },
     // Sintesi di "Come sto andando" (CycleSummary) e giorni del ciclo in corso.
     overview: {
@@ -380,7 +381,8 @@ export default {
       over: 'Budget exceeded',
       overspent: 'Spending above income',
       nosalary: 'No salary recorded',
-      used: '{percent} of the budget used',
+      usedleft: 'You’ve used {percent} of your budget and still have {amount} available.',
+      usedleftdone: 'You used {percent} of your budget and had {amount} left.',
       overspenttext: '{amount} more than came in',
       spenttext: '{amount} spent this cycle',
       day: 'Day {day} of {total}',
@@ -388,13 +390,24 @@ export default {
       leftmany: '{count} days left',
       lastday: 'last day of the cycle',
     },
+    days: {
+      label: 'Days elapsed',
+    },
+    // "Ritmo di spesa": stesse soglie del messaggio del budget in Home.
+    pace: {
+      label: 'Spending pace',
+      ok: 'On track',
+      near: 'Close to the limit',
+      over: 'At the limit',
+    },
     trend: {
       title: 'Spending per cycle',
       bar: '{cycle}: spending {spent}, income {income}',
       first: 'This is your first cycle with data: from the next one you’ll see how it changes.',
       hint: 'Tap a cycle for details',
       over: 'Above income',
-      average: 'avg {amount}',
+      range: 'Last {count} cycles',
+      rangelabel: 'How many cycles to show',
     },
     compare: {
       pickers: 'Choose the periods',

@@ -1,38 +1,22 @@
-/* "Come sto andando": stesso linguaggio di "Confronta periodi"
-   (CycleComparison.css) — sintesi con bordo colorato, riquadri bianchi
-   compatti con ombra leggera, card di sezione, stesse misure responsive. */
+/* "Come sto andando": una sola card bianca con dentro il periodo, Spendy e
+   la sintesi, tre riquadri colorati, il budget usato e (per il ciclo in
+   corso) giorni trascorsi e ritmo di spesa. Le categorie sono una card a
+   parte (CycleCategories), sotto il grafico. */
 
 .cycle-summary {
+  --summary-blue: #2f7cf6;
+  --summary-blue-soft: rgba(47, 124, 246, 0.1);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-/* ------------------------------------------------------------ sintesi */
-
-.cycle-summary__overview {
-  padding: 16px 18px;
+  gap: 14px;
+  padding: 18px 16px 16px;
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
-  border-left: 4px solid var(--color-text-tertiary);
 }
 
-.cycle-summary__overview--good {
-  border-left-color: var(--color-accent-mint);
-  background: linear-gradient(135deg, var(--color-accent-mint-soft), var(--color-surface) 60%);
-}
-
-.cycle-summary__overview--warn {
-  border-left-color: var(--color-accent-gold);
-  background: linear-gradient(135deg, var(--color-accent-gold-soft), var(--color-surface) 60%);
-}
-
-.cycle-summary__overview--bad {
-  border-left-color: var(--color-accent-coral);
-  background: linear-gradient(135deg, var(--color-accent-coral-soft), var(--color-surface) 60%);
-}
+/* ------------------------------------------------------------- testa */
 
 .cycle-summary__head {
   display: flex;
@@ -41,20 +25,24 @@
   gap: 10px;
 }
 
-.cycle-summary__title {
+.cycle-summary__heading {
   min-width: 0;
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
-/* Come cycle-comparison__status. */
+.cycle-summary__title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+}
+
 .cycle-summary__badge {
   flex-shrink: 0;
-  padding: 1px 7px;
+  padding: 1px 8px;
   border-radius: var(--radius-pill);
   font-size: 10.5px;
   font-weight: 800;
@@ -63,7 +51,7 @@
 
 .cycle-summary__badge--current {
   background: var(--color-accent-mint-soft);
-  color: var(--color-accent-mint);
+  color: #0e9b71;
 }
 
 .cycle-summary__badge--done {
@@ -71,95 +59,335 @@
   color: var(--color-text-secondary);
 }
 
-.cycle-summary__days {
-  margin-top: 2px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--color-text-tertiary);
+/* Il menu del periodo: una pillola come "Questo mese ▾". */
+.cycle-summary__picker {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 58%;
+  min-height: 40px;
+  padding: 0 30px 0 14px;
+  border: 1px solid rgba(16, 26, 51, 0.08);
+  border-radius: var(--radius-pill);
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%2310182b' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E")
+      no-repeat right 12px center,
+    var(--color-surface);
+  box-shadow: var(--shadow-float);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  appearance: none;
+  -webkit-appearance: none;
+  text-overflow: ellipsis;
 }
+
+.cycle-summary__picker:focus-visible {
+  outline: 2px solid var(--color-accent-mint);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------- Spendy e sintesi */
+
+.cycle-summary__overview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cycle-summary__mascot {
+  flex-shrink: 0;
+  width: 92px;
+  height: 92px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, #fff 0%, var(--summary-blue-soft) 100%);
+  overflow: hidden;
+}
+
+.cycle-summary__mascot img {
+  width: 118%;
+  height: 118%;
+  object-fit: contain;
+  object-position: center 20%;
+  margin-top: 14px;
+}
+
+.cycle-summary__bubble {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: var(--color-surface-raised);
+}
+
+/* La punta del fumetto verso Spendy. */
+.cycle-summary__bubble::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  transform: translateY(-50%) rotate(45deg);
+  border-radius: 2px;
+}
+
+.cycle-summary__overview--good .cycle-summary__bubble { background: #e8f8f1; }
+.cycle-summary__overview--warn .cycle-summary__bubble { background: #fdf4e1; }
+.cycle-summary__overview--bad .cycle-summary__bubble { background: #fdecec; }
 
 .cycle-summary__overview-title {
-  margin-top: 10px;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 800;
-  color: var(--color-text-secondary);
-}
-
-.cycle-summary__overview--good .cycle-summary__overview-title { color: var(--color-accent-mint); }
-.cycle-summary__overview--warn .cycle-summary__overview-title { color: var(--color-accent-gold); }
-.cycle-summary__overview--bad .cycle-summary__overview-title { color: var(--color-accent-coral); }
-
-.cycle-summary__overview-text {
-  margin-top: 4px;
-  font-size: 21px;
-  font-weight: 800;
-  line-height: 1.2;
+  line-height: 1.25;
   color: var(--color-text-primary);
 }
 
-/* La barra del budget, a tutta larghezza e più alta: si legge al volo. */
-.cycle-summary__progress {
-  margin-top: 12px;
-  height: 10px;
-  background: rgba(16, 26, 51, 0.07);
+.cycle-summary__overview--good .cycle-summary__overview-title { color: #0b8a62; }
+.cycle-summary__overview--warn .cycle-summary__overview-title { color: #b97a06; }
+.cycle-summary__overview--bad .cycle-summary__overview-title { color: #d9443f; }
+
+.cycle-summary__overview-text {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
 }
 
-/* ------------------------------------------------- metriche 2 × 2 */
+/* ---------------------------------------------- tre riquadri colorati */
 
 .cycle-summary__grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
-/* Come cycle-comparison__metric (senza il pulsante: qui non si apre nulla). */
 .cycle-summary__metric {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
+  gap: 6px;
+  padding: 11px 10px 10px;
+  border-radius: 16px;
+}
+
+.cycle-summary__metric--spent { background: #fdeeee; --metric-ink: #e0504b; }
+.cycle-summary__metric--income { background: #ebf3fe; --metric-ink: var(--summary-blue); }
+.cycle-summary__metric--savings { background: #e8f8f1; --metric-ink: #0e9b71; }
+.cycle-summary__metric--savings.cycle-summary__metric--bad { background: #fdeeee; --metric-ink: #e0504b; }
+
+.cycle-summary__metric-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  min-width: 0;
+}
+
+.cycle-summary__metric-icon {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
   background: var(--color-surface);
-  box-shadow: var(--shadow-float);
+  color: var(--metric-ink);
+}
+
+.cycle-summary__icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .cycle-summary__metric-label {
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-tertiary);
-}
-
-.cycle-summary__metric-value {
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  color: var(--color-text-primary);
+  min-width: 0;
+  max-width: 100%;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
   overflow-wrap: anywhere;
 }
 
-.cycle-summary__metric--good .cycle-summary__metric-value {
-  color: var(--color-accent-mint);
+.cycle-summary__metric-value {
+  font-size: 15.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
-.cycle-summary__metric--bad .cycle-summary__metric-value {
-  color: var(--color-accent-coral);
-}
+.cycle-summary__metric--savings .cycle-summary__metric-value { color: var(--metric-ink); }
 
 .cycle-summary__metric-note {
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.3;
   color: var(--color-text-tertiary);
 }
 
+/* ------------------------------------------------------------ budget */
+
+.cycle-summary__budget {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cycle-summary__budget-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.cycle-summary__budget-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.cycle-summary__progress {
+  flex: 1;
+  height: 14px;
+  background: rgba(16, 26, 51, 0.07);
+}
+
+.cycle-summary__budget-note {
+  flex: 1;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+.cycle-summary__percent {
+  flex-shrink: 0;
+  min-width: 48px;
+  text-align: right;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------- giorni trascorsi e ritmo */
+
+.cycle-summary__footer {
+  display: flex;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(16, 26, 51, 0.07);
+}
+
+.cycle-summary__fact {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.cycle-summary__fact + .cycle-summary__fact {
+  padding-left: 12px;
+  border-left: 1px solid rgba(16, 26, 51, 0.07);
+}
+
+.cycle-summary__fact-icon {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--summary-blue-soft);
+  color: var(--summary-blue);
+}
+
+.cycle-summary__fact-icon .cycle-summary__icon {
+  width: 19px;
+  height: 19px;
+}
+
+.cycle-summary__fact-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cycle-summary__fact-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+.cycle-summary__days {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.cycle-summary__days-bar {
+  display: block;
+  width: 100%;
+  min-width: 72px;
+  height: 5px;
+  margin-top: 2px;
+  border-radius: var(--radius-pill);
+  background: rgba(16, 26, 51, 0.07);
+  overflow: hidden;
+}
+
+.cycle-summary__days-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--summary-blue);
+}
+
+.cycle-summary__days-left {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+.cycle-summary__pace {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 800;
+}
+
+.cycle-summary__pace-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.cycle-summary__pace--ok { color: #0b8a62; }
+.cycle-summary__pace--near { color: #b97a06; }
+.cycle-summary__pace--over { color: #d9443f; }
+
 /* ---------------------------------------------------------- categorie */
 
-/* Come cycle-comparison__categories. */
 .cycle-summary__categories {
-  padding: 14px 16px 12px;
+  flex-shrink: 0;
+  padding: 16px 16px 14px;
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
@@ -167,7 +395,7 @@
 
 .cycle-summary__section-title {
   margin-bottom: 6px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 800;
   color: var(--color-text-primary);
 }
@@ -180,7 +408,7 @@
 }
 
 .cycle-summary__list {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   padding: 0;
   list-style: none;
   display: flex;
@@ -196,13 +424,14 @@
 
 .cycle-summary__row-emoji {
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-sm);
+  border-radius: 12px;
   background: var(--color-surface-raised);
+  background: color-mix(in srgb, var(--category-color, #98a1b3) 15%, white);
   font-size: 18px;
 }
 
@@ -235,6 +464,7 @@
   font-size: 14px;
   font-weight: 800;
   color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .cycle-summary__row-bar {
@@ -268,19 +498,25 @@
   color: var(--color-text-tertiary);
 }
 
-/* Stesse soglie responsive di "Confronta periodi". */
-@media (max-width: 359px) {
-  .cycle-summary__overview { padding: 14px 14px; }
-  .cycle-summary__overview-text { font-size: 18px; }
-  .cycle-summary__metric { padding: 9px 10px; }
+/* ------------------------------------------------------- responsive */
+
+/* Telefoni stretti: Spendy più piccolo, i tre riquadri restano in fila ma
+   compatti; giorni e ritmo uno sotto l'altro. */
+@media (max-width: 379px) {
+  .cycle-summary { padding: 16px 12px 14px; }
+  .cycle-summary__mascot { width: 72px; height: 72px; }
+  .cycle-summary__overview-title { font-size: 15px; }
+  .cycle-summary__grid { gap: 6px; }
+  .cycle-summary__metric { padding: 9px 8px 8px; }
+  .cycle-summary__metric-value { font-size: 13px; letter-spacing: -0.02em; }
+  .cycle-summary__percent { font-size: 18px; }
+  .cycle-summary__footer { flex-direction: column; }
+  .cycle-summary__fact + .cycle-summary__fact { padding-left: 0; border-left: none; }
 }
 
 @media (min-width: 600px) {
-  .cycle-summary { gap: 12px; }
-  .cycle-summary__overview { padding: 18px 22px; }
-  .cycle-summary__overview-text { font-size: 24px; }
-  .cycle-summary__grid { gap: 10px; }
-  .cycle-summary__metric { padding: 12px 14px; }
+  .cycle-summary { padding: 20px 20px 18px; }
+  .cycle-summary__mascot { width: 104px; height: 104px; }
   .cycle-summary__metric-value { font-size: 17px; }
 }
 

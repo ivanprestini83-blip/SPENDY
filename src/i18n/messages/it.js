@@ -386,6 +386,7 @@ export default {
       where: 'Dove sono andati',
       moreone: "+ un'altra categoria (la trovi in {tab})",
       moremany: '+ altre {count} categorie (le trovi in {tab})',
+      period: 'Periodo da analizzare',
     },
     // Sintesi di "Come sto andando" (CycleSummary) e giorni del ciclo in corso.
     overview: {
@@ -396,7 +397,8 @@ export default {
       over: 'Budget superato',
       overspent: 'Uscite oltre le entrate',
       nosalary: 'Stipendio non registrato',
-      used: '{percent} del budget utilizzato',
+      usedleft: 'Hai già utilizzato il {percent} del budget e hai ancora {amount} a disposizione.',
+      usedleftdone: 'Hai utilizzato il {percent} del budget e ti sono rimasti {amount}.',
       overspenttext: '{amount} più di quanto è entrato',
       spenttext: '{amount} di spese in questo ciclo',
       day: 'Giorno {day} di {total}',
@@ -404,13 +406,24 @@ export default {
       leftmany: '{count} giorni rimasti',
       lastday: 'ultimo giorno del ciclo',
     },
+    days: {
+      label: 'Giorni trascorsi',
+    },
+    // "Ritmo di spesa": stesse soglie del messaggio del budget in Home.
+    pace: {
+      label: 'Ritmo di spesa',
+      ok: 'In linea',
+      near: 'Vicino al limite',
+      over: 'Al limite',
+    },
     trend: {
       title: 'Spese per ciclo',
       bar: '{cycle}: spese {spent}, entrate {income}',
       first: 'Questo è il tuo primo ciclo con dei dati: dal prossimo vedrai come cambia.',
       hint: 'Tocca un ciclo per i dettagli',
       over: 'Oltre le entrate',
-      average: 'media {amount}',
+      range: 'Ultimi {count} cicli',
+      rangelabel: 'Quanti cicli mostrare',
     },
     compare: {
       pickers: 'Scegli i periodi',
