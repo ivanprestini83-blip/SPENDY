@@ -7,6 +7,7 @@ import {
   SALARY_CATEGORY_ID, extraIncomes, legacySalaryCycles, needsCycleConfirmation, needsLegacySalaryHistory, salaryForPeriod,
 } from '../../utils/salary.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { cycleLabelNames } from '../../i18n/cycleLabelNames.js'
 import './CycleStartCard.css'
 
 // In cima alla Home quando serve una risposta sul ciclo. Non cancella né
@@ -26,7 +27,7 @@ import './CycleStartCard.css'
 //    in Andamento con i suoi numeri; il nuovo parte da 0 finché l'utente non
 //    inserisce il nuovo stipendio.
 export function CycleStartCard() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const today = useAppStore((s) => s.today)
   const incomes = useAppStore((s) => s.incomes)
   const expenses = useAppStore((s) => s.expenses)
@@ -45,8 +46,10 @@ export function CycleStartCard() {
   const current = getCycleRange(today, cycleStartDay)
   const previous = getPreviousCycleRange(current, cycleStartDay)
   const legacyCycles = showLegacy ? legacySalaryCycles({ expenses, incomes, today, cycleStartDay }) : []
+  // Le etichette dei cicli nella lingua scelta (solo il testo: date e confini restano quelli di range).
+  const names = cycleLabelNames(language)
   const legacyLabel = legacyCycles.length === 1
-    ? formatCycleLabel(legacyCycles[0], cycleStartDay)
+    ? formatCycleLabel(legacyCycles[0], cycleStartDay, names)
     : t('budget.cycle.legacy.cycles', { count: legacyCycles.length })
   const fieldName = (range) => `legacySalary:${range.start}`
 
@@ -82,7 +85,7 @@ export function CycleStartCard() {
           </p>
           {legacyCycles.map((range) => (
             <label key={range.start} className="cycle-start__field">
-              <span>{t('budget.cycle.legacy.field', { cycle: formatCycleLabel(range, cycleStartDay) })}</span>
+              <span>{t('budget.cycle.legacy.field', { cycle: formatCycleLabel(range, cycleStartDay, names) })}</span>
               <input name={fieldName(range)} type="number" inputMode="decimal" placeholder={t('budget.cycle.legacy.placeholder')} defaultValue="" />
             </label>
           ))}
@@ -99,10 +102,10 @@ export function CycleStartCard() {
         <div className="cycle-start__part">
           <p className="cycle-start__title">{t('budget.cycle.fresh.title')}</p>
           <p className="cycle-start__text">
-            {t('budget.cycle.fresh.previous', { cycle: formatCycleLabel(previous, cycleStartDay), income: money(previousIncome), spent: money(previousSpent) })}
+            {t('budget.cycle.fresh.previous', { cycle: formatCycleLabel(previous, cycleStartDay, names), income: money(previousIncome), spent: money(previousSpent) })}
           </p>
           <p className="cycle-start__text">
-            {t('budget.cycle.fresh.current', { cycle: formatCycleLabel(current, cycleStartDay) })}
+            {t('budget.cycle.fresh.current', { cycle: formatCycleLabel(current, cycleStartDay, names) })}
           </p>
           <div className="cycle-start__actions">
             <button

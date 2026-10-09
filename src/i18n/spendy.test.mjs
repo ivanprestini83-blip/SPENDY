@@ -57,7 +57,8 @@ const leftoverItalian = (text, lang, keys = NEW_KEYS) => {
 // =====================================================================
 section('1. Dizionari: nessuna chiave mancante, parametri identici')
 // =====================================================================
-check(`chiavi nuove della Fase 4A: ${NEW_KEYS.length}`, NEW_KEYS.length === 150, NEW_KEYS.length)
+// 150 della Fase 4A + 6 testi alternativi dell'immagine di Spendy (mascot.alt.*).
+check(`chiavi nuove della Fase 4A: ${NEW_KEYS.length}`, NEW_KEYS.length === 156, NEW_KEYS.length)
 for (const lang of LANGS) {
   const missing = NEW_KEYS.filter((key) => typeof lookup(MESSAGES[lang], key) !== 'string' || !lookup(MESSAGES[lang], key).trim())
   check(`${lang}: tutte presenti e non vuote`, missing.length === 0, missing.join(', '))
@@ -83,6 +84,8 @@ for (const lang of LANGS) {
   }
   for (const level of ['concerned', 'attentive']) for (const phase of ['early', 'middle', 'finaldays', 'lastday', 'neutral']) used.add(`coach.warning.${level}.${phase}`)
   for (const state of ['happy', 'attentive', 'concerned', 'ironic', 'advisor', 'celebrating']) used.add(`mascot.badge.${state}`)
+  // Il testo alternativo dell'immagine, per stato (SpendyHero, SpendyCharacter).
+  for (const state of ['happy', 'attentive', 'concerned', 'ironic', 'advisor', 'celebrating']) used.add(`mascot.alt.${state}`)
   for (const key of ['one', 'two', 'three', 'four', 'five', 'six']) used.add(`radarcard.quiet.${key}`)
   for (const category of [...CATEGORIES, ...INCOME_CATEGORIES]) used.add(`categories.${category.id}`)
   for (const key of ['high', 'low', 'above', 'below', 'savings', 'unusual', 'frequency', 'positivestreak', 'negativestreak']) used.add(`coach.insight.${key}`)

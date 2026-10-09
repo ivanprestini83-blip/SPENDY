@@ -164,6 +164,15 @@ export default {
       advisor: 'Conseil',
       celebrating: 'La fête !',
     },
+    // Testo alternativo dell'immagine di Spendy (lettori di schermo), per stato.
+    alt: {
+      happy: '{name} souriant',
+      attentive: '{name} attentif',
+      concerned: '{name} inquiet',
+      ironic: '{name} ironique',
+      advisor: '{name} qui donne un conseil',
+      celebrating: '{name} qui fait la fête',
+    },
     open: 'Aller voir {name} →',
   },
   radarcard: {

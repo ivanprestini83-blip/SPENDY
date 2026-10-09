@@ -75,7 +75,7 @@ export function SpendyHero({
       <div key={state} className="spendy-hero__stage">
         <div className="spendy-hero__mascot">
           <div className="spendy-hero__float">
-            <img src={src} alt={`${MASCOT_NAME}: ${state}`} className="spendy-hero__img" draggable="false" />
+            <img src={src} alt={t(`mascot.alt.${spendyStates[state] ? state : 'happy'}`, { name: MASCOT_NAME })} className="spendy-hero__img" draggable="false" />
           </div>
           <span className="spendy-hero__ground" aria-hidden="true" />
         </div>

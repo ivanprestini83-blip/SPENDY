@@ -19,6 +19,7 @@ import { ExpenseSummaryCards } from '../components/budget/ExpenseSummaryCards.js
 import { AffordabilityCTA } from '../components/affordability/AffordabilityCTA.jsx'
 import { GoalCard } from '../components/goals/GoalCard.jsx'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { cycleLabelNames } from '../i18n/cycleLabelNames.js'
 import './HomePage.css'
 
 // "6 mensilità" — matches EmergencyFundScreen's own target so the
@@ -66,7 +67,8 @@ export function HomePage() {
   const financialData = buildFinancialData({ today, monthlyBudget, expenses, incomes, goals, cycleStartDay })
   const { spentThisMonth, available } = financialData
   const todaySummary = todaysExpenses(expenses, today)
-  const cycleLabel = formatCycleLabel(getCycleRange(today, cycleStartDay), cycleStartDay)
+  // Solo il testo dell'etichetta segue la lingua (come in Andamento); il ciclo no.
+  const cycleLabel = formatCycleLabel(getCycleRange(today, cycleStartDay), cycleStartDay, cycleLabelNames(language))
 
   // getSpendyCoach still fully owns Spendy's general state (see
   // utils/spendyCoach.js) — passing behaviorContext only lets its lowest

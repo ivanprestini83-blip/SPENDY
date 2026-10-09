@@ -163,7 +163,15 @@ try {
 
   const dataBefore = dataOf(S())
   const moneyIt = money()
-  const cycleLabel = html().match(/· ([^<]+)<\/p>/)?.[1]
+  // Il periodo e i cicli della scheda "nuovo ciclo": stessi confini in ogni
+  // lingua, solo i nomi dei mesi tradotti (le funzioni vere, come in Andamento).
+  const { formatCycleLabel, getCycleRange, getPreviousCycleRange } = await server.ssrLoadModule('/src/utils/cycle.js')
+  const { cycleLabelNames } = await server.ssrLoadModule('/src/i18n/cycleLabelNames.js')
+  const startDay = S().cycleStartDay ?? 1
+  const currentRange = getCycleRange(today, startDay)
+  const previousRange = getPreviousCycleRange(currentRange, startDay)
+  const labelIn = (code, range = currentRange) => formatCycleLabel(range, startDay, cycleLabelNames(code))
+  const shownLabel = () => html().match(/· ([^<]+)<\/p>/)?.[1]
   const shown = { it: [], en: [], es: [], fr: [] }
 
   // Le chiavi sempre visibili con questi dati, con i parametri veri.
@@ -205,6 +213,7 @@ try {
     fr: ['Disponible', 'Dépenses du jour', '1 transaction', 'Fonds d’urgence', 'et 2 autres objectifs →', 'Puis-je me le permettre\u00a0?', 'aria-label="Paramètres"', 'Mon Radar', '>Accueil<'],
   }
 
+  check('italiano: periodo identico a prima (formatCycleLabel senza nomi tradotti)', labelIn('it') === formatCycleLabel(currentRange, startDay) && labelIn('it', previousRange) === formatCycleLabel(previousRange, startDay))
   for (const code of ['it', 'en', 'es', 'fr', 'it']) {
     await act(() => S().setLanguage(code))
     const screen = uiHtml()
@@ -222,7 +231,9 @@ try {
     }
     check(`   ${code}: nessun segnaposto {…} non sostituito`, !/\{\w+\}/.test(html()))
     check(`   ${code}: importi identici a quelli in italiano (${moneyIt})`, money() === moneyIt)
-    check(`   ${code}: nomi e date restano quelli dei dati (Lisbona, ${cycleLabel})`, html().includes('Lisbona') && html().includes(cycleLabel))
+    check(`   ${code}: nomi restano quelli dei dati, periodo nella lingua scelta (Lisbona, ${labelIn(code)})`, html().includes('Lisbona') && shownLabel() === labelIn(code))
+    check(`   ${code}: scheda "nuovo ciclo" con i cicli nella lingua scelta (${labelIn(code, previousRange)} → ${labelIn(code)})`,
+      screen.includes(translate(code, 'budget.cycle.fresh.current', { cycle: labelIn(code) })) && screen.includes(labelIn(code, previousRange)))
     check(`   ${code}: nessun errore di rendering`, caught.length === 0, caught[0]?.message)
     shown[code].push(screen)
   }

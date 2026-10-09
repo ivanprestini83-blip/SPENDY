@@ -1,3 +1,5 @@
+import { MASCOT_NAME } from '../../brand.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import { spendyStates } from './spendyStates.js'
 import './SpendyCharacter.css'
 
@@ -9,11 +11,14 @@ import './SpendyCharacter.css'
 // came from. Adding a 7th state later means only adding a key to
 // spendyStates.js — nothing here changes.
 export function SpendyCharacter({ state = 'happy', size = 68 }) {
+  const { t } = useLanguage()
   const src = spendyStates[state] ?? spendyStates.happy
+  // Il testo alternativo descrive Spendy nella lingua dell'app, mai con il nome interno dello stato.
+  const alt = t(`mascot.alt.${spendyStates[state] ? state : 'happy'}`, { name: MASCOT_NAME })
 
   return (
     <div className="spendy-character" style={{ width: size, height: size }}>
-      <img src={src} alt={`Spendy: ${state}`} className="spendy-character__img" />
+      <img src={src} alt={alt} className="spendy-character__img" />
     </div>
   )
 }
