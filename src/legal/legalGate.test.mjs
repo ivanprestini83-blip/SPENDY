@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { check, section, report } from '../sync/testkit.mjs'
+import { check, section, report, ITALIAN_USE_LANGUAGE_FAKE, isUseLanguageImport } from '../sync/testkit.mjs'
 import { installFakeDom } from '../store/fakeDom.mjs'
 import { LEGAL_VERSIONS } from '../../supabase/functions/_shared/legalVersions.js'
 import { stateKey, scopeFor, GUEST } from '../store/scope.js'
@@ -60,11 +60,14 @@ const harness = {
     const from = importer?.split('?')[0] ?? ''
     if (from.endsWith('/src/sync/spendySync.js') && source in SYNC_STUBS) return `\0gate-sync:${source}`
     if (source === '/__gate-fake/react') return '\0gate-ui:react'
+    // La schermata e i suoi pezzi parlano italiano (dizionari veri).
+    if (isUseLanguageImport(source, from)) return '\0gate-ui:useLanguage'
     if (isScreen(importer) && source in SCREEN_FAKES) return `\0gate-ui:${source}`
     return null
   },
   load(id) {
     if (id.startsWith('\0gate-sync:')) return SYNC_STUBS[id.slice('\0gate-sync:'.length)]
+    if (id === '\0gate-ui:useLanguage') return ITALIAN_USE_LANGUAGE_FAKE
     if (id.startsWith('\0gate-ui:')) return SCREEN_FAKES[id.slice('\0gate-ui:'.length)]
     return null
   },

@@ -258,7 +258,8 @@ try {
     await act(() => S().setLanguage('en'))
     check('   rimessa → "Available"', html().includes('>Available<'))
     await act(() => S().setLanguage('de'))
-    check('lingua non valida → tutta la Home in italiano', S().language === 'it' && html().includes('Spese di oggi') && html().includes('aria-label="Impostazioni"'))
+    // Un codice non valido diventa la lingua predefinita (inglese), non più l'italiano.
+    check('lingua non valida → tutta la Home nella lingua predefinita (inglese)', S().language === 'en' && html().includes(translate('en', 'expenses.summary.today')) && html().includes(`aria-label="${translate('en', 'home.header.settings')}"`))
   }
   check('nessun errore di rendering in tutto il percorso', caught.length === 0, caught[0]?.message)
   await act(() => root.unmount())

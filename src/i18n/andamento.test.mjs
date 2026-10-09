@@ -384,9 +384,11 @@ try {
     await act(() => setLanguage(lang))
     check(`${lang}: riepilogo senza spese → "${translate(lang, 'andamento.noexpenses')}"`, text(one(container, 'cycle-summary__empty')) === translate(lang, 'andamento.noexpenses'))
   }
-  check('describeChange / describeDiff: senza lingua l\'italiano di prima, con lingua il testo tradotto', fmt.describeChange({ kind: 'same', diff: 0, percent: 0 }).text === 'Invariato'
-    && fmt.describeChange({ kind: 'new', diff: 10, percent: null }).detail === 'Nuova' && fmt.describeChange({ kind: 'gone', diff: -10, percent: null }).detail === 'Azzerata'
-    && fmt.describeDiff(0).text === 'Invariato' && fmt.describeDiff(0, { lang: 'fr' }).text === 'Inchangé'
+  // Con 'it' l'italiano di prima; senza lingua quella predefinita (l'app la passa sempre).
+  check('describeChange / describeDiff: in italiano il testo di prima, con lingua il testo tradotto', fmt.describeChange({ kind: 'same', diff: 0, percent: 0 }, { lang: 'it' }).text === 'Invariato'
+    && fmt.describeChange({ kind: 'new', diff: 10, percent: null }, { lang: 'it' }).detail === 'Nuova' && fmt.describeChange({ kind: 'gone', diff: -10, percent: null }, { lang: 'it' }).detail === 'Azzerata'
+    && fmt.describeDiff(0, { lang: 'it' }).text === 'Invariato' && fmt.describeDiff(0, { lang: 'fr' }).text === 'Inchangé'
+    && fmt.describeDiff(0).text === translate('en', 'andamento.change.unchanged')
     && fmt.describeChange({ kind: 'new', diff: 10, percent: null }, { lang: 'en' }).detail === 'New')
   await act(() => r.unmount())
 
@@ -534,7 +536,8 @@ try {
     check(`${lang}: periodo senza spese → "${translate(lang, 'analytics.empty')}"`, text(one(page, 'analytics-page__empty')) === translate(lang, 'analytics.empty'))
   }
   await act(() => setLanguage('de'))
-  check('lingua non valida → italiano', text(one(page, 'analytics-page__empty')) === 'Nessuna spesa registrata in questo periodo.')
+  // Un codice non valido diventa la lingua predefinita (inglese), non più l'italiano.
+  check('lingua non valida → lingua predefinita (inglese)', text(one(page, 'analytics-page__empty')) === translate('en', 'analytics.empty'))
   await act(() => pageRoot.unmount())
 } finally {
   await server.close()

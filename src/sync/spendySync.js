@@ -5,7 +5,12 @@ import { createSyncEngine } from './syncEngine.js'
 import { migrateLocalToCloud, migrationStatus } from './migrateLocal.js'
 import { GUEST, retireScope, scopeFor } from '../store/scope.js'
 import { DELETE_ACCOUNT_MESSAGES, requestAccountDeletion } from '../lib/accountDeletion.js'
-import { SIGNUP_ACCEPTANCE_REQUIRED, buildSignUpMetadata, canSignUp } from '../legal/legal.js'
+import { LEGAL_MESSAGES, buildSignUpMetadata, canSignUp } from '../legal/legal.js'
+import { authErrorMessage } from '../lib/authMessages.js'
+import { tr } from '../i18n/currentLanguage.js'
+import {
+  accountLanguage, accountMetadataFor, deviceStorage, readLanguagePreference, reconcileLanguage, subscribeLanguagePreference,
+} from '../i18n/languagePreference.js'
 import {
   LEGAL_GATE_MESSAGES, currentLegalVersionKey, getLegalGateState, needsAcceptance, requestLegalAcceptance, setLegalGateState,
 } from '../legal/legalGate.js'
@@ -166,18 +171,73 @@ function stopEngine() {
   useAppStore.getState().setSyncStatus({ status: 'idle', error: null })
 }
 
+// --- lingua dell'account ----------------------------------------------------
+// La lingua segue l'account nei metadati di Supabase Auth (user_metadata), non
+// nel sync dei dati: la riga delle impostazioni (profiles) porta budget, ciclo
+// e valuta e non viene mai scritta per una lingua. Niente di qui blocca
+// l'accesso, il sync o i documenti: un errore lascia la lingua del dispositivo
+// e il salvataggio riparte al prossimo accesso (regola in languagePreference.js).
+
+let languagePush = null // { key, promise }: un solo salvataggio per volta
+
+export function saveLanguageToAccount(metadata) {
+  if (!supabase || !metadata || isOffline()) return Promise.resolve(false)
+  const key = JSON.stringify(metadata)
+  if (languagePush?.key === key) return languagePush.promise
+  const promise = (async () => {
+    try {
+      // `data` aggiunge queste chiavi ai metadati: quelle dei documenti legali restano.
+      const { error } = await supabase.auth.updateUser({ data: metadata })
+      return !error
+    } catch {
+      return false
+    }
+  })().finally(() => {
+    if (languagePush?.promise === promise) languagePush = null
+  })
+  languagePush = { key, promise }
+  return promise
+}
+
+// Dopo l'accesso e a ogni aggiornamento della sessione: adotta la lingua
+// dell'account oppure le salva quella del dispositivo. → la promessa del
+// salvataggio, o null se non serviva.
+export function reconcileAccountLanguage(user) {
+  if (!user) return null
+  try {
+    const { apply, push } = reconcileLanguage(readLanguagePreference(deviceStorage()), accountLanguage(user))
+    if (apply) useAppStore.getState().setLanguage(apply.language, { source: 'account', chosenAt: apply.chosenAt })
+    return push ? saveLanguageToAccount(push) : null
+  } catch {
+    return null
+  }
+}
+
 // Chiamata una volta da App.jsx. Se Supabase non e' configurato non fa
 // niente e l'app resta quella di sempre, tutta locale.
 export function bootstrapSync() {
   if (!isSupabaseConfigured) return () => {}
 
   supabase.auth.getSession().then(({ data }) => {
-    if (data.session) startFor(data.session.user.id)
+    if (data.session) {
+      startFor(data.session.user.id)
+      reconcileAccountLanguage(data.session.user)
+    }
+  })
+
+  // Una lingua scelta in Impostazioni con un account aperto: subito anche
+  // nell'account (offline riparte al prossimo accesso).
+  const stopLanguage = subscribeLanguagePreference((preference) => {
+    if (preference.source !== 'settings') return
+    supabase.auth.getSession()
+      .then(({ data }) => (data?.session ? saveLanguageToAccount(accountMetadataFor(preference)) : null))
+      .catch(() => null)
   })
 
   const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
     if (session) {
       startFor(session.user.id)
+      reconcileAccountLanguage(session.user)
       return
     }
     stopEngine()
@@ -189,24 +249,41 @@ export function bootstrapSync() {
     // in arrivo.)
   })
 
-  return () => listener?.subscription?.unsubscribe()
+  return () => {
+    stopLanguage()
+    listener?.subscription?.unsubscribe()
+  }
 }
 
 export const syncNow = () => engine?.syncNow() ?? Promise.resolve({ skipped: 'sync non attivo' })
 
+// → null se riuscito, altrimenti un messaggio nella lingua dell'app (mai il
+// testo tecnico di Supabase).
 export async function signIn(email, password) {
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
-  return error?.message ?? null
+  try {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    return error ? authErrorMessage(error) : null
+  } catch (error) {
+    return authErrorMessage(error)
+  }
 }
 
 // La registrazione parte solo con Termini accettati e Privacy Policy presa
 // visione (due scelte distinte, vedi legal/legal.js): la UI disabilita il
 // pulsante, e qui lo si rifiuta comunque, senza nessuna chiamata.
+// La lingua scelta sul dispositivo parte con la registrazione: è quella
+// dell'account fin da subito (e delle email, se i modelli la usano).
 export async function signUp(email, password, acceptance) {
   const metadata = buildSignUpMetadata(acceptance)
-  if (!metadata) return SIGNUP_ACCEPTANCE_REQUIRED
-  const { error } = await supabase.auth.signUp({ email, password, options: { data: metadata } })
-  return error?.message ?? null
+  if (!metadata) return LEGAL_MESSAGES.acceptanceRequired
+  const device = readLanguagePreference(deviceStorage())
+  const language = accountMetadataFor(device ?? { language: useAppStore.getState().language, chosenAt: null })
+  try {
+    const { error } = await supabase.auth.signUp({ email, password, options: { data: { ...metadata, ...language } } })
+    return error ? authErrorMessage(error) : null
+  } catch (error) {
+    return authErrorMessage(error)
+  }
 }
 
 // Esce dall'account da QUESTO dispositivo, spegne il motore e passa all'ambito
@@ -224,12 +301,15 @@ export async function signUp(email, password, acceptance) {
 // attivo. Se nemmeno il ripristino riesce l'ambito resta comunque quello
 // dell'account (come per una sessione scaduta): i dati restano e basta
 // rientrare con lo stesso account.
-export const SIGNOUT_OFFLINE_MESSAGE = 'Sei offline: per uscire serve la connessione. Sei ancora nell\u2019account su questo dispositivo, riprova quando torna la rete.'
-export const SIGNOUT_FAILED_MESSAGE = 'Non è stato possibile chiudere la sessione. Sei ancora nell\u2019account su questo dispositivo, riprova quando c\u2019è connessione.'
-export const SIGNOUT_RELOGIN_MESSAGE = 'Non è stato possibile chiudere la sessione e l\u2019accesso non è più attivo. I tuoi dati su questo dispositivo sono intatti: rientra con lo stesso account.'
+// Nella lingua dell'app, letti nel momento in cui servono.
+export const SIGNOUT_MESSAGES = {
+  get offline() { return tr('auth.signout.offline') },
+  get failed() { return tr('auth.signout.failed') },
+  get relogin() { return tr('auth.signout.relogin') },
+}
 
 export async function signOut() {
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) return SIGNOUT_OFFLINE_MESSAGE
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return SIGNOUT_MESSAGES.offline
 
   let saved = null
   try {
@@ -250,14 +330,14 @@ export async function signOut() {
   }
 
   if (failure) {
-    if (!saved) return SIGNOUT_RELOGIN_MESSAGE
+    if (!saved) return SIGNOUT_MESSAGES.relogin
     try {
       const { data, error } = await supabase.auth.setSession(saved)
-      if (!error && data?.session) return SIGNOUT_FAILED_MESSAGE
+      if (!error && data?.session) return SIGNOUT_MESSAGES.failed
     } catch {
       // il ripristino richiede rete: vedi sotto
     }
-    return SIGNOUT_RELOGIN_MESSAGE
+    return SIGNOUT_MESSAGES.relogin
   }
 
   stopEngine()

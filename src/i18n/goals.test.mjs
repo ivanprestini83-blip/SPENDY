@@ -344,7 +344,8 @@ try {
   }
   check('nessun guadagno cancellato dal primo tocco su Elimina', S().incomes.length === 1 && S().incomes[0].amount === 300)
   await act(() => S().setLanguage('de'))
-  check('lingua non valida → italiano', text(one(container, 'expenses-page__summary-label')) === 'Entrate di questo ciclo')
+  // Un codice non valido diventa la lingua predefinita (inglese), non più l'italiano.
+  check('lingua non valida → lingua predefinita (inglese)', text(one(container, 'expenses-page__summary-label')) === translate('en', 'incomes.title'))
   check('nessun errore di rendering in tutto il percorso', caught.length === 0, caught[0]?.message)
   await act(() => root.unmount())
 } finally {

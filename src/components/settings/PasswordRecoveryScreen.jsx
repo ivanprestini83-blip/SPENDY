@@ -8,6 +8,7 @@ import {
   submitNewPassword,
 } from '../../lib/passwordRecovery.js'
 import { PasswordToggle } from './PasswordToggle.jsx'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './SyncCard.css'
 import './PasswordRecoveryScreen.css'
 
@@ -16,6 +17,7 @@ import './PasswordRecoveryScreen.css'
 // recupero può cambiare l'ambito dei dati e ricreare l'interfaccia, e quello
 // che l'utente sta scrivendo non deve sparire.
 export function PasswordRecoveryScreen({ client = supabase }) {
+  const { t } = useLanguage()
   const recovery = useSyncExternalStore(subscribeRecovery, getRecoveryState, getRecoveryState)
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
@@ -67,23 +69,23 @@ export function PasswordRecoveryScreen({ client = supabase }) {
   }
 
   return (
-    <div className="recovery-screen" role="dialog" aria-modal="true" aria-label="Recupero password">
+    <div className="recovery-screen" role="dialog" aria-modal="true" aria-label={t('recovery.screen.label')}>
       <div className="recovery-screen__card settings-screen__card">
         {recovery.kind === 'invalid-link' ? (
           <>
-            <p className="settings-screen__label">🔑 Link non valido</p>
+            <p className="settings-screen__label">🔑 {t('recovery.screen.invalidtitle')}</p>
             <p className="settings-screen__hint">{MESSAGES.linkInvalid}</p>
-            <button type="button" className="sync-card__primary" onClick={close}>Chiudi</button>
+            <button type="button" className="sync-card__primary" onClick={close}>{t('common.close')}</button>
           </>
         ) : done ? (
           <>
-            <p className="settings-screen__label">✅ Password aggiornata</p>
-            <p className="settings-screen__hint">La nuova password è attiva. D&apos;ora in poi accedi con quella.</p>
-            <button type="button" className="sync-card__primary" onClick={close}>Continua</button>
+            <p className="settings-screen__label">✅ {t('recovery.screen.donetitle')}</p>
+            <p className="settings-screen__hint">{t('recovery.screen.donetext')}</p>
+            <button type="button" className="sync-card__primary" onClick={close}>{t('recovery.screen.continue')}</button>
           </>
         ) : (
           <>
-            <p className="settings-screen__label">🔑 Scegli una nuova password</p>
+            <p className="settings-screen__label">🔑 {t('recovery.screen.choosetitle')}</p>
             <div className="sync-card__form">
               <div className="password-field">
                 <input
@@ -93,7 +95,7 @@ export function PasswordRecoveryScreen({ client = supabase }) {
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  placeholder="Nuova password"
+                  placeholder={t('recovery.screen.newpassword')}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                 />
@@ -107,7 +109,7 @@ export function PasswordRecoveryScreen({ client = supabase }) {
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  placeholder="Ripeti la nuova password"
+                  placeholder={t('recovery.screen.repeat')}
                   value={confirmation}
                   onChange={(event) => setConfirmation(event.target.value)}
                 />
@@ -115,10 +117,10 @@ export function PasswordRecoveryScreen({ client = supabase }) {
               </div>
             </div>
             <button type="button" className="sync-card__primary" disabled={busy || !password || !confirmation} onClick={save}>
-              {busy ? 'Attendi…' : 'Salva password'}
+              {busy ? t('auth.wait') : t('recovery.screen.save')}
             </button>
             {error && <p className="sync-card__message sync-card__message--error">{error}</p>}
-            <button type="button" className="sync-card__secondary" disabled={busy} onClick={close}>Non ora</button>
+            <button type="button" className="sync-card__secondary" disabled={busy} onClick={close}>{t('recovery.screen.notnow')}</button>
           </>
         )}
       </div>

@@ -66,3 +66,30 @@ export function installFakeLocalStorage(seed = null) {
 
   return map
 }
+
+// Un dispositivo di un utente italiano: la lingua del dispositivo
+// (i18n/languagePreference.js) è l'italiano, come per chi usava SPENDY prima
+// della scelta della lingua. Serve ai test che controllano i testi italiani:
+// senza, un dispositivo nuovo parte in inglese (la lingua dei nuovi utenti).
+// `target` è la Map dello storage finto (o un oggetto tipo localStorage).
+export const ITALIAN_DEVICE_LANGUAGE = JSON.stringify({ language: 'it', chosenAt: null, source: 'inherited' })
+export function italianDevice(target) {
+  if (target instanceof Map) target.set('spendy-language', ITALIAN_DEVICE_LANGUAGE)
+  else target?.setItem?.('spendy-language', ITALIAN_DEVICE_LANGUAGE)
+  return target
+}
+
+// Un useLanguage finto in italiano, con i dizionari veri: per i banchi di
+// prova che disegnano un componente chiamandolo direttamente (con hook finti),
+// dove il vero useLanguage (hook di zustand) non può girare. Registra anche la
+// lingua dei messaggi fuori da React, come fa quello vero.
+export const ITALIAN_USE_LANGUAGE_FAKE = `
+  import { translate } from '/src/i18n/translate.js'
+  import { setCurrentLanguageSource } from '/src/i18n/currentLanguage.js'
+  import { languageInfo } from '/src/i18n/languages.js'
+  setCurrentLanguageSource(() => 'it')
+  const t = (key, params) => translate('it', key, params)
+  export const useLanguage = () => ({ language: 'it', info: languageInfo('it'), t, setLanguage: () => {}, previewLanguage: () => {}, confirmWelcomeLanguage: () => {} })`
+// Il modulo da sostituire, per qualunque componente lo importi.
+export const isUseLanguageImport = (source, importer) =>
+  typeof source === 'string' && source.endsWith('/i18n/useLanguage.js') && /\/src\/components\//.test(importer ?? '')

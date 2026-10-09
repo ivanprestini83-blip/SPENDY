@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { check, section, report } from '../../sync/testkit.mjs'
+import { check, section, report, italianDevice } from '../../sync/testkit.mjs'
 import { createMemoryDatabase, createMemoryRemote } from '../../sync/memoryRemote.mjs'
 import { createSyncEngine } from '../../sync/syncEngine.js'
 import { scopeFor } from '../../store/scope.js'
@@ -73,6 +73,8 @@ function installStorage(map) {
 }
 let boots = 0
 async function device(db, userId, { map = new Map(), realtime = false, today } = {}) {
+  // Dispositivo di un utente italiano: i testi controllati sono quelli italiani.
+  if (!map.has('spendy-language')) italianDevice(map)
   installStorage(map)
   const { useAppStore } = await import(`../../store/useAppStore.js?cycle-start=${(boots += 1)}`)
   if (useAppStore.getState().scopeId !== scopeFor(userId)) useAppStore.getState().switchScope(scopeFor(userId))

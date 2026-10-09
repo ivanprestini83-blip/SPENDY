@@ -6,26 +6,23 @@ import { ForgotPasswordForm } from './ForgotPasswordForm.jsx'
 import { PasswordToggle } from './PasswordToggle.jsx'
 import { canSignUp } from '../../legal/legal.js'
 import { LegalConsentFields } from './LegalConsentFields.jsx'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './SyncCard.css'
 
-const STATUS_LABELS = {
-  idle: { text: 'In attesa', tone: 'neutral' },
-  syncing: { text: 'Sincronizzazione…', tone: 'busy' },
-  synced: { text: 'Sincronizzato', tone: 'ok' },
-  offline: { text: 'Offline — le modifiche partiranno da sole', tone: 'warn' },
-  error: { text: 'Errore di sincronizzazione', tone: 'error' },
-}
+const STATUS_TONES = { idle: 'neutral', syncing: 'busy', synced: 'ok', offline: 'warn', error: 'error' }
 
-const formatWhen = (iso) => {
-  if (!iso) return 'mai'
+// Data e ora dell'ultima sincronizzazione nel formato della lingua scelta.
+const formatWhen = (iso, t, locale) => {
+  if (!iso) return t('auth.never')
   const date = new Date(iso)
-  return `${date.toLocaleDateString('it-IT')} alle ${date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`
+  return t('auth.when', { date: date.toLocaleDateString(locale), time: date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) })
 }
 
 // La card ☁️ in Impostazioni. È l'UNICO punto dell'interfaccia che parla
 // di sincronizzazione: le schermate principali restano identiche a prima,
 // senza badge, banner o spinner sparsi in giro.
 export function SyncCard() {
+  const { t, info } = useLanguage()
   const sync = useAppStore((state) => state.sync)
   const [session, setSession] = useState(null)
   const [email, setEmail] = useState('')
@@ -49,11 +46,8 @@ export function SyncCard() {
   if (!isSupabaseConfigured) {
     return (
       <div className="settings-screen__card">
-        <p className="settings-screen__label">☁️ Sincronizzazione</p>
-        <p className="settings-screen__hint">
-          Non configurata: Spendy sta salvando tutto solo su questo dispositivo. Per attivarla servono
-          l&apos;indirizzo del progetto Supabase e la chiave pubblica in un file <code>.env.local</code>.
-        </p>
+        <p className="settings-screen__label">☁️ {t('auth.title')}</p>
+        <p className="settings-screen__hint">{t('auth.notconfigured')}</p>
       </div>
     )
   }
@@ -80,33 +74,31 @@ export function SyncCard() {
       if (result.error) return String(result.error)
       setMessage(
         result.migrated
-          ? { tone: 'ok', text: `Caricate ${result.total} righe sul cloud. Copia di sicurezza in "${result.backupKey}".` }
-          : { tone: 'neutral', text: 'Niente da caricare: i dati di questo dispositivo sono già sul cloud.' },
+          ? { tone: 'ok', text: t('auth.migration.done', { count: result.total, key: result.backupKey }) }
+          : { tone: 'neutral', text: t('auth.migration.nothing') },
       )
       return null
     })
 
-  const status = STATUS_LABELS[sync.status] ?? STATUS_LABELS.idle
+  const statusKey = STATUS_TONES[sync.status] ? sync.status : 'idle'
+  const status = { text: t(`auth.status.${statusKey}`), tone: STATUS_TONES[statusKey] }
   const pending = sync.outbox.length
 
   return (
     <div className="settings-screen__card">
-      <p className="settings-screen__label">☁️ Sincronizzazione</p>
+      <p className="settings-screen__label">☁️ {t('auth.title')}</p>
 
       {!session && forgot ? (
         <ForgotPasswordForm initialEmail={email} onBack={() => setForgot(false)} />
       ) : !session ? (
         <>
-          <p className="settings-screen__hint">
-            Accedi per ritrovare le stesse spese su telefono e computer. I dati già presenti su questo
-            dispositivo restano dove sono: non viene cancellato niente.
-          </p>
+          <p className="settings-screen__hint">{t('auth.intro')}</p>
           <div className="sync-card__form">
             <input
               type="email"
               inputMode="email"
               autoComplete="email"
-              placeholder="Email"
+              placeholder={t('auth.email')}
               value={email}
               onChange={(event) => setEmail(event.target.value)}
             />
@@ -118,14 +110,14 @@ export function SyncCard() {
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                placeholder="Password"
+                placeholder={t('auth.password')}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
               <PasswordToggle visible={showPassword} onToggle={() => setShowPassword((shown) => !shown)} controls="sync-card-password" />
             </div>
             <button type="button" className="sync-card__link" disabled={busy} onClick={() => setForgot(true)}>
-              Password dimenticata?
+              {t('auth.forgot')}
             </button>
           </div>
           <button
@@ -134,10 +126,10 @@ export function SyncCard() {
             disabled={busy || !email || password.length < 6}
             onClick={() => run(() => signIn(email, password))}
           >
-            {busy ? 'Attendi…' : 'Accedi'}
+            {busy ? t('auth.wait') : t('auth.signin')}
           </button>
           <LegalConsentFields
-            title="Per creare un nuovo account:"
+            title={t('auth.newaccount')}
             termsAccepted={termsAccepted}
             privacyAcknowledged={privacyAcknowledged}
             onTermsChange={setTermsAccepted}
@@ -150,12 +142,12 @@ export function SyncCard() {
             onClick={() =>
               run(async () => {
                 const error = await signUp(email, password, acceptance)
-                if (!error) setMessage({ tone: 'ok', text: 'Account creato. Se richiesto, conferma l\'email e poi accedi.' })
+                if (!error) setMessage({ tone: 'ok', text: t('auth.created') })
                 return error
               })
             }
           >
-            Crea un account
+            {t('auth.signup')}
           </button>
         </>
       ) : (
@@ -167,39 +159,32 @@ export function SyncCard() {
 
           <dl className="sync-card__rows">
             <div>
-              <dt>Account</dt>
+              <dt>{t('auth.account')}</dt>
               <dd>{session.user.email}</dd>
             </div>
             <div>
-              <dt>Ultima sincronizzazione</dt>
-              <dd>{formatWhen(sync.lastSyncAt)}</dd>
+              <dt>{t('auth.lastsync')}</dt>
+              <dd>{formatWhen(sync.lastSyncAt, t, info.locale)}</dd>
             </div>
             <div>
-              <dt>In attesa di invio</dt>
-              <dd>{pending === 0 ? 'niente' : `${pending} modifiche`}</dd>
+              <dt>{t('auth.pending')}</dt>
+              <dd>{pending === 0 ? t('auth.pendingnone') : t(pending === 1 ? 'auth.pendingone' : 'auth.pendingmany', { count: pending })}</dd>
             </div>
           </dl>
 
           {sync.error && <p className="sync-card__error">{sync.error}</p>}
           {sync.rejected?.length > 0 && (
             <p className="sync-card__error">
-              {sync.rejected.length === 1 ? '1 modifica non è stata accettata' : `${sync.rejected.length} modifiche non sono state accettate`} dal
-              server (per esempio un importo troppo grande): {sync.rejected.length === 1 ? 'è rimasta' : 'sono rimaste'} solo su questo dispositivo.
+              {t(sync.rejected.length === 1 ? 'auth.rejectedone' : 'auth.rejectedmany', { count: sync.rejected.length })}
             </p>
           )}
 
           {migration?.needed && (
             <div className="sync-card__migration">
-              <p className="sync-card__migration-title">
-                {migration.total} righe di questo dispositivo non sono ancora sul cloud
-              </p>
-              <p className="sync-card__migration-text">
-                Sono i dati salvati prima di attivare la sincronizzazione. Caricandoli non viene
-                cancellato né sovrascritto niente, né qui né sul cloud: prima dell&apos;operazione viene
-                salvata anche una copia di sicurezza.
-              </p>
+              <p className="sync-card__migration-title">{t('auth.migration.title', { count: migration.total })}</p>
+              <p className="sync-card__migration-text">{t('auth.migration.text')}</p>
               <button type="button" className="sync-card__primary" disabled={busy} onClick={handleMigration}>
-                {busy ? 'Caricamento…' : `Carica ${migration.total} righe sul cloud`}
+                {busy ? t('auth.migration.loading') : t('auth.migration.button', { count: migration.total })}
               </button>
             </div>
           )}
@@ -217,12 +202,12 @@ export function SyncCard() {
               })
             }
           >
-            Sincronizza ora
+            {t('auth.syncnow')}
           </button>
           <button type="button" className="sync-card__signout" disabled={busy} onClick={() => run(signOut)}>
-            Esci dall&apos;account
+            {t('auth.signout.button')}
           </button>
-          <p className="sync-card__note">Uscendo, i tuoi dati restano salvati sul cloud e per questo account su questo dispositivo: li ritrovi rientrando.</p>
+          <p className="sync-card__note">{t('auth.signout.note')}</p>
         </>
       )}
 

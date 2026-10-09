@@ -10,7 +10,7 @@ import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { check, section, report } from '../sync/testkit.mjs'
+import { check, section, report, italianDevice } from '../sync/testkit.mjs'
 import { expensesForPeriod, totalForMonth, todaysExpenses } from '../utils/budgetCalculations.js'
 import { buildAndamento } from '../utils/andamentoEngine.js'
 import { startTodayWatcher } from '../store/todayWatcher.js'
@@ -173,7 +173,8 @@ section('7. La pagina Spese vera (componente, store vero)')
 // =====================================================================
 {
   const { installFakeDom } = await import('../store/fakeDom.mjs')
-  const dom = installFakeDom(new Map())
+  // Dispositivo di un utente italiano: i testi controllati sono quelli italiani.
+  const dom = installFakeDom(italianDevice(new Map()))
   const { createRoot } = await import('react-dom/client')
   const { flushSync } = await import('react-dom')
   const { createElement: h } = await import('react')

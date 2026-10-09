@@ -2,7 +2,7 @@ import it from './messages/it.js'
 import en from './messages/en.js'
 import es from './messages/es.js'
 import fr from './messages/fr.js'
-import { DEFAULT_LANGUAGE, normalizeLanguage } from './languages.js'
+import { DEFAULT_LANGUAGE, LEGACY_LANGUAGE, normalizeLanguage } from './languages.js'
 
 // I dizionari: chiavi tecniche a punti ("settings.language.title"), mai
 // testi italiani come chiavi.
@@ -15,11 +15,13 @@ const lookup = (dictionary, key) => key.split('.').reduce((node, part) => (node 
 const interpolate = (text, params) =>
   text.replace(/\{(\w+)\}/g, (match, name) => (params && params[name] !== undefined && params[name] !== null ? String(params[name]) : match))
 
-// Il testo di una chiave nella lingua richiesta; se manca, in italiano; se
-// manca anche lì, la chiave stessa (mai un crash, mai `undefined`).
+// Il testo di una chiave nella lingua richiesta; se manca, in inglese (la
+// lingua predefinita), poi in italiano (il dizionario di riferimento); se manca
+// anche lì, la chiave stessa (mai un crash, mai `undefined`).
 export function translate(language, key, params) {
   if (typeof key !== 'string' || !key) return ''
-  const own = lookup(MESSAGES[normalizeLanguage(language)], key)
-  const text = typeof own === 'string' ? own : lookup(MESSAGES[DEFAULT_LANGUAGE], key)
+  const text = [normalizeLanguage(language), DEFAULT_LANGUAGE, LEGACY_LANGUAGE]
+    .map((code) => lookup(MESSAGES[code], key))
+    .find((value) => typeof value === 'string')
   return typeof text === 'string' ? interpolate(text, params) : key
 }

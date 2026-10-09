@@ -10,6 +10,7 @@
 // Chi decide QUANDO controllare e quando avviare il sync è
 // sync/spendySync.js; la schermata è components/legal/LegalGateScreen.jsx.
 import { LEGAL_DOCUMENTS } from './legal.js'
+import { tr } from '../i18n/currentLanguage.js'
 
 export const ACCEPT_LEGAL_FUNCTION = 'accept-legal'
 
@@ -30,12 +31,13 @@ export function needsAcceptance(row) {
   )
 }
 
+// Nella lingua dell'app, letti nel momento in cui servono.
 export const LEGAL_GATE_MESSAGES = {
-  required: 'Per continuare devi accettare i Termini di utilizzo e prendere visione della Privacy Policy.',
-  offline: 'Serve la connessione per verificare e confermare i documenti. Riprova quando sei online.',
-  unavailable: 'Non è stato possibile verificare i documenti. Riprova tra poco.',
-  failed: 'Non è stato possibile registrare la conferma: non è stato salvato niente. Riprova tra poco.',
-  unauthenticated: 'La sessione non è più valida. Esci e rientra con il tuo account.',
+  get required() { return tr('legal.gate.required') },
+  get offline() { return tr('legal.gate.offline') },
+  get unavailable() { return tr('legal.gate.unavailable') },
+  get failed() { return tr('legal.gate.failed') },
+  get unauthenticated() { return tr('legal.gate.unauthenticated') },
 }
 
 // --- stato della schermata ----------------------------------------------

@@ -14,7 +14,7 @@ import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement as h } from 'react'
-import { check, section, report } from '../../sync/testkit.mjs'
+import { check, section, report, ITALIAN_USE_LANGUAGE_FAKE, isUseLanguageImport } from '../../sync/testkit.mjs'
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -79,10 +79,12 @@ const harness = {
   enforce: 'pre',
   resolveId(source, importer) {
     if (source === '/__pw-fake/react') return '\0pw:react'
+    // I componenti parlano italiano (dizionari veri).
+    if (isUseLanguageImport(source, importer)) return '\0pw:useLanguage'
     if (isUnderTest(importer) && source in FAKES) return `\0pw:${source}`
     return null
   },
-  load: (id) => (id.startsWith('\0pw:') ? FAKES[id.slice('\0pw:'.length)] : null),
+  load: (id) => (id === '\0pw:useLanguage' ? ITALIAN_USE_LANGUAGE_FAKE : id.startsWith('\0pw:') ? FAKES[id.slice('\0pw:'.length)] : null),
   transform(code, id) {
     if (!isUnderTest(id)) return null
     return code.replace("from 'react'", "from '/__pw-fake/react'")

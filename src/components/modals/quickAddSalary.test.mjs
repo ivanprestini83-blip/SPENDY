@@ -57,7 +57,8 @@ function createRuntime(storeState) {
   const slots = []
   let cursor = 0
   const calls = []
-  const store = { customCategories: [], ...storeState }
+  // Utente italiano: i testi controllati sono quelli italiani.
+  const store = { customCategories: [], language: 'it', ...storeState }
   for (const name of ACTIONS) store[name] = (...args) => calls.push({ name, args })
   return {
     calls,

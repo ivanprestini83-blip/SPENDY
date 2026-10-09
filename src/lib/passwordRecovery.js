@@ -11,23 +11,24 @@
 //   3. updateUser({ password }) salva la nuova password (la sessione di
 //      recupero è quella che autorizza la modifica).
 
+import { tr } from '../i18n/currentLanguage.js'
+
 export const MIN_PASSWORD_LENGTH = 6
 
-// Stessa risposta se l'indirizzo esiste o no: Supabase non lo rivela e
+// Nella lingua dell'app, letti nel momento in cui servono. `resetSent` è la
+// stessa risposta se l'indirizzo esiste o no: Supabase non lo rivela e
 // nemmeno noi.
-export const RESET_SENT_MESSAGE =
-  'Se l’indirizzo è registrato, tra poco riceverai un’email con il link per scegliere una nuova password. Controlla anche la cartella spam.'
-
 export const MESSAGES = {
-  emailInvalid: 'Inserisci un indirizzo email valido.',
-  passwordShort: `La password deve avere almeno ${MIN_PASSWORD_LENGTH} caratteri.`,
-  passwordMismatch: 'Le due password non coincidono.',
-  rateLimit: 'Hai richiesto troppe email in poco tempo. Riprova tra qualche minuto.',
-  network: 'Connessione assente. Riprova quando sei online.',
-  samePassword: 'La nuova password deve essere diversa da quella attuale.',
-  weakPassword: 'Password troppo debole: scegline una più lunga o più varia.',
-  linkInvalid: 'Il link non è valido o è scaduto. Richiedine uno nuovo da Impostazioni → Password dimenticata?',
-  generic: 'Qualcosa non ha funzionato. Riprova tra poco.',
+  get resetSent() { return tr('recovery.message.resetsent') },
+  get emailInvalid() { return tr('recovery.message.emailinvalid') },
+  get passwordShort() { return tr('recovery.message.passwordshort', { count: MIN_PASSWORD_LENGTH }) },
+  get passwordMismatch() { return tr('recovery.message.passwordmismatch') },
+  get rateLimit() { return tr('recovery.message.ratelimit') },
+  get network() { return tr('recovery.message.network') },
+  get samePassword() { return tr('recovery.message.samepassword') },
+  get weakPassword() { return tr('recovery.message.weakpassword') },
+  get linkInvalid() { return tr('recovery.message.linkinvalid') },
+  get generic() { return tr('recovery.message.generic') },
 }
 
 // L'app nativa (Capacitor) non ha un indirizzo web a cui far tornare il link:
@@ -75,7 +76,7 @@ export async function requestPasswordReset(client, email, win = globalThis.windo
   } catch (error) {
     if (classifyAuthError(error) === 'network') return { ok: false, message: MESSAGES.network }
   }
-  return { ok: true, message: RESET_SENT_MESSAGE }
+  return { ok: true, message: MESSAGES.resetSent }
 }
 
 export function validateNewPassword(password, confirmation) {

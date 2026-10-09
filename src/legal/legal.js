@@ -13,6 +13,7 @@
 // definita da un legale (vedi privacy.html).
 
 import { LEGAL_VERSIONS } from '../../supabase/functions/_shared/legalVersions.js'
+import { tr } from '../i18n/currentLanguage.js'
 
 // Le versioni vengono da supabase/functions/_shared/legalVersions.js, la stessa
 // fonte usata dalla Edge Function accept-legal: app e server non possono
@@ -22,8 +23,10 @@ export const LEGAL_DOCUMENTS = {
   privacy: { url: '/privacy.html', version: LEGAL_VERSIONS.privacy },
 }
 
-export const SIGNUP_ACCEPTANCE_REQUIRED =
-  'Per creare un account devi accettare i Termini di utilizzo e prendere visione della Privacy Policy.'
+// Nella lingua dell'app, letto nel momento in cui serve.
+export const LEGAL_MESSAGES = {
+  get acceptanceRequired() { return tr('legal.acceptancerequired') },
+}
 
 // Entrambe le caselle, esplicitamente vere: niente valori "quasi veri".
 export const canSignUp = (acceptance) =>

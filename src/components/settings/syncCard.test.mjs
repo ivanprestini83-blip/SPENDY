@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { check, section, report } from '../../sync/testkit.mjs'
+import { check, section, report, ITALIAN_USE_LANGUAGE_FAKE, isUseLanguageImport } from '../../sync/testkit.mjs'
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 const CARD = '/src/components/settings/SyncCard.jsx'
@@ -62,10 +62,13 @@ const harnessPlugin = {
     // 'react' è un import "nudo": Vite lo darebbe per esterno (il React vero)
     // prima di interpellarci, quindi il transform qui sotto lo riscrive.
     if (source === '/__card-fake/react') return '\0card-fake:react'
+    // La card e i suoi pezzi parlano italiano (dizionari veri).
+    if (isUseLanguageImport(source, importer)) return '\0card-fake:useLanguage'
     if (importer && importer.includes('SyncCard.jsx') && source in FAKE_MODULES) return `\0card-fake:${source}`
     return null
   },
   load(id) {
+    if (id === '\0card-fake:useLanguage') return ITALIAN_USE_LANGUAGE_FAKE
     return id.startsWith('\0card-fake:') ? FAKE_MODULES[id.slice('\0card-fake:'.length)] : null
   },
   transform(code, id) {

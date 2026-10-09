@@ -13,10 +13,11 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 import reactPlugin from '@vitejs/plugin-react'
 import { createElement as h } from 'react'
-import { check, section, report } from '../../sync/testkit.mjs'
+import { check, section, report, italianDevice } from '../../sync/testkit.mjs'
 import { installFakeDom } from '../../store/fakeDom.mjs'
 
-const dom = installFakeDom(new Map())
+// Dispositivo di un utente italiano: i testi controllati sono quelli italiani.
+const dom = installFakeDom(italianDevice(new Map()))
 // Il DOM minimo condiviso non conosce <select>: qui, solo per questo test, il
 // minimo che React usa per una select controllata (options, value, selected).
 {

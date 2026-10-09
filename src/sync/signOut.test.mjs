@@ -11,12 +11,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
-import { check, section, report } from './testkit.mjs'
+import { check, section, report, italianDevice } from './testkit.mjs'
 import { installFakeDom } from '../store/fakeDom.mjs'
 import { LEGAL_VERSIONS } from '../../supabase/functions/_shared/legalVersions.js'
 
 // localStorage finto: senza, i dati di A non sopravvivrebbero al cambio di ambito.
-installFakeDom(new Map())
+// Dispositivo di un utente italiano (i messaggi d'uscita sono confrontati con quelli dell'app).
+installFakeDom(italianDevice(new Map()))
 
 const A = 'utente-a-0001'
 const scopeFor = (id) => `u:${id}`
@@ -113,7 +114,7 @@ try {
   // =====================================================================
   setOnline(false)
   let result = await sync.signOut()
-  check('restituisce l\'errore offline', result === sync.SIGNOUT_OFFLINE_MESSAGE, result)
+  check('restituisce l\'errore offline', result === sync.SIGNOUT_MESSAGES.offline, result)
   check('lo scope resta quello di A', S().scopeId === scopeFor(A), S().scopeId)
   check('i dati di A sono ancora a schermo (non è tornato guest)', hasA())
   check('Supabase non è stato nemmeno chiamato: la sessione è intatta', fake.signOutCalls.length === 0 && fake.current !== null)
@@ -125,7 +126,7 @@ try {
   setOnline(true)
   fake.signOutMode = 'network-error'
   result = await sync.signOut()
-  check('restituisce l\'errore (visibile: la card non viene smontata)', result === sync.SIGNOUT_FAILED_MESSAGE, result)
+  check('restituisce l\'errore (visibile: la card non viene smontata)', result === sync.SIGNOUT_MESSAGES.failed, result)
   check('lo scope resta quello di A, con i suoi dati (NON guest)', stillAccountA(), S().scopeId)
   check('chiusura richiesta solo per questo dispositivo: signOut({ scope: \'local\' })', fake.signOutCalls.length === 1 && fake.signOutCalls[0]?.scope === 'local', JSON.stringify(fake.signOutCalls))
   check('la sessione è stata ripristinata con i token salvati', fake.setSessionCalls === 1 && fake.current?.refresh_token === 'ref-a')
@@ -137,7 +138,7 @@ try {
   fake.restoreMode = 'fail'
   fake.setSessionCalls = 0
   result = await sync.signOut()
-  check('errore con indicazione di rientrare con lo stesso account', result === sync.SIGNOUT_RELOGIN_MESSAGE, result)
+  check('errore con indicazione di rientrare con lo stesso account', result === sync.SIGNOUT_MESSAGES.relogin, result)
   check('lo scope resta quello di A: dati intatti, niente guest', stillAccountA(), S().scopeId)
   check('il ripristino è stato tentato', fake.setSessionCalls === 1)
 

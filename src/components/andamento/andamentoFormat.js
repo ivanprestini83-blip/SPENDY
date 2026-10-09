@@ -34,7 +34,7 @@ export function formatCompactAmount(value) {
 // Come leggere una variazione (vedi computeChange nell'engine).
 // `higherIsBetter` decide il colore: più spese = coral, più risparmio =
 // mint. Il colore non è mai l'unico segnale — c'è sempre la freccia e il
-// segno scritto. `lang` sceglie solo le parole (assente → italiano).
+// segno scritto. `lang` sceglie solo le parole (assente → lingua predefinita).
 export function describeChange(change, { higherIsBetter = false, lang, newLabel = translate(lang, 'andamento.change.new'), goneLabel = translate(lang, 'andamento.change.gone') } = {}) {
   const { kind, diff, percent } = change
   const unchanged = translate(lang, 'andamento.change.unchanged')

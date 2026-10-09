@@ -1,3 +1,4 @@
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './PasswordToggle.css'
 
 // Il pulsante "occhio" dentro un campo password (vedi .password-field).
@@ -7,14 +8,15 @@ import './PasswordToggle.css'
 // onMouseDown evita che il campo perda il focus (su telefono la tastiera
 // resta aperta); da tastiera si raggiunge con Tab e si usa con Invio/Spazio.
 export function PasswordToggle({ visible, onToggle, controls }) {
+  const { t } = useLanguage()
   return (
     <button
       type="button"
       className="password-field__toggle"
-      aria-label="Mostra password"
+      aria-label={t('recovery.toggle.show')}
       aria-pressed={visible}
       aria-controls={controls}
-      title={visible ? 'Nascondi password' : 'Mostra password'}
+      title={visible ? t('recovery.toggle.hide') : t('recovery.toggle.show')}
       onMouseDown={(event) => event.preventDefault()}
       onClick={onToggle}
     >

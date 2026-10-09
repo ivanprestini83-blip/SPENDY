@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 import reactPlugin from '@vitejs/plugin-react'
 import { createElement as h } from 'react'
-import { check, section, report } from '../sync/testkit.mjs'
+import { check, section, report, italianDevice } from '../sync/testkit.mjs'
 import { MESSAGES, translate } from './translate.js'
 import { humorLibrary } from '../utils/humorLibrary.js'
 import * as reactionLibrary from '../data/spendyReactionLibrary.js'
@@ -311,7 +311,9 @@ section('8. Notifiche nuove nella lingua scelta (regole)')
     [near[0]?.message, goal[0]?.message, syncError[0]?.message].join(' | '))
     check(`   ${lang}: stessi eventi e stesse chiavi (eventKey) di prima`, near[0]?.eventKey === 'budget:near:2026-09-01' && over[0]?.eventKey === 'budget:over:2026-09-01' && goal[0]?.eventKey === 'goal:g:50')
   }
-  check('stato senza lingua → italiano, testo identico a prima', budgetNotifications({ ...base(undefined, [expense(TODAY, 500, 'spesa')]) }, { ...base(undefined, [expense(TODAY, 500, 'spesa'), expense(TODAY, 600, 'casa')]) })[0]?.message === 'Budget mensile superato.')
+  // In italiano il testo di prima; senza lingua nello stato (mai nell'app: la lingua è sempre valorizzata) quella predefinita.
+  check('italiano: testo identico a prima', budgetNotifications({ ...base('it', [expense(TODAY, 500, 'spesa')]) }, { ...base('it', [expense(TODAY, 500, 'spesa'), expense(TODAY, 600, 'casa')]) })[0]?.message === 'Budget mensile superato.')
+  check('stato senza lingua → lingua predefinita (inglese)', budgetNotifications({ ...base(undefined, [expense(TODAY, 500, 'spesa')]) }, { ...base(undefined, [expense(TODAY, 500, 'spesa'), expense(TODAY, 600, 'casa')]) })[0]?.message === translate('en', 'notifications.budget.over'))
 }
 
 // =====================================================================
@@ -344,7 +346,8 @@ const ITALIAN = ['Casa', 'Carburante', 'Spesa', 'Ristorante', 'Bar', 'Farmacia',
 // =====================================================================
 section('10. L\'app vera: Home, Spese, notifiche e AI cambiando lingua senza reload')
 // =====================================================================
-const dom = installFakeDom(new Map())
+// Dispositivo di un utente italiano: la Home parte in italiano, come prima.
+const dom = installFakeDom(italianDevice(new Map()))
 const { createRoot } = await import('react-dom/client')
 const { flushSync } = await import('react-dom')
 const server = await createServer({

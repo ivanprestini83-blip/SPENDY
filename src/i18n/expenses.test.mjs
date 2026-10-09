@@ -213,7 +213,8 @@ try {
     await act(() => S().setLanguage('en'))
     check('   rimessa → "+ Add expense"', Boolean(button('+ Add expense')))
     await act(() => S().setLanguage('de'))
-    check('lingua non valida → tutta la pagina in italiano', S().language === 'it' && Boolean(button('+ Aggiungi spesa')) && Boolean(button('Ciclo precedente')))
+    // Un codice non valido diventa la lingua predefinita (inglese), non più l'italiano.
+    check('lingua non valida → tutta la pagina nella lingua predefinita (inglese)', S().language === 'en' && Boolean(button(translate('en', 'expenses.page.add'))) && Boolean(button(translate('en', 'expenses.page.prev'))))
   }
   await act(() => S().switchScope('u:utente-spese-vuoto'))
   for (const lang of ['it', 'en', 'es', 'fr']) {

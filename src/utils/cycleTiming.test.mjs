@@ -85,7 +85,8 @@ section('Contesto di Spendy AI: tempo corretto e coerente con l\'app')
 function contextFor(today, { spent = 760, budget = 1000, cycleStartDay = 7 } = {}) {
   const expenses = [expense(getCycleTiming(today, cycleStartDay).start, spent)]
   const financialData = buildFinancialData({ today, monthlyBudget: budget, expenses, incomes: [], goals: [], cycleStartDay })
-  const coach = getSpendyCoach(financialData, { expenses, today, monthlyBudget: budget, cycleStartDay, goals: [], jokeHistory: [], financialData })
+  // Le frasi controllate qui sono quelle italiane: la lingua va detta (senza, vale quella predefinita).
+  const coach = getSpendyCoach(financialData, { expenses, today, monthlyBudget: budget, cycleStartDay, goals: [], jokeHistory: [], financialData, lang: 'it' })
   const prepared = prepareSpendyVoice({ coach, financialData, expenses, today, monthlyBudget: budget, cycleStartDay, goals: [] })
   return { financialData, coach, expenses, ...prepared }
 }

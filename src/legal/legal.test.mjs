@@ -15,8 +15,8 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
-import { check, section, report } from '../sync/testkit.mjs'
-import { LEGAL_DOCUMENTS, SIGNUP_ACCEPTANCE_REQUIRED, canSignUp, buildSignUpMetadata } from './legal.js'
+import { check, section, report, ITALIAN_USE_LANGUAGE_FAKE, isUseLanguageImport } from '../sync/testkit.mjs'
+import { LEGAL_DOCUMENTS, LEGAL_MESSAGES, canSignUp, buildSignUpMetadata } from './legal.js'
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const readText = (path) => readFileSync(join(ROOT, path), 'utf8')
@@ -82,11 +82,14 @@ const harness = {
     const from = importer?.split('?')[0] ?? ''
     if (from.endsWith('/src/sync/spendySync.js') && source in SYNC_STUBS) return `\0legal-sync:${source}`
     if (source === '/__legal-fake/react') return '\0legal-card:react'
+    // La card e i suoi pezzi parlano italiano (dizionari veri).
+    if (isUseLanguageImport(source, from)) return '\0legal-card:useLanguage'
     if (from.endsWith('SyncCard.jsx') && source in CARD_FAKES) return `\0legal-card:${source}`
     return null
   },
   load(id) {
     if (id.startsWith('\0legal-sync:')) return SYNC_STUBS[id.slice('\0legal-sync:'.length)]
+    if (id === '\0legal-card:useLanguage') return ITALIAN_USE_LANGUAGE_FAKE
     if (id.startsWith('\0legal-card:')) return CARD_FAKES[id.slice('\0legal-card:'.length)]
     return null
   },
@@ -121,9 +124,9 @@ try {
     }
     const sync = await server.ssrLoadModule('/src/sync/spendySync.js')
 
-    check('senza accettazione: rifiutata', await sync.signUp('a@esempio.invalid', 'password1') === SIGNUP_ACCEPTANCE_REQUIRED)
-    check('solo Termini accettati: rifiutata', await sync.signUp('a@esempio.invalid', 'password1', { termsAccepted: true, privacyAcknowledged: false }) === SIGNUP_ACCEPTANCE_REQUIRED)
-    check('solo Privacy presa visione: rifiutata', await sync.signUp('a@esempio.invalid', 'password1', { termsAccepted: false, privacyAcknowledged: true }) === SIGNUP_ACCEPTANCE_REQUIRED)
+    check('senza accettazione: rifiutata', await sync.signUp('a@esempio.invalid', 'password1') === LEGAL_MESSAGES.acceptanceRequired)
+    check('solo Termini accettati: rifiutata', await sync.signUp('a@esempio.invalid', 'password1', { termsAccepted: true, privacyAcknowledged: false }) === LEGAL_MESSAGES.acceptanceRequired)
+    check('solo Privacy presa visione: rifiutata', await sync.signUp('a@esempio.invalid', 'password1', { termsAccepted: false, privacyAcknowledged: true }) === LEGAL_MESSAGES.acceptanceRequired)
     check('   in nessuno di questi casi parte una chiamata a Supabase', calls.length === 0)
 
     const before = Date.now()

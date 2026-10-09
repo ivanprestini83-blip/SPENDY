@@ -13,14 +13,15 @@ import { fileURLToPath } from 'node:url'
 import { createServer } from 'vite'
 import reactPlugin from '@vitejs/plugin-react'
 import { createElement as h } from 'react'
-import { check, section, report } from '../sync/testkit.mjs'
+import { check, section, report, italianDevice } from '../sync/testkit.mjs'
 import { installFakeDom } from './fakeDom.mjs'
 
 const A = 'utente-a-0001'
 const B = 'utente-b-0002'
 const scopeFor = (userId) => `u:${userId}`
 
-const storageMap = new Map()
+// Dispositivo di un utente italiano: i testi controllati sono quelli italiani.
+const storageMap = italianDevice(new Map())
 const dom = installFakeDom(storageMap)
 const { createRoot } = await import('react-dom/client')
 const { flushSync } = await import('react-dom')

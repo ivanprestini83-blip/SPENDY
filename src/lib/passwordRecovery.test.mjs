@@ -7,8 +7,12 @@ import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement as h } from 'react'
-import { check, section, report } from '../sync/testkit.mjs'
+import { check, section, report, ITALIAN_USE_LANGUAGE_FAKE, isUseLanguageImport } from '../sync/testkit.mjs'
 import * as rec from './passwordRecovery.js'
+import { setCurrentLanguageSource } from '../i18n/currentLanguage.js'
+
+// I testi controllati sono quelli italiani: la lingua va detta (senza, vale quella predefinita).
+setCurrentLanguageSource(() => 'it')
 
 const web = { location: { origin: 'http://localhost:5199' } }
 const native = { location: { origin: 'https://localhost' }, Capacitor: { isNativePlatform: () => true } }
@@ -45,7 +49,7 @@ section('1. Richiesta del link')
   const r = await rec.requestPasswordReset(c, '  utente@esempio.invalid ', web)
   check('chiama resetPasswordForEmail con l\'email ripulita', c.calls.reset.length === 1 && c.calls.reset[0][0] === 'utente@esempio.invalid')
   check('   redirectTo = origine dell\'app sul web', c.calls.reset[0][1]?.redirectTo === 'http://localhost:5199/')
-  check('   messaggio di invio generico', r.ok === true && r.message === rec.RESET_SENT_MESSAGE)
+  check('   messaggio di invio generico', r.ok === true && r.message === rec.MESSAGES.resetSent)
 
   const n = fakeClient()
   await rec.requestPasswordReset(n, 'utente@esempio.invalid', native)
@@ -130,7 +134,17 @@ const server = await createServer({
   cacheDir: join(tmpdir(), 'spendy-recovery-test-vite'),
   server: { middlewareMode: true, hmr: false, watch: null },
   optimizeDeps: { noDiscovery: true, include: [] },
-  plugins: [react(), { name: 'css-stub', enforce: 'pre', load: (id) => (id.split('?')[0].endsWith('.css') ? 'export default {}' : null) }],
+  plugins: [
+    react(),
+    { name: 'css-stub', enforce: 'pre', load: (id) => (id.split('?')[0].endsWith('.css') ? 'export default {}' : null) },
+    // Le schermate parlano italiano (dizionari veri): con renderToStaticMarkup lo
+    // store vero darebbe il suo stato iniziale, cioè la lingua predefinita.
+    {
+      name: 'italian-ui', enforce: 'pre',
+      resolveId: (source, importer) => (isUseLanguageImport(source, importer) ? '\0italian-use-language' : null),
+      load: (id) => (id === '\0italian-use-language' ? ITALIAN_USE_LANGUAGE_FAKE : null),
+    },
+  ],
 })
 
 try {

@@ -3,7 +3,7 @@
 // persist sul gestore degli ambiti), ogni "dispositivo" ha il suo localStorage
 // finto, il tempo è iniettato.
 
-import { check, section, report } from '../sync/testkit.mjs'
+import { check, section, report, italianDevice } from '../sync/testkit.mjs'
 import { GUEST, scopeFor, stateKey } from '../store/scope.js'
 import { lastCycles } from '../utils/cycle.js'
 import { getSnapshot, buildBackup, serializeBackup } from '../sync/backup.js'
@@ -35,6 +35,8 @@ function installStorage(map) {
 }
 let boots = 0
 async function bootDevice(map) {
+  // Dispositivo di un utente italiano: i testi controllati sono quelli italiani.
+  if (!map.has('spendy-language')) italianDevice(map)
   installStorage(map)
   const { useAppStore } = await import(`../store/useAppStore.js?notif-test=${(boots += 1)}`)
   return useAppStore
@@ -93,7 +95,7 @@ section('1. Stato: creazione, lettura, eliminazione, badge')
   check('badge: 0 → nessun badge', badgeText(0) === null && badgeText(-1) === null)
   check('   1-99 → numero', badgeText(1) === '1' && badgeText(99) === '99')
   check('   da 100 → "99+"', badgeText(100) === '99+' && badgeText(250) === '99+')
-  check('   aria-label', bellLabel(3) === 'Notifiche, 3 non lette' && bellLabel(0) === 'Notifiche, nessuna nuova notifica')
+  check('   aria-label', bellLabel(3, 'it') === 'Notifiche, 3 non lette' && bellLabel(0, 'it') === 'Notifiche, nessuna nuova notifica')
   check('stato vuoto: unreadCount([]) = 0, nessuna notifica', unreadCount([]) === 0 && unreadCount(undefined) === 0)
 
   check('tempo relativo', formatRelativeTime(now.toISOString(), now) === 'adesso'

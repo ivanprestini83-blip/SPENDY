@@ -23,6 +23,8 @@ import { startNotificationWatcher } from './notifications/notificationWatcher.js
 import { unreadCount } from './notifications/notificationState.js'
 import { PasswordRecoveryScreen } from './components/settings/PasswordRecoveryScreen.jsx'
 import { LegalGateScreen } from './components/legal/LegalGateScreen.jsx'
+import { LanguageWelcomeScreen } from './components/language/LanguageWelcomeScreen.jsx'
+import { useNeedsLanguageWelcome } from './components/language/useNeedsLanguageWelcome.js'
 import { HomePage } from './pages/HomePage.jsx'
 import { ExpensesPage } from './pages/ExpensesPage.jsx'
 import { IncomesPage } from './pages/IncomesPage.jsx'
@@ -58,6 +60,8 @@ function App() {
   const scopeId = useAppStore((state) => state.scopeId)
   // Un numero (primitivo): il badge si aggiorna solo quando cambia davvero.
   const unread = useAppStore((state) => unreadCount(state.notifications))
+  // Primo avvio su questo dispositivo: prima di tutto la lingua.
+  const needsLanguageWelcome = useNeedsLanguageWelcome()
 
   // `today` is set once when the store is created — refresh it on mount
   // so a tab reopened days later (or left open across midnight) reads
@@ -137,6 +141,7 @@ function App() {
     {/* Fuori dalla schermata a chiave: sopravvivono al cambio di ambito. */}
     <LegalGateScreen />
     <PasswordRecoveryScreen />
+    {needsLanguageWelcome && <LanguageWelcomeScreen />}
     </>
   )
 }

@@ -1,17 +1,20 @@
 // Fase 1 del multilingue: l'infrastruttura (lingue, dizionari, translate) e la
 // lingua per account/dispositivo. `npm test`, senza rete.
 //
-// La lingua è una preferenza dell'esperienza: vive nel contenitore locale
-// dell'account (spendy-storage-v2:<ambito>), non viaggia con il sync e
-// cambiarla non tocca nessun dato.
+// La lingua è una preferenza dell'esperienza: vale per il DISPOSITIVO
+// ('spendy-language', i18n/languagePreference.js), non viaggia con il sync e
+// cambiarla non tocca nessun dato. Inglese per i nuovi utenti, italiano per
+// chi usava già SPENDY. La lingua dell'account (metadati di Supabase Auth) è
+// provata in languageChoice.test.mjs.
 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { check, section, report } from '../sync/testkit.mjs'
-import { LANGUAGES, LANGUAGE_CODES, DEFAULT_LANGUAGE, isLanguage, normalizeLanguage, languageInfo } from './languages.js'
+import { check, section, report, italianDevice } from '../sync/testkit.mjs'
+import { LANGUAGES, LANGUAGE_CODES, DEFAULT_LANGUAGE, LEGACY_LANGUAGE, isLanguage, normalizeLanguage, languageInfo } from './languages.js'
+import { LANGUAGE_PREFERENCE_KEY, needsLanguageWelcome } from './languagePreference.js'
 import { MESSAGES, translate } from './translate.js'
-import { scopeFor, stateKey, GUEST } from '../store/scope.js'
+import { scopeFor, stateKey, GUEST, ACTIVE_SCOPE_KEY } from '../store/scope.js'
 
 // --- dispositivi: store vero, localStorage per dispositivo ------------------
 
@@ -34,6 +37,8 @@ async function boot(map) {
   return useAppStore
 }
 const savedLanguage = (map, scope) => JSON.parse(map.get(stateKey(scope)) ?? '{}')?.state?.language
+const devicePreference = (map) => JSON.parse(map.get(LANGUAGE_PREFERENCE_KEY) ?? 'null')
+const storageOf = (map) => ({ getItem: (key) => (map.has(key) ? map.get(key) : null), key: (index) => [...map.keys()][index] ?? null, get length() { return map.size } })
 
 // Tutto ciò che NON è la lingua: deve restare identico cambiando lingua.
 const DATA_FIELDS = ['monthlyBudget', 'currency', 'cycleStartDay', 'amountHidden', 'spendyAIEnabled', 'legalAcceptedVersion', 'legacySalaryHistoryDone', 'confirmedCycleStart',
@@ -51,8 +56,9 @@ section('Lingue e dizionari')
 check('quattro lingue: it, en, es, fr', LANGUAGE_CODES.join() === 'it,en,es,fr' && Object.keys(MESSAGES).sort().join() === 'en,es,fr,it')
 check('ognuna con nome nella propria lingua, bandiera e locale', LANGUAGES.map((l) => `${l.flag} ${l.name}`).join(' | ') === '🇮🇹 Italiano | 🇬🇧 English | 🇪🇸 Español | 🇫🇷 Français' && LANGUAGES.every((l) => /^[a-z]{2}-[A-Z]{2}$/.test(l.locale)))
 check('B. lingue valide accettate', ['it', 'en', 'es', 'fr'].every((code) => isLanguage(code) && normalizeLanguage(code) === code))
-check('C. valori non validi → it', [undefined, null, '', 'de', 'EN', 'italiano', 42, {}].every((value) => !isLanguage(value) && normalizeLanguage(value) === 'it') && DEFAULT_LANGUAGE === 'it')
-check('languageInfo: anche un codice non valido dà l\'italiano', languageInfo('xx').code === 'it' && languageInfo('fr').name === 'Français')
+check('C. valori non validi → en, la lingua dei nuovi utenti', [undefined, null, '', 'de', 'EN', 'italiano', 42, {}].every((value) => !isLanguage(value) && normalizeLanguage(value) === 'en') && DEFAULT_LANGUAGE === 'en')
+check('   per i vecchi contenitori il ripiego è l\'italiano', LEGACY_LANGUAGE === 'it' && normalizeLanguage('de', LEGACY_LANGUAGE) === 'it' && normalizeLanguage('fr', LEGACY_LANGUAGE) === 'fr')
+check('languageInfo: un codice non valido dà la lingua predefinita', languageInfo('xx').code === 'en' && languageInfo('fr').name === 'Français')
 
 const keysOf = (node, prefix = '') => Object.entries(node).flatMap(([key, value]) => (typeof value === 'object' ? keysOf(value, `${prefix}${key}.`) : [`${prefix}${key}`]))
 const itKeys = keysOf(MESSAGES.it).sort().join()
@@ -68,9 +74,13 @@ check('chiave inesistente → la chiave stessa, nessun crash', translate('en', '
   // Chiave presente solo in italiano: si ricade sull'italiano.
   MESSAGES.it.settings.language.onlyItalian = 'Solo in italiano'
   check('chiave mancante in una lingua → testo italiano', translate('fr', 'settings.language.onlyItalian') === 'Solo in italiano')
+  // Presente in inglese e in italiano ma non in francese: prima l'inglese.
+  MESSAGES.en.settings.language.onlyItalian = 'English first'
+  check('   se c\'è, prima l\'inglese (la lingua predefinita)', translate('fr', 'settings.language.onlyItalian') === 'English first')
+  delete MESSAGES.en.settings.language.onlyItalian
   delete MESSAGES.it.settings.language.onlyItalian
 }
-check('lingua non valida → italiano', translate('xx', 'settings.language.title') === 'Lingua' && translate(undefined, 'settings.language.title') === 'Lingua')
+check('lingua non valida → lingua predefinita (inglese)', translate('xx', 'settings.language.title') === 'Language' && translate(undefined, 'settings.language.title') === 'Language')
 check('parametri: {language}', translate('en', 'settings.language.current', { language: 'English' }) === 'Current language: English' && translate('fr', 'settings.language.current', { language: 'Français' }) === 'Langue actuelle : Français')
 check('parametro mancante: il segnaposto resta visibile', translate('it', 'settings.language.current') === 'Lingua attuale: {language}')
 check('chiave non valida: stringa vuota, nessun crash', translate('it', undefined) === '' && translate('it', '') === '' && translate('it', 'settings') === 'settings')
@@ -82,50 +92,80 @@ section('A. Default, D. persistenza, F. cambio lingua')
   const map = new Map()
   const store = await boot(map)
   const S = store.getState
+  check('A. nuovo dispositivo → en, in attesa della scelta (schermata di benvenuto)', S().language === 'en' && devicePreference(map) === null && needsLanguageWelcome(storageOf(map)))
   S().switchScope(scopeFor('utente-a'))
-  check('A. account senza lingua → it', S().language === 'it')
-  check('   anche l\'ospite parte in italiano', (await boot(new Map())).getState().language === 'it')
+  check('   un account senza lingua sul dispositivo nuovo → en', S().language === 'en')
   const sequence = ['en', 'fr', 'es', 'it']
   const seen = sequence.map((code) => { S().setLanguage(code); return S().language })
   check('F. it → en → fr → es → it', seen.join() === sequence.join())
   S().setLanguage('en')
-  check('   salvata subito nel contenitore dell\'account', savedLanguage(map, scopeFor('utente-a')) === 'en')
+  check('   salvata subito sul dispositivo (scelta in Impostazioni)', devicePreference(map)?.language === 'en' && devicePreference(map)?.source === 'settings' && !needsLanguageWelcome(storageOf(map)))
+  check('   e anche nel contenitore dell\'account (copia)', savedLanguage(map, scopeFor('utente-a')) === 'en')
   const reopened = await boot(map)
   check('D. setLanguage(\'en\') → riapertura → en', reopened.getState().scopeId === scopeFor('utente-a') && reopened.getState().language === 'en')
   S().setLanguage('de')
-  check('C. setLanguage(\'de\') → it', S().language === 'it' && savedLanguage(map, scopeFor('utente-a')) === 'it')
-  // Un contenitore salvato con un valore non valido (versione futura, file manomesso).
-  const blob = JSON.parse(map.get(stateKey(scopeFor('utente-a'))))
-  map.set(stateKey(scopeFor('utente-a')), JSON.stringify({ ...blob, state: { ...blob.state, language: 'klingon' } }))
-  check('   valore non valido nel salvataggio → it alla riapertura', (await boot(map)).getState().language === 'it')
-  // Un contenitore salvato prima che esistesse la lingua.
-  const old = JSON.parse(map.get(stateKey(scopeFor('utente-a'))))
-  delete old.state.language
-  map.set(stateKey(scopeFor('utente-a')), JSON.stringify(old))
-  check('   contenitore di prima (senza lingua) → it, nessun utente vede cambiamenti', (await boot(map)).getState().language === 'it')
+  check('C. setLanguage(\'de\') → en (la lingua predefinita)', S().language === 'en' && devicePreference(map)?.language === 'en')
 }
 
 // =====================================================================
-section('E. Isolamento tra account sullo stesso dispositivo')
+section('Utenti esistenti: la loro lingua resta, nessuna schermata di benvenuto')
+// =====================================================================
+{
+  // Un dispositivo usato PRIMA della scelta della lingua: un contenitore con
+  // dei dati e senza la chiave del dispositivo.
+  const legacyDevice = async (language) => {
+    const map = new Map()
+    const store = await boot(map)
+    store.getState().switchScope(scopeFor('utente-a'))
+    store.setState({ today: '2026-10-20' })
+    store.getState().addExpense({ amount: 12, categoryId: 'bar', description: 'caffè', date: '2026-10-20' })
+    const blob = JSON.parse(map.get(stateKey(scopeFor('utente-a'))))
+    if (language === undefined) delete blob.state.language
+    else blob.state.language = language
+    map.set(stateKey(scopeFor('utente-a')), JSON.stringify(blob))
+    map.delete(LANGUAGE_PREFERENCE_KEY)
+    return map
+  }
+  for (const [label, saved, expected] of [['salvato in italiano', 'it', 'it'], ['salvato in francese', 'fr', 'fr'], ['salvato prima della lingua (nessun valore)', undefined, 'it'], ['con un valore non valido', 'klingon', 'it']]) {
+    const map = await legacyDevice(saved)
+    const expensesBefore = JSON.parse(map.get(stateKey(scopeFor('utente-a')))).state.expenses
+    const reopened = await boot(map)
+    check(`contenitore ${label} → ${expected}`, reopened.getState().language === expected && reopened.getState().scopeId === scopeFor('utente-a'))
+    check('   nessuna schermata di benvenuto: la lingua diventa quella del dispositivo (ereditata)', !needsLanguageWelcome(storageOf(map)) && devicePreference(map)?.language === expected && devicePreference(map)?.source === 'inherited' && devicePreference(map)?.chosenAt === null)
+    check('   spese intatte', JSON.stringify(reopened.getState().expenses) === JSON.stringify(expensesBefore))
+  }
+  {
+    // Ospite vuoto (chi ha solo aperto il sito, con la vecchia versione): è un nuovo utente.
+    const map = new Map([[stateKey(GUEST), JSON.stringify({ state: { language: 'it', expenses: [], incomes: [] }, version: 0 })]])
+    const store = await boot(map)
+    check('contenitore ospite vuoto → nuovo utente: en e schermata di benvenuto', store.getState().language === 'en' && needsLanguageWelcome(storageOf(map)))
+  }
+  {
+    // Un account già usato su questo dispositivo (ambito attivo di un account), anche senza dati.
+    const map = new Map([[ACTIVE_SCOPE_KEY, scopeFor('utente-b')], [stateKey(scopeFor('utente-b')), JSON.stringify({ state: { language: 'es' }, version: 0 })]])
+    const store = await boot(map)
+    check('ambito attivo di un account → è un utente esistente: resta es, nessuna schermata', store.getState().language === 'es' && !needsLanguageWelcome(storageOf(map)))
+  }
+}
+
+// =====================================================================
+section('E. La lingua è del dispositivo: uscire o cambiare account non la cambia')
 // =====================================================================
 {
   const map = new Map()
   const store = await boot(map)
   const S = store.getState
   S().switchScope(scopeFor('account-a'))
-  S().setLanguage('en')
-  S().switchScope(scopeFor('account-b'))
-  check('B entra dopo A (en): B ha la sua lingua, it', S().language === 'it')
   S().setLanguage('fr')
-  S().switchScope(scopeFor('account-a'))
-  check('A rientra: ritrova en, non la fr di B', S().language === 'en')
   S().switchScope(scopeFor('account-b'))
-  check('B rientra: ritrova fr', S().language === 'fr')
-  check('due contenitori separati: A = en, B = fr', savedLanguage(map, scopeFor('account-a')) === 'en' && savedLanguage(map, scopeFor('account-b')) === 'fr')
+  check('B entra dopo A (fr): la lingua resta fr (quella dell\'account arriva dai metadati, vedi languageChoice.test)', S().language === 'fr')
   S().switchScope(GUEST)
-  check('l\'ospite non vede la lingua degli account', S().language === 'it')
+  check('uscendo (ospite): resta fr, non torna all\'italiano', S().language === 'fr')
+  S().switchScope(scopeFor('account-a'))
+  check('A rientra: fr', S().language === 'fr')
+  S().switchScope(GUEST)
   const reopened = await boot(map)
-  check('riaprendo l\'app (ultimo ambito: ospite) resta it', reopened.getState().scopeId === GUEST && reopened.getState().language === 'it')
+  check('riaprendo l\'app (ultimo ambito: ospite) resta fr', reopened.getState().scopeId === GUEST && reopened.getState().language === 'fr')
 }
 
 // =====================================================================
@@ -166,7 +206,8 @@ section('<html lang> segue la lingua scelta')
 // =====================================================================
 {
   const { startDocumentLanguage } = await import('./documentLanguage.js')
-  const map = new Map()
+  // Dispositivo di un utente italiano.
+  const map = italianDevice(new Map())
   const store = await boot(map)
   const S = store.getState
   S().switchScope(scopeFor('utente-lang'))
@@ -185,10 +226,10 @@ section('<html lang> segue la lingua scelta')
   check('4. cambio a fr → lang="fr"', doc.documentElement.lang === 'fr')
   check('5. nessun altro dato dello store modificato', dataOf(S()) === before)
   S().setLanguage('de')
-  check('   valore non valido → lang="it"', doc.documentElement.lang === 'it')
+  check('   valore non valido → lang="en" (la lingua predefinita)', doc.documentElement.lang === 'en')
   S().setLanguage('fr')
   S().switchScope(scopeFor('altro-account'))
-  check('   cambio di account (lingua del nuovo account: it) → lang="it"', doc.documentElement.lang === 'it')
+  check('   cambio di account: la lingua è del dispositivo → resta lang="fr"', doc.documentElement.lang === 'fr')
   S().switchScope(scopeFor('utente-lang'))
   check('   ritorno all\'account in francese → lang="fr"', doc.documentElement.lang === 'fr')
   const reopened = await boot(map)
@@ -209,7 +250,8 @@ section('I. Il selettore in Impostazioni (componente vero, store vero)')
 // =====================================================================
 {
   const { installFakeDom } = await import('../store/fakeDom.mjs')
-  const dom = installFakeDom(new Map())
+  // Dispositivo di un utente italiano.
+  const dom = installFakeDom(italianDevice(new Map()))
   const { createRoot } = await import('react-dom/client')
   const { flushSync } = await import('react-dom')
   const { createElement: h } = await import('react')

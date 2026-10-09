@@ -11,7 +11,8 @@ import { addToState, markAllReadInState, markReadInState, removeFromState, sanit
 import { STATE_BASE, createScopeManager, isUserScope, isValidScope, ownerOf, scopeFor } from './scope.js'
 import { isValidAmount, isValidBudget } from '../utils/amounts.js'
 import { SALARY_CATEGORY_ID, isSalary } from '../utils/salary.js'
-import { DEFAULT_LANGUAGE, normalizeLanguage } from '../i18n/languages.js'
+import { DEFAULT_LANGUAGE, LEGACY_LANGUAGE, normalizeLanguage } from '../i18n/languages.js'
+import { deviceStorage, ensureLanguagePreference, readLanguagePreference, writeLanguagePreference } from '../i18n/languagePreference.js'
 
 const sumAmounts = (list) => list.reduce((total, entry) => total + entry.amount, 0)
 
@@ -126,6 +127,12 @@ const scopes = createScopeManager({
   getStorage: () => (typeof window === 'undefined' ? null : window.localStorage),
 })
 
+// La lingua del dispositivo, decisa PRIMA di creare lo store
+// (i18n/languagePreference.js): chi usava già SPENDY riceve come preferenza la
+// lingua che stava usando, senza schermata di benvenuto; un primo avvio parte
+// in inglese, in attesa della scelta. È anche la lingua dello stato iniziale.
+const startupLanguagePreference = ensureLanguagePreference(deviceStorage())
+
 // Single store for everything the app needs. Persisted to localStorage
 // (see the `persist` wrapper below) — a real backend would later replace
 // the persisted blob with a fetch/sync, but nothing that reads from this
@@ -169,6 +176,10 @@ export const useAppStore = create(
           registerCustomCategories([])
           set({ ...emptyScopeState(), scopeId: scope, activeTab: 'home', modal: null, modalPayload: null })
           api.persist.rehydrate()
+          // La lingua è del dispositivo: cambiare ambito (uscire, entrare,
+          // cambiare account) non la cambia.
+          const device = readLanguagePreference(deviceStorage())
+          if (device) set({ language: device.language })
         })
 
         // Il contenitore di un account appartiene a quell'account, e il
@@ -276,13 +287,22 @@ export const useAppStore = create(
       setLegalAcceptedVersion: (version) => set({ legalAcceptedVersion: typeof version === 'string' && version ? version : null }),
 
       // La lingua dell'app (i18n/languages.js): una preferenza dell'esperienza,
-      // non un dato finanziario. Come legalAcceptedVersion vive nel contenitore
-      // locale dell'account (quindi ogni account sullo stesso dispositivo ha la
-      // sua), non viaggia con il sync e non tocca nessun altro campo. Un valore
-      // non valido diventa l'italiano. Si legge e si cambia solo da
-      // i18n/useLanguage.js.
-      language: DEFAULT_LANGUAGE,
-      setLanguage: (language) => set({ language: normalizeLanguage(language) }),
+      // non un dato finanziario. Vale per il DISPOSITIVO (chiave
+      // 'spendy-language', i18n/languagePreference.js), così uscire
+      // dall'account o cambiarlo non la cambia; segue l'account tramite i
+      // metadati di Supabase Auth (sync/spendySync.js), mai tramite il sync dei
+      // dati, e non tocca nessun altro campo. Si legge e si cambia solo da
+      // i18n/useLanguage.js. `source` dice chi l'ha scelta (vedi
+      // languagePreference.js): 'settings' è una scelta esplicita dell'utente.
+      language: startupLanguagePreference?.language ?? DEFAULT_LANGUAGE,
+      setLanguage: (language, { source = 'settings', chosenAt } = {}) => {
+        const next = normalizeLanguage(language)
+        writeLanguagePreference(deviceStorage(), { language: next, source, chosenAt: chosenAt === undefined ? nowIso() : chosenAt })
+        set({ language: next })
+      },
+      // Solo l'anteprima della schermata di benvenuto: cambia la lingua a
+      // schermo senza salvare nessuna scelta (la salva "Continua").
+      previewLanguage: (language) => set({ language: normalizeLanguage(language) }),
 
       // Le risposte alla scheda di inizio ciclo (components/budget/
       // CycleStartCard). Come legalAcceptedVersion sono solo locali, per
@@ -761,9 +781,11 @@ export const useAppStore = create(
         if (!state) return
         if (state.customCategories) registerCustomCategories(state.customCategories)
 
-        // Contenitori salvati prima della scelta della lingua, o con un valore
-        // non valido: italiano.
-        state.language = normalizeLanguage(state.language)
+        // La lingua del dispositivo, se c'è già una preferenza; altrimenti
+        // quella del contenitore. Contenitori salvati prima della scelta della
+        // lingua, o con un valore non valido: italiano (utenti esistenti).
+        const device = readLanguagePreference(deviceStorage())
+        state.language = device ? device.language : normalizeLanguage(state.language, LEGACY_LANGUAGE)
 
         // Contenitori salvati prima delle notifiche, o con dati non validi.
         Object.assign(state, sanitizeNotificationState(state.notifications, state.notificationKeys))
@@ -807,3 +829,12 @@ export const useAppStore = create(
     },
   ),
 )
+
+// Dopo il primo caricamento: la lingua a schermo è quella del dispositivo (o,
+// al primo avvio, la predefinita, anche se un vecchio contenitore vuoto dice
+// altro). Solo se cambia davvero: altrimenti nessuna scrittura (un contenitore
+// appena migrato deve restare identico all'originale).
+{
+  const language = startupLanguagePreference?.language ?? DEFAULT_LANGUAGE
+  if (useAppStore.getState().language !== language) useAppStore.setState({ language })
+}

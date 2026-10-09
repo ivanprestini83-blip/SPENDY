@@ -1,0 +1,84 @@
+/* La schermata di benvenuto: sopra tutto il resto (anche sopra il recupero
+   password e i documenti, che compaiono dopo la scelta), con lo stesso fondo
+   e la stessa card delle altre schermate a tutto schermo. */
+.language-welcome {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(20px + env(safe-area-inset-top)) 18px calc(20px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  background: radial-gradient(120% 80% at 50% -10%, var(--color-bg-glow) 0%, var(--color-bg) 55%);
+  animation: language-welcome-in 0.25s var(--ease-standard);
+}
+
+@keyframes language-welcome-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.language-welcome__card {
+  width: 100%;
+  max-width: 400px;
+  margin: auto;
+  padding: 26px 20px 20px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  text-align: center;
+}
+
+.language-welcome__mascot {
+  display: block;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 6px;
+  object-fit: contain;
+}
+
+.language-welcome__title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+}
+
+.language-welcome__subtitle {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+/* Le opzioni sono quelle di Impostazioni → Lingua, una per riga e più alte:
+   è la prima cosa che si tocca. */
+.language-welcome__options {
+  margin-top: 18px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.language-welcome__options .language-card__option {
+  min-height: 52px;
+  font-size: 15px;
+}
+
+.language-welcome__continue {
+  margin-top: 16px;
+  width: 100%;
+}
+
+.language-welcome__hint {
+  margin-top: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .language-welcome {
+    animation: none;
+  }
+}
