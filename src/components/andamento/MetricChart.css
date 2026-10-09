@@ -3,10 +3,10 @@
 .metric-chart {
   grid-column: 1 / -1;
   min-width: 0;
-  padding: 12px 14px 12px;
+  padding: 14px 16px 14px;
   border-radius: var(--radius-md);
   background: var(--color-surface);
-  box-shadow: var(--shadow-float);
+  box-shadow: var(--shadow-card);
   animation: metric-chart-in 0.22s var(--ease-standard);
 }
 
@@ -45,6 +45,15 @@
   animation: metric-chart-draw 0.28s var(--ease-standard);
 }
 
+.metric-chart__area {
+  animation: metric-chart-fade 0.35s var(--ease-standard);
+}
+
+.metric-chart__fill-stop--top { stop-opacity: 0.22; }
+.metric-chart__fill-stop--bottom { stop-opacity: 0; }
+.metric-chart--violet .metric-chart__fill-stop { stop-color: var(--color-accent-violet); }
+.metric-chart--mint .metric-chart__fill-stop { stop-color: var(--color-accent-mint); }
+
 .metric-chart__dot {
   fill: var(--color-surface);
   stroke-width: 3;
@@ -74,7 +83,7 @@
 .metric-chart--mint .metric-chart__dot:not(.metric-chart__dot--missing) { stroke: var(--color-accent-mint); }
 
 .metric-chart__summary {
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 14px;
   font-weight: 800;
 }
@@ -113,6 +122,11 @@
   to { opacity: 1; transform: none; }
 }
 
+@keyframes metric-chart-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @keyframes metric-chart-draw {
   from { stroke-dashoffset: 1; }
   to { stroke-dashoffset: 0; }
@@ -120,6 +134,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .metric-chart,
+  .metric-chart__area,
   .metric-chart__line {
     animation: none;
   }

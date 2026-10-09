@@ -24,6 +24,9 @@ export function MetricChart({ id, title, color, points, summary, summaryTone, se
   const ys = points.map((point) => (point.value === null ? BOTTOM : y(point.value)))
   const both = points.every((point) => point.value !== null)
   const path = `M ${XS[0]} ${ys[0]} C ${XS[0] + 70} ${ys[0]}, ${XS[1] - 70} ${ys[1]}, ${XS[1]} ${ys[1]}`
+  // L'area sfumata sotto la linea: solo un rinforzo visivo della stessa curva.
+  const area = `${path} L ${XS[1]} ${BOTTOM} L ${XS[0]} ${BOTTOM} Z`
+  const fillId = `${id}-fill`
 
   return (
     <div id={id} className={`metric-chart metric-chart--${color}`} role="region" aria-label={title}>
@@ -41,6 +44,13 @@ export function MetricChart({ id, title, color, points, summary, summaryTone, se
         {[TOP, (TOP + BOTTOM) / 2, BOTTOM].map((lineY) => (
           <line key={lineY} className="metric-chart__grid" x1="16" x2={WIDTH - 16} y1={lineY} y2={lineY} />
         ))}
+        <defs>
+          <linearGradient id={fillId} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" className="metric-chart__fill-stop metric-chart__fill-stop--top" />
+            <stop offset="100%" className="metric-chart__fill-stop metric-chart__fill-stop--bottom" />
+          </linearGradient>
+        </defs>
+        {both && <path className="metric-chart__area" d={area} fill={`url(#${fillId})`} />}
         {both && <path className="metric-chart__line" d={path} pathLength="1" />}
         {points.map((point, index) => (
           <g key={point.label} className="metric-chart__point">

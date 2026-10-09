@@ -1,59 +1,141 @@
+/* "Come sto andando": stesso linguaggio di "Confronta periodi"
+   (CycleComparison.css) — sintesi con bordo colorato, riquadri bianchi
+   compatti con ombra leggera, card di sezione, stesse misure responsive. */
+
 .cycle-summary {
   flex-shrink: 0;
-  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ------------------------------------------------------------ sintesi */
+
+.cycle-summary__overview {
+  padding: 16px 18px;
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
+  border-left: 4px solid var(--color-text-tertiary);
+}
+
+.cycle-summary__overview--good {
+  border-left-color: var(--color-accent-mint);
+  background: linear-gradient(135deg, var(--color-accent-mint-soft), var(--color-surface) 60%);
+}
+
+.cycle-summary__overview--warn {
+  border-left-color: var(--color-accent-gold);
+  background: linear-gradient(135deg, var(--color-accent-gold-soft), var(--color-surface) 60%);
+}
+
+.cycle-summary__overview--bad {
+  border-left-color: var(--color-accent-coral);
+  background: linear-gradient(135deg, var(--color-accent-coral-soft), var(--color-surface) 60%);
 }
 
 .cycle-summary__head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
 }
 
 .cycle-summary__title {
-  font-size: 17px;
+  min-width: 0;
+  font-size: 13px;
   font-weight: 800;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Come cycle-comparison__status. */
+.cycle-summary__badge {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.cycle-summary__badge--current {
+  background: var(--color-accent-mint-soft);
+  color: var(--color-accent-mint);
+}
+
+.cycle-summary__badge--done {
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+}
+
+.cycle-summary__days {
+  margin-top: 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+.cycle-summary__overview-title {
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-text-secondary);
+}
+
+.cycle-summary__overview--good .cycle-summary__overview-title { color: var(--color-accent-mint); }
+.cycle-summary__overview--warn .cycle-summary__overview-title { color: var(--color-accent-gold); }
+.cycle-summary__overview--bad .cycle-summary__overview-title { color: var(--color-accent-coral); }
+
+.cycle-summary__overview-text {
+  margin-top: 4px;
+  font-size: 21px;
+  font-weight: 800;
+  line-height: 1.2;
   color: var(--color-text-primary);
 }
 
-.cycle-summary__badge {
-  padding: 3px 9px;
-  border-radius: var(--radius-pill);
-  background: var(--color-accent-mint-soft);
-  color: var(--color-accent-mint);
-  font-size: 11.5px;
-  font-weight: 800;
+/* La barra del budget, a tutta larghezza e più alta: si legge al volo. */
+.cycle-summary__progress {
+  margin-top: 12px;
+  height: 10px;
+  background: rgba(16, 26, 51, 0.07);
 }
+
+/* ------------------------------------------------- metriche 2 × 2 */
 
 .cycle-summary__grid {
-  margin-top: 16px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
+/* Come cycle-comparison__metric (senza il pulsante: qui non si apre nulla). */
 .cycle-summary__metric {
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 14px;
+  padding: 10px 12px;
   border-radius: var(--radius-md);
-  background: var(--color-surface-raised);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-float);
 }
 
 .cycle-summary__metric-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--color-text-secondary);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
 }
 
 .cycle-summary__metric-value {
-  font-size: 19px;
+  font-size: 15px;
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   color: var(--color-text-primary);
   overflow-wrap: anywhere;
 }
@@ -73,33 +155,32 @@
   color: var(--color-text-tertiary);
 }
 
-.cycle-summary__progress {
-  margin-top: 4px;
-  height: 7px;
-  background: rgba(16, 26, 51, 0.07);
-}
+/* ---------------------------------------------------------- categorie */
 
+/* Come cycle-comparison__categories. */
 .cycle-summary__categories {
-  margin-top: 20px;
+  padding: 14px 16px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
 }
 
 .cycle-summary__section-title {
-  font-size: 12.5px;
+  margin-bottom: 6px;
+  font-size: 14px;
   font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
+  color: var(--color-text-primary);
 }
 
 .cycle-summary__empty {
-  margin-top: 10px;
+  margin-top: 6px;
   font-size: 13.5px;
   font-weight: 600;
   color: var(--color-text-tertiary);
 }
 
 .cycle-summary__list {
-  margin: 12px 0 0;
+  margin: 8px 0 0;
   padding: 0;
   list-style: none;
   display: flex;
@@ -185,4 +266,26 @@
   font-size: 12.5px;
   font-weight: 600;
   color: var(--color-text-tertiary);
+}
+
+/* Stesse soglie responsive di "Confronta periodi". */
+@media (max-width: 359px) {
+  .cycle-summary__overview { padding: 14px 14px; }
+  .cycle-summary__overview-text { font-size: 18px; }
+  .cycle-summary__metric { padding: 9px 10px; }
+}
+
+@media (min-width: 600px) {
+  .cycle-summary { gap: 12px; }
+  .cycle-summary__overview { padding: 18px 22px; }
+  .cycle-summary__overview-text { font-size: 24px; }
+  .cycle-summary__grid { gap: 10px; }
+  .cycle-summary__metric { padding: 12px 14px; }
+  .cycle-summary__metric-value { font-size: 17px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cycle-summary__row-bar > span {
+    transition: none;
+  }
 }

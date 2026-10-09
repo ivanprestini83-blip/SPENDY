@@ -38,7 +38,7 @@ const FILES = [
 // =====================================================================
 section('1. Dizionari: nessuna chiave mancante, stessi segnaposto')
 // =====================================================================
-check(`chiavi nuove: ${NEW_KEYS.length} (common ${NEW_KEYS.filter((k) => k.startsWith('common.')).length}, analytics ${NEW_KEYS.filter((k) => k.startsWith('analytics.')).length}, andamento ${NEW_KEYS.filter((k) => k.startsWith('andamento.')).length})`, NEW_KEYS.length === 86)
+check(`chiavi nuove: ${NEW_KEYS.length} (common ${NEW_KEYS.filter((k) => k.startsWith('common.')).length}, analytics ${NEW_KEYS.filter((k) => k.startsWith('analytics.')).length}, andamento ${NEW_KEYS.filter((k) => k.startsWith('andamento.')).length})`, NEW_KEYS.length === 103)
 for (const lang of LANGS) {
   const missing = NEW_KEYS.filter((key) => typeof lookup(MESSAGES[lang], key) !== 'string' || !lookup(MESSAGES[lang], key).trim())
   check(`${lang}: tutte presenti e non vuote`, missing.length === 0, missing.join(', '))
@@ -161,6 +161,41 @@ try {
   load(MAIN)
   const andamento = buildAndamento({ ...MAIN })
   const [A, B, C] = andamento.cycles
+  // Le etichette dei periodi seguono la lingua (solo il testo): L(lang, ciclo)
+  // è l'etichetta che la schermata deve mostrare in quella lingua. Tutti gli
+  // scenari qui sotto usano il ciclo personalizzato del giorno 7.
+  const { formatCycleLabel, formatCycleStartLabel } = await server.ssrLoadModule('/src/utils/cycle.js')
+  const { cycleLabelNames } = await server.ssrLoadModule('/src/i18n/cycleLabelNames.js')
+  const L = (lang, cycle) => formatCycleLabel(cycle.range, 7, cycleLabelNames(lang))
+
+  // =====================================================================
+  section('3b. Etichette dei periodi nelle quattro lingue (testo atteso scritto a mano)')
+  // =====================================================================
+  {
+    const custom = { start: '2026-09-07', end: '2026-10-07' }
+    const calendar = { start: '2026-09-01', end: '2026-10-01' }
+    const january = { start: '2027-01-31', end: '2027-02-28' }
+    const EXPECTED = {
+      it: ['7 Set – 6 Ott', '7 Set', 'Settembre 2026', 'Set', '31 Gen – 27 Feb'],
+      en: ['7 Sep – 6 Oct', '7 Sep', 'September 2026', 'Sep', '31 Jan – 27 Feb'],
+      es: ['7 sept – 6 oct', '7 sept', 'septiembre de 2026', 'sept', '31 ene – 27 feb'],
+      fr: ['7 sept. – 6 oct.', '7 sept.', 'septembre 2026', 'sept.', '31 janv. – 27 févr.'],
+    }
+    for (const lang of LANGS) {
+      const names = cycleLabelNames(lang)
+      const got = [formatCycleLabel(custom, 7, names), formatCycleStartLabel(custom, 7, names), formatCycleLabel(calendar, 1, names), formatCycleStartLabel(calendar, 1, names), formatCycleLabel(january, 31, names)]
+      check(`${lang}: ${got.join(' | ')}`, got.join('|') === EXPECTED[lang].join('|'), EXPECTED[lang].join(' | '))
+    }
+    check('senza nomi dei mesi: italiano, identico a prima', formatCycleLabel(custom, 7) === '7 Set – 6 Ott' && formatCycleLabel(calendar, 1) === 'Settembre 2026' && formatCycleStartLabel(calendar, 1) === 'Set'
+      && A.label === L('it', A) && B.label === '7 Set – 6 Ott' && C.shortLabel === '7 Ott')
+    // La lingua cambia SOLO label/shortLabel: chiavi, confini e numeri identici.
+    const strip = (cycle) => JSON.stringify({ ...cycle, label: null, shortLabel: null })
+    const sameNumbers = LANGS.every((lang) => {
+      const other = buildAndamento({ ...MAIN, labelNames: cycleLabelNames(lang) }).cycles
+      return other.length === andamento.cycles.length && other.every((cycle, i) => strip(cycle) === strip(andamento.cycles[i]) && cycle.label === L(lang, cycle))
+    })
+    check('buildAndamento in ogni lingua: stessi cicli, confini, importi e categorie (cambiano solo le etichette)', sameNumbers)
+  }
   const cmpBC = compareCycles(B, C)
   const cmpAC = compareCycles(A, C)
 
@@ -185,7 +220,7 @@ try {
       && summary.includes(tr('andamento.status.current')) && summary.includes(tr('andamento.metric.savings')) && summary.includes(tr('andamento.metric.budget'))
       && summary.includes(tr('andamento.summary.extra', { amount: formatCurrency(120) })) && summary.includes(tr('andamento.expensesmany', { count: 2 }))
       && summary.includes(tr('andamento.summary.where')))
-    check(`   ${lang}: aria del grafico per ciclo, con importi invariati`, aria(byClass(container, 'trend-chart__column').at(-1)) === tr('andamento.trend.bar', { cycle: C.label, spent: formatCurrency(C.spent), income: formatCurrency(C.income) }))
+    check(`   ${lang}: aria del grafico per ciclo, con importi invariati`, aria(byClass(container, 'trend-chart__column').at(-1)) === tr('andamento.trend.bar', { cycle: L(lang, C), spent: formatCurrency(C.spent), income: formatCurrency(C.income) }))
     overviewTexts[lang] = byClass(container, 'cycle-summary__metric-value').map(text).join('|')
     if (lang !== 'it') check(`   ${lang}: nessun testo italiano rimasto`, leftover(text(container) + html(), lang).length === 0, leftover(text(container) + html(), lang).join(' | '))
   }
@@ -223,12 +258,14 @@ try {
     check(`   ${lang}: conclusione in frasi intere ("${text(one(container, 'cycle-comparison__verdict-text'))}" / "${text(one(container, 'cycle-comparison__verdict-ref'))}")`,
       text(one(container, 'cycle-comparison__verdict-title')).endsWith(tr('andamento.verdict.good'))
       && text(one(container, 'cycle-comparison__verdict-text')) === tr('andamento.verdict.less', { amount: formatCurrency(Math.abs(cmpBC.spent.diff)) })
-      && text(one(container, 'cycle-comparison__verdict-ref')) === `${tr('andamento.verdict.diffprevious')} (${B.label})`
+      && text(one(container, 'cycle-comparison__verdict-ref')) === `${tr('andamento.verdict.diffprevious')} (${L(lang, B)})`
       && text(one(container, 'cycle-comparison__note')) === tr('andamento.compare.currentnote') && aria(one(container, 'cycle-comparison__verdict')) === tr('andamento.compare.conclusion'))
     check(`   ${lang}: riquadri Spese / Entrate / Risparmio / Budget utilizzato`, byClass(container, 'cycle-comparison__metric-label').map(text).join('|') === ['spent', 'income', 'savings', 'budget'].map((m) => tr(`andamento.metric.${m}`)).join('|')
-      && aria(one(container, 'cycle-comparison__metrics')) === tr('andamento.compare.numbers', { before: B.label, after: C.label })
+      && aria(one(container, 'cycle-comparison__metrics')) === tr('andamento.compare.numbers', { before: L(lang, B), after: L(lang, C) })
       && text(one(container, 'cycle-comparison__section-title')).endsWith(tr('andamento.compare.difference')))
     shown[lang] = values()
+    if (lang === 'fr') check('   fr: a schermo "(7 sept. – 6 oct.)", minuscolo come in francese', text(one(container, 'cycle-comparison__verdict-ref')).endsWith('(7 sept. – 6 oct.)'))
+    if (lang === 'es') check('   es: a schermo "(7 sept – 6 oct)", minuscolo come in spagnolo', text(one(container, 'cycle-comparison__verdict-ref')).endsWith('(7 sept – 6 oct)'))
     if (lang !== 'it') check(`   ${lang}: nessun testo italiano rimasto`, leftover(text(container) + html(), lang).length === 0, leftover(text(container) + html(), lang).join(' | '))
   }
   check('valori dei riquadri identici in ogni lingua (calcoli invariati)', same(Object.values(shown)) && shown.it.includes(formatCurrency(B.spent)) && shown.it.includes(formatCurrency(C.spent)), JSON.stringify(shown))
@@ -264,7 +301,7 @@ try {
   await act(() => propsOf(selects()[0]).onChange({ target: { value: A.key } }))
   for (const lang of LANGS) {
     await act(() => setLanguage(lang))
-    check(`${lang}: periodi non consecutivi → "${text(one(container, 'cycle-comparison__verdict-ref'))}"`, text(one(container, 'cycle-comparison__verdict-ref')) === translate(lang, 'andamento.verdict.diffother', { cycle: A.label })
+    check(`${lang}: periodi non consecutivi → "${text(one(container, 'cycle-comparison__verdict-ref'))}"`, text(one(container, 'cycle-comparison__verdict-ref')) === translate(lang, 'andamento.verdict.diffother', { cycle: L(lang, A) })
       && text(one(container, 'cycle-comparison__verdict-text')) === translate(lang, `andamento.verdict.${cmpAC.spent.diff < 0 ? 'less' : 'more'}`, { amount: formatCurrency(Math.abs(cmpAC.spent.diff)) }))
   }
   // Stesso periodo su entrambi i selettori.
@@ -291,7 +328,7 @@ try {
     await act(() => setLanguage(lang))
     const cur = buildAndamento({ today: '2026-10-20', cycleStartDay: 7, incomes: [], expenses: [expense('s1', 'bar', 5, '2026-10-12')] }).current
     check(`${lang}: un solo periodo → titolo e frase intera con {cycle}`, text(one(container, 'andamento-screen__empty-title')) === translate(lang, 'andamento.single.title')
-      && text(one(container, 'andamento-screen__empty-text')) === translate(lang, 'andamento.single.text', { cycle: cur.label }))
+      && text(one(container, 'andamento-screen__empty-text')) === translate(lang, 'andamento.single.text', { cycle: L(lang, cur) }))
   }
   await act(() => propsOf(tabs()[0]).onClick({}))
   for (const lang of LANGS) {
@@ -308,12 +345,12 @@ try {
     await act(() => propsOf(card(3)).onClick({}))
     const unavailable = one(container, 'metric-chart--unavailable')
     const budgetOk = text(one(unavailable, 'metric-chart__summary')) === tr('andamento.chart.budgetna')
-      && text(one(unavailable, 'metric-chart__sentence')) === tr('andamento.chart.nosalarytwo', { first: N1.label, second: N2.label })
+      && text(one(unavailable, 'metric-chart__sentence')) === tr('andamento.chart.nosalarytwo', { first: L(lang, N1), second: L(lang, N2) })
       && text(byClass(card(3), 'cycle-comparison__change')[0]).includes(tr('andamento.change.notcomparable'))
     await act(() => propsOf(card(1)).onClick({}))
     const notes = byClass(chart(), 'metric-chart__note').map(text).join('|')
     await act(() => propsOf(card(1)).onClick({}))
-    check(`${lang}: budget non confrontabile (due periodi, frase intera) e note "nessuna entrata"`, budgetOk && notes === [N1, N2].map((c) => tr('andamento.chart.noincome', { cycle: c.label })).join('|'), notes)
+    check(`${lang}: budget non confrontabile (due periodi, frase intera) e note "nessuna entrata"`, budgetOk && notes === [N1, N2].map((c) => tr('andamento.chart.noincome', { cycle: L(lang, c) })).join('|'), notes)
   }
   check('   italiano identico a prima (due periodi)', translate('it', 'andamento.chart.nosalarytwo', { first: 'A', second: 'B' }) === 'Il budget utilizzato si misura sullo stipendio del periodo, e A e B non hanno uno stipendio registrato.')
   // Stipendio solo nel periodo più recente: un periodo senza stipendio.
@@ -325,7 +362,7 @@ try {
     await act(() => propsOf(card(3)).onClick({}))
     const sentence = text(one(one(container, 'metric-chart--unavailable'), 'metric-chart__sentence'))
     await act(() => propsOf(card(3)).onClick({}))
-    check(`${lang}: un periodo senza stipendio → frase al singolare`, sentence === translate(lang, 'andamento.chart.nosalaryone', { cycle: O1.label }), sentence)
+    check(`${lang}: un periodo senza stipendio → frase al singolare`, sentence === translate(lang, 'andamento.chart.nosalaryone', { cycle: L(lang, O1) }), sentence)
   }
   // Solo entrate, nessuna spesa: categorie vuote, riepilogo vuoto, conclusione "uguale".
   const NOEXP = { today: '2026-10-20', cycleStartDay: 7, incomes: [income('x1', 'stipendio', 2000, '2026-09-07'), income('x2', 'stipendio', 2000, '2026-10-07')], expenses: [] }
@@ -336,7 +373,7 @@ try {
     const tr = (key, params) => translate(lang, key, params)
     check(`${lang}: nessuna spesa → categorie vuote, "${tr('andamento.verdict.flat')}", "${tr('andamento.verdict.same')}" / "${tr('andamento.verdict.sameprevious')}"`, text(one(container, 'category-comparison__empty')) === tr('andamento.categories.empty')
       && text(one(container, 'cycle-comparison__verdict-title')).endsWith(tr('andamento.verdict.flat')) && text(one(container, 'cycle-comparison__verdict-text')) === tr('andamento.verdict.same')
-      && text(one(container, 'cycle-comparison__verdict-ref')) === `${tr('andamento.verdict.sameprevious')} (${X1.label})`
+      && text(one(container, 'cycle-comparison__verdict-ref')) === `${tr('andamento.verdict.sameprevious')} (${L(lang, X1)})`
       && byClass(container, 'cycle-comparison__change').map(text).some((c) => c.includes(tr('andamento.change.unchanged'))))
   }
   await act(() => propsOf(tabs()[0]).onClick({}))
@@ -349,6 +386,98 @@ try {
     && fmt.describeDiff(0).text === 'Invariato' && fmt.describeDiff(0, { lang: 'fr' }).text === 'Inchangé'
     && fmt.describeChange({ kind: 'new', diff: 10, percent: null }, { lang: 'en' }).detail === 'New')
   await act(() => r.unmount())
+
+  // =====================================================================
+  section('6b. "Come sto andando": sintesi, giorni del ciclo, stati del budget')
+  // =====================================================================
+  // La sintesi deve leggere SOLO i valori di buildAndamento (budgetUsed,
+  // savings, spent) e i giorni di getCycleTiming: qui si confrontano con i
+  // valori calcolati dalle stesse funzioni, in ogni lingua.
+  const { getCycleTiming } = await server.ssrLoadModule('/src/utils/cycle.js')
+  const { registerCustomCategories: registerCustom } = await server.ssrLoadModule('/src/data/categories.js')
+  const { NOTIFICATION_THRESHOLDS } = await server.ssrLoadModule('/src/notifications/notificationRules.js')
+  const box = dom.createContainer()
+  let boxRoot = null
+  const mount = async (state) => {
+    if (boxRoot) await act(() => boxRoot.unmount())
+    load(state)
+    boxRoot = createRoot(box, { onRecoverableError: () => {} })
+    await act(() => boxRoot.render(h(AndamentoScreen, { onClose: () => {} })))
+  }
+  const overviewTone = () => (cls(one(box, 'cycle-summary__overview')).match(/cycle-summary__overview--(\w+)/) ?? [])[1]
+  const cycleState = (state) => buildAndamento({ ...state }).current
+  // Ciclo personalizzato (giorno 7): il ciclo in corso va dal 7/10 al 6/11.
+  const base = (expenses, incomes, today = '2026-10-20') => ({ today, cycleStartDay: 7, incomes, expenses })
+  const salary = (amount) => income('o-sal', 'stipendio', amount, '2026-10-07')
+  const spentOf = (amount) => [expense('o-e1', 'spesa', amount, '2026-10-12')]
+  const CASES = [
+    ['budget al 25%', base(spentOf(500), [salary(2000)]), 'good', 'ok', 'used'],
+    ['budget al 69,95% (sotto la soglia del 70%)', base(spentOf(1399), [salary(2000)]), 'good', 'ok', 'used'],
+    ['budget al 70% esatto', base(spentOf(1400), [salary(2000)]), 'warn', 'tight', 'used'],
+    ['budget all\'89,95%', base(spentOf(1799), [salary(2000)]), 'warn', 'tight', 'used'],
+    ['budget al 90% esatto (quasi esaurito)', base(spentOf(1800), [salary(2000)]), 'bad', 'near', 'used'],
+    ['budget oltre il 100%, ma entrate extra: risparmio ancora positivo', base(spentOf(2200), [salary(2000), income('o-x', 'extra', 500, '2026-10-09')]), 'bad', 'over', 'used'],
+    ['spese oltre le entrate (anche oltre il 100%): prevale "uscite oltre le entrate"', base(spentOf(2500), [salary(2000)]), 'bad', 'overspent', 'overspenttext'],
+    ['senza stipendio, solo un extra', base(spentOf(100), [income('o-x', 'extra', 300, '2026-10-09')]), 'flat', 'nosalary', 'spenttext'],
+    ['senza stipendio e spese oltre l\'extra: prevale "uscite oltre le entrate"', base(spentOf(400), [income('o-x', 'extra', 300, '2026-10-09')]), 'bad', 'overspent', 'overspenttext'],
+    ['nessuna entrata, nessuna spesa', base([], []), 'flat', 'nosalary', 'spenttext'],
+  ]
+  for (const [label, state, tone, titleKey, textKey] of CASES) {
+    await mount(state)
+    const cycle = cycleState(state)
+    const params = { percent: fmt.formatPercent(cycle.budgetUsed), amount: formatCurrency(textKey === 'overspenttext' ? Math.abs(cycle.savings) : cycle.spent) }
+    check(`${label}: sintesi "${translate('it', `andamento.overview.${titleKey}`)}" (${tone})`, overviewTone() === tone, overviewTone())
+    for (const lang of LANGS) {
+      await act(() => setLanguage(lang))
+      const tr = (key, p) => translate(lang, `andamento.overview.${key}`, p)
+      const ok = text(one(box, 'cycle-summary__overview-title')) === tr(titleKey) && text(one(box, 'cycle-summary__overview-text')) === tr(textKey, params)
+        && Boolean(one(box, 'cycle-summary__progress')) === (cycle.budgetUsed !== null)
+      check(`   ${lang}: titolo e frase dai valori di buildAndamento`, ok, `${text(one(box, 'cycle-summary__overview-title'))} | ${text(one(box, 'cycle-summary__overview-text'))}`)
+      if (lang !== 'it') check(`   ${lang}: nessun testo italiano`, leftover(text(box), lang).length === 0, leftover(text(box), lang).join(' | '))
+    }
+    await act(() => setLanguage('it'))
+    // Le quattro cifre restano quelle di prima, nello stesso ordine.
+    const expected = [formatCurrency(cycle.income), formatCurrency(cycle.spent), cycle.savings < 0 ? `-${formatCurrency(Math.abs(cycle.savings))}` : formatCurrency(cycle.savings), fmt.formatPercent(cycle.budgetUsed)]
+    check('   le quattro metriche: stessi valori del motore, stesso ordine', byClass(box, 'cycle-summary__metric-value').map(text).join('|') === expected.join('|'), byClass(box, 'cycle-summary__metric-value').map(text).join('|'))
+  }
+  check('soglie: 70 e 90 della barra, 100 delle notifiche (nessuna soglia nuova)', NOTIFICATION_THRESHOLDS.budgetOver === 100 && NOTIFICATION_THRESHOLDS.budgetNear === 90
+    && read('src/components/andamento/CycleSummary.jsx').includes('NOTIFICATION_THRESHOLDS.budgetOver'))
+
+  // Giorni del ciclo in corso: getCycleTiming, con il ciclo personalizzato.
+  const DAY_CASES = [['a metà ciclo', '2026-10-20'], ['penultimo giorno (1 giorno rimasto)', '2026-11-05'], ['ultimo giorno', '2026-11-06'], ['primo giorno', '2026-10-07']]
+  for (const [label, today] of DAY_CASES) {
+    const state = base(today === '2026-10-07' ? [expense('o-d', 'bar', 5, today)] : spentOf(500), [salary(2000)], today)
+    await mount(state)
+    const timing = getCycleTiming(today, 7)
+    check(`giorni (${label}): ciclo personalizzato ${timing.start} → ${timing.lastDay}, giorno ${timing.dayOfCycle}/${timing.cycleDays}, ${timing.daysRemaining} rimasti`, timing.start === cycleState(state).range.start)
+    for (const lang of LANGS) {
+      await act(() => setLanguage(lang))
+      const tr = (key, p) => translate(lang, `andamento.overview.${key}`, p)
+      const left = timing.daysRemaining === 0 ? tr('lastday') : timing.daysRemaining === 1 ? tr('leftone') : tr('leftmany', { count: timing.daysRemaining })
+      check(`   ${lang}: "${text(one(box, 'cycle-summary__days'))}"`, text(one(box, 'cycle-summary__days')) === `${tr('day', { day: timing.dayOfCycle, total: timing.cycleDays })} · ${left}`)
+    }
+  }
+  // Ciclo concluso: badge "Completo", nessun giorno, nessuna frase sul ciclo in corso.
+  await mount(MAIN)
+  await act(() => propsOf(byClass(box, 'trend-chart__column').at(-2)).onClick({}))
+  for (const lang of LANGS) {
+    await act(() => setLanguage(lang))
+    check(`${lang}: ciclo concluso → badge "${translate(lang, 'andamento.status.done')}", nessun giorno`, text(one(box, 'cycle-summary__badge')).includes(translate(lang, 'andamento.status.done'))
+      && cls(one(box, 'cycle-summary__badge')).includes('cycle-summary__badge--done') && !one(box, 'cycle-summary__days'))
+  }
+  await act(() => propsOf(byClass(box, 'trend-chart__column').at(-1)).onClick({}))
+  check('di nuovo il ciclo in corso: badge "In corso" e giorni', cls(one(box, 'cycle-summary__badge')).includes('cycle-summary__badge--current') && Boolean(one(box, 'cycle-summary__days')))
+  // Categoria personalizzata: il nome scelto dall'utente non si traduce.
+  registerCustom([{ id: 'custom-fufi', label: 'Croccantini di Fufi', emoji: '🐱', type: 'expense' }])
+  await mount(base([expense('o-c', 'custom-fufi', 42, '2026-10-12')], [salary(2000)]))
+  for (const lang of LANGS) {
+    await act(() => setLanguage(lang))
+    check(`${lang}: categoria personalizzata "Croccantini di Fufi" invariata`, byClass(box, 'cycle-summary__row-label').map(text).includes('Croccantini di Fufi'))
+  }
+  registerCustom([])
+  check('CycleSummary.jsx: nessun testo italiano scritto nel codice', !/['"`>][A-ZÀ-Ù][a-zà-ù]+ [a-zà-ù]+/.test(read('src/components/andamento/CycleSummary.jsx').split('\n').filter((l) => !l.trim().startsWith('//')).join('\n')))
+  await act(() => setLanguage('it'))
+  await act(() => boxRoot.unmount())
 
   // =====================================================================
   section('7. Analisi (pagina) e dettaglio categoria')

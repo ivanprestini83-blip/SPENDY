@@ -20,7 +20,10 @@ function MetricCard({ id, label, before, after, beforeValue, afterValue, change,
       aria-label={`${label}: ${before.shortLabel} ${beforeValue}, ${after.shortLabel} ${afterValue}, ${change.text}`}
       onClick={onToggle}
     >
-      <span className="cycle-comparison__metric-label">{label}</span>
+      <span className="cycle-comparison__metric-label">
+        <span className={`cycle-comparison__metric-dot cycle-comparison__metric-dot--${id}`} aria-hidden="true" />
+        {label}
+      </span>
       <span className="cycle-comparison__chevron" aria-hidden="true" />
       <span className="cycle-comparison__values">
         <span className="cycle-comparison__value">{beforeValue}</span>
@@ -78,6 +81,30 @@ function CycleStatus({ cycle }) {
   return cycle.isCurrent
     ? <span className="cycle-comparison__status cycle-comparison__status--current"><span aria-hidden="true">● </span>{t('andamento.status.current')}</span>
     : <span className="cycle-comparison__status cycle-comparison__status--done"><span aria-hidden="true">✓ </span>{t('andamento.status.done')}</span>
+}
+
+// Le spese dei due periodi una sopra l'altra, in scala fra loro: la
+// differenza raccontata dalla conclusione si vede prima ancora di leggerla.
+// Solo disegno: gli importi sono quelli di buildAndamento, già nei riquadri.
+function SpentBars({ before, after, tone }) {
+  const max = Math.max(before.spent, after.spent)
+  const width = (value) => (max > 0 ? Math.max(value > 0 ? 3 : 0, (value / max) * 100) : 0)
+  return (
+    <div className="cycle-comparison__bars" aria-hidden="true">
+      {[before, after].map((cycle, index) => (
+        <div key={cycle.key} className="cycle-comparison__bar-row">
+          <span className="cycle-comparison__bar-label">{cycle.shortLabel}</span>
+          <span className="cycle-comparison__bar-track">
+            <span
+              className={`cycle-comparison__bar-fill cycle-comparison__bar-fill--${index === 0 ? 'before' : tone}`}
+              style={{ width: `${width(cycle.spent)}%` }}
+            />
+          </span>
+          <span className="cycle-comparison__bar-amount">{formatCurrency(cycle.spent)}</span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 // Il confronto fra due cicli scelti dall'utente. Il più vecchio fa sempre
@@ -257,6 +284,7 @@ export function CycleComparison({ cycles, firstKey, secondKey, onChangeFirst, on
               {consecutive ? t(`andamento.verdict.${conclusion.ref}previous`) : t(`andamento.verdict.${conclusion.ref}other`, { cycle: before.label })}
               {consecutive && <span className="cycle-comparison__verdict-period"> ({before.label})</span>}
             </p>
+            <SpentBars before={before} after={after} tone={conclusion.tone} />
             {after.isCurrent && (
               <p className="cycle-comparison__note">{t('andamento.compare.currentnote')}</p>
             )}

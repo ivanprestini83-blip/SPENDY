@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { formatCurrency } from '../../utils/format.js'
+import { getCategoryColor } from '../../data/categoryColors.js'
 import { describeChange } from './andamentoFormat.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import './CategoryComparison.css'
@@ -30,7 +31,15 @@ export function CategoryComparison({ rows, beforeLabel, afterLabel }) {
           const width = largest > 0 ? Math.max(Math.abs(row.diff) / largest, row.diff === 0 ? 0 : 0.04) * 100 : 0
           return (
             <li key={row.categoryId} className="category-comparison__row">
-              <span className="category-comparison__emoji" aria-hidden="true">{row.category.emoji}</span>
+              {/* Il riquadro dell'icona prende il colore della categoria (lo
+                  stesso di Analisi), così si riconosce prima di leggerla. */}
+              <span
+                className="category-comparison__emoji"
+                aria-hidden="true"
+                style={{ '--category-color': getCategoryColor(row.categoryId) }}
+              >
+                {row.category.emoji}
+              </span>
               <span className="category-comparison__body">
                 <span className="category-comparison__top">
                   <span className="category-comparison__label">{row.category.label}</span>

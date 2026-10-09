@@ -70,7 +70,7 @@ function countCyclesWithData(entries, currentRange, cycleStartDay, maxCycles) {
   return count
 }
 
-function buildCycle({ range, expenses, incomes, cycleStartDay, isCurrent }) {
+function buildCycle({ range, expenses, incomes, cycleStartDay, isCurrent, labelNames }) {
   const spent = round2(totalForPeriod(expenses, range))
   const salary = round2(salaryForPeriod(incomes, range))
   const extraIncome = round2(totalForPeriod(extraIncomes(incomes), range))
@@ -90,8 +90,9 @@ function buildCycle({ range, expenses, incomes, cycleStartDay, isCurrent }) {
   return {
     key: range.start,
     range,
-    label: formatCycleLabel(range, cycleStartDay),
-    shortLabel: formatCycleStartLabel(range, cycleStartDay),
+    // Solo il testo delle etichette segue la lingua; `key` e `range` no.
+    label: formatCycleLabel(range, cycleStartDay, labelNames),
+    shortLabel: formatCycleStartLabel(range, cycleStartDay, labelNames),
     isCurrent,
     salary,
     extraIncome,
@@ -118,13 +119,16 @@ export function buildAndamento({
   today,
   cycleStartDay = 1,
   maxCycles = ANDAMENTO_MAX_CYCLES,
+  // Nomi dei mesi già tradotti per le etichette (cycleLabelNames);
+  // assenti = italiano. Non tocca nessun conto.
+  labelNames,
 }) {
   const startDay = cycleStartDay ?? 1
   const [currentRange] = lastCycles(today, 1, startDay)
   const count = countCyclesWithData([...expenses, ...incomes], currentRange, startDay, maxCycles)
 
   const cycles = lastCycles(today, count, startDay).map((range, index) =>
-    buildCycle({ range, expenses, incomes, cycleStartDay: startDay, isCurrent: index === count - 1 }),
+    buildCycle({ range, expenses, incomes, cycleStartDay: startDay, isCurrent: index === count - 1, labelNames }),
   )
 
   return {

@@ -1,5 +1,6 @@
 import { formatCurrency } from '../../utils/format.js'
 import { getCategoryColor } from '../../data/categoryColors.js'
+import { NOTIFICATION_THRESHOLDS } from '../../notifications/notificationRules.js'
 import { ProgressBar } from '../ProgressBar/ProgressBar.jsx'
 import { formatPercent } from './andamentoFormat.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
@@ -15,19 +16,70 @@ function budgetColor(budgetUsed) {
   return 'var(--color-accent-mint)'
 }
 
-// Il riepilogo di UN ciclo: le quattro cifre che rispondono a "come sto
-// andando?" e le categorie che pesano di più. Riceve un ciclo già
+// La sintesi in cima, come la conclusione di "Confronta periodi": solo stati
+// che l'app ha già, nessuna regola nuova. Le condizioni si sovrappongono, quindi
+// conta l'ordine, dalla più specifica:
+//   1. risparmio negativo (uscite oltre le entrate: la nota che il riquadro
+//      Risparmio mostra già);
+//   2. nessuno stipendio nel ciclo (budget utilizzato = null);
+//   3. budget ≥ 100% (la soglia "superato" delle notifiche);
+//   4. ≥ 90% e 5. ≥ 70% (le soglie della barra, budgetColor);
+//   6. altrimenti, tutto sotto controllo.
+function overviewOf(cycle, t) {
+  if (cycle.savings < 0) {
+    return { tone: 'bad', title: t('andamento.overview.overspent'), text: t('andamento.overview.overspenttext', { amount: formatCurrency(Math.abs(cycle.savings)) }) }
+  }
+  if (cycle.budgetUsed === null) {
+    return { tone: 'flat', title: t('andamento.overview.nosalary'), text: t('andamento.overview.spenttext', { amount: formatCurrency(cycle.spent) }) }
+  }
+  const used = t('andamento.overview.used', { percent: formatPercent(cycle.budgetUsed) })
+  if (cycle.budgetUsed >= NOTIFICATION_THRESHOLDS.budgetOver) return { tone: 'bad', title: t('andamento.overview.over'), text: used }
+  if (cycle.budgetUsed >= 90) return { tone: 'bad', title: t('andamento.overview.near'), text: used }
+  if (cycle.budgetUsed >= 70) return { tone: 'warn', title: t('andamento.overview.tight'), text: used }
+  return { tone: 'good', title: t('andamento.overview.ok'), text: used }
+}
+
+// "Giorno 12 di 30 · 18 giorni rimasti": i numeri sono quelli di
+// getCycleTiming (utils/cycle.js), passati da AndamentoScreen solo per il
+// ciclo in corso.
+function daysText(timing, t) {
+  const day = t('andamento.overview.day', { day: timing.dayOfCycle, total: timing.cycleDays })
+  const left = timing.daysRemaining === 0
+    ? t('andamento.overview.lastday')
+    : t(timing.daysRemaining === 1 ? 'andamento.overview.leftone' : 'andamento.overview.leftmany', { count: timing.daysRemaining })
+  return `${day} · ${left}`
+}
+
+// Il riepilogo di UN ciclo: la sintesi, le quattro cifre che rispondono a
+// "come sto andando?" e le categorie che pesano di più. Riceve un ciclo già
 // calcolato da buildAndamento, non fa conti suoi.
-export function CycleSummary({ cycle }) {
+export function CycleSummary({ cycle, timing = null }) {
   const { t } = useLanguage()
   const topCategories = cycle.categories.slice(0, TOP_CATEGORIES)
   const inRed = cycle.savings < 0
+  const overview = overviewOf(cycle, t)
+  // Prudenza: i giorni solo se sono davvero quelli di questo ciclo.
+  const showDays = Boolean(cycle.isCurrent && timing && timing.start === cycle.range?.start)
 
   return (
     <section className="cycle-summary" aria-live="polite">
-      <div className="cycle-summary__head">
-        <p className="cycle-summary__title">{cycle.label}</p>
-        {cycle.isCurrent && <span className="cycle-summary__badge">{t('andamento.status.current')}</span>}
+      <div className={`cycle-summary__overview cycle-summary__overview--${overview.tone}`} role="group" aria-label={t('andamento.overview.label')}>
+        <div className="cycle-summary__head">
+          <p className="cycle-summary__title">{cycle.label}</p>
+          {cycle.isCurrent
+            ? <span className="cycle-summary__badge cycle-summary__badge--current"><span aria-hidden="true">● </span>{t('andamento.status.current')}</span>
+            : <span className="cycle-summary__badge cycle-summary__badge--done"><span aria-hidden="true">✓ </span>{t('andamento.status.done')}</span>}
+        </div>
+        {showDays && <p className="cycle-summary__days">{daysText(timing, t)}</p>}
+        <p className="cycle-summary__overview-title">{overview.title}</p>
+        <p className="cycle-summary__overview-text">{overview.text}</p>
+        {cycle.budgetUsed !== null && (
+          <ProgressBar
+            value={cycle.budgetUsed}
+            colorValue={budgetColor(cycle.budgetUsed)}
+            trackClassName="cycle-summary__progress"
+          />
+        )}
       </div>
 
       <div className="cycle-summary__grid">
@@ -58,14 +110,8 @@ export function CycleSummary({ cycle }) {
         <div className="cycle-summary__metric">
           <span className="cycle-summary__metric-label">{t('andamento.metric.budget')}</span>
           <span className="cycle-summary__metric-value">{formatPercent(cycle.budgetUsed)}</span>
-          {cycle.budgetUsed === null ? (
+          {cycle.budgetUsed === null && (
             <span className="cycle-summary__metric-note">{t('andamento.summary.nosalary')}</span>
-          ) : (
-            <ProgressBar
-              value={cycle.budgetUsed}
-              colorValue={budgetColor(cycle.budgetUsed)}
-              trackClassName="cycle-summary__progress"
-            />
           )}
         </div>
       </div>

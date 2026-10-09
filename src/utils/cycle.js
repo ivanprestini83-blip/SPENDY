@@ -64,39 +64,50 @@ export function isWithinRange(dateStr, range) {
   return dateStr >= range.start && dateStr < range.end
 }
 
-const MONTH_LABELS_IT = [
-  'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-  'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
-]
-const SHORT_MONTH_LABELS_IT = [
-  'Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic',
-]
+// Le etichette dei cicli sono solo testo: date e confini restano quelli di
+// `range`. Questo modulo resta logica pura, senza dizionari: i nomi dei mesi
+// arrivano già tradotti in `names` ({ long, short, monthYear }, preparati da
+// cycleLabelNames nella cartella delle traduzioni). Senza `names` è
+// l'italiano di sempre: chi non lo passa vede le stesse etichette di prima.
+export const ITALIAN_CYCLE_LABEL_NAMES = Object.freeze({
+  long: Object.freeze([
+    'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+    'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
+  ]),
+  short: Object.freeze(['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu', 'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic']),
+  // "{month} {year}" ("Settembre 2026"); lo spagnolo usa "{month} de {year}".
+  monthYear: '{month} {year}',
+})
 
-function shortDate(dateStr) {
+const namesOrDefault = (names) => names ?? ITALIAN_CYCLE_LABEL_NAMES
+
+function shortDate(dateStr, names) {
   const [, month, day] = dateStr.split('-').map(Number)
-  return `${day} ${SHORT_MONTH_LABELS_IT[month - 1]}`
+  return `${day} ${names.short[month - 1]}`
 }
 
 // A human label for a cycle range — "Settembre 2026" when it's a plain
 // calendar month (cycleStartDay is 1, or unset), "27 ago – 26 set"
 // otherwise, since calling a Sep 27 - Oct 26 span "Settembre" would be
 // misleading.
-export function formatCycleLabel(range, cycleStartDay = 1) {
+export function formatCycleLabel(range, cycleStartDay = 1, names) {
+  const n = namesOrDefault(names)
   if (cycleStartDay === 1) {
     const [year, month] = range.start.split('-').map(Number)
-    return `${MONTH_LABELS_IT[month - 1]} ${year}`
+    return n.monthYear.replace('{month}', n.long[month - 1]).replace('{year}', String(year))
   }
-  return `${shortDate(range.start)} – ${shortDate(dayBefore(range.end))}`
+  return `${shortDate(range.start, n)} – ${shortDate(dayBefore(range.end), n)}`
 }
 
 // A short label for where ONE cycle starts — "Set" in calendar mode
 // (just the month name), "27 Set" in custom-cycle mode. Used side by
 // side (previous cycle / current cycle) where formatCycleLabel's own
 // combined range string would be too long, e.g. Radar's before/after.
-export function formatCycleStartLabel(range, cycleStartDay = 1) {
+export function formatCycleStartLabel(range, cycleStartDay = 1, names) {
+  const n = namesOrDefault(names)
   const [, month] = range.start.split('-').map(Number)
-  if (cycleStartDay === 1) return SHORT_MONTH_LABELS_IT[month - 1]
-  return shortDate(range.start)
+  if (cycleStartDay === 1) return n.short[month - 1]
+  return shortDate(range.start, n)
 }
 
 // One day before `dateStr` — used only to show the cycle's inclusive

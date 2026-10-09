@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useAppStore } from '../../store/useAppStore.js'
 import { buildAndamento } from '../../utils/andamentoEngine.js'
+import { getCycleTiming } from '../../utils/cycle.js'
 import { CycleTrendChart } from './CycleTrendChart.jsx'
 import { CycleSummary } from './CycleSummary.jsx'
 import { CycleComparison } from './CycleComparison.jsx'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { cycleLabelNames } from '../../i18n/cycleLabelNames.js'
 import './AndamentoScreen.css'
 
 // ANDAMENTO — "fammi vedere come sto andando". Il Radar segnala, questa
@@ -16,17 +18,20 @@ import './AndamentoScreen.css'
 // salvato da nessuna parte — è ricalcolato dalle stesse spese/entrate che
 // il sync tiene allineate fra Mac e Samsung.
 export function AndamentoScreen({ onClose }) {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const today = useAppStore((state) => state.today)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
   const incomes = useAppStore((state) => state.incomes)
 
   const andamento = useMemo(
-    () => buildAndamento({ expenses, incomes, today, cycleStartDay }),
-    [expenses, incomes, today, cycleStartDay],
+    // `language`: solo le etichette dei periodi ("7 oct. – 6 nov."), non i conti.
+    () => buildAndamento({ expenses, incomes, today, cycleStartDay, labelNames: cycleLabelNames(language) }),
+    [expenses, incomes, today, cycleStartDay, language],
   )
   const { cycles, current } = andamento
+  // Giorni del ciclo in corso: la stessa funzione di Home e Spendy (utils/cycle.js).
+  const timing = useMemo(() => getCycleTiming(today, cycleStartDay), [today, cycleStartDay])
   const previous = cycles.length > 1 ? cycles[cycles.length - 2] : current
 
   const [view, setView] = useState('overview')
@@ -45,16 +50,21 @@ export function AndamentoScreen({ onClose }) {
     <div className="andamento-screen">
       <div className="andamento-screen__header">
         <button type="button" className="andamento-screen__back" onClick={onClose} aria-label={t('common.close')}>
-          ←
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
         </button>
-        <div>
+        <div className="andamento-screen__heading">
           <p className="andamento-screen__title">
-            <span aria-hidden="true">📈</span> {t('andamento.title')}
+            <span className="andamento-screen__title-icon" aria-hidden="true">📈</span> {t('andamento.title')}
           </p>
-          <p className="andamento-screen__subtitle">{current.label}</p>
+          <p className="andamento-screen__subtitle">
+            <span className="andamento-screen__subtitle-dot" aria-hidden="true" />
+            {current.label}
+          </p>
         </div>
       </div>
 
+      {/* Le due viste sono il "filtro" principale della schermata: un
+          controllo segmentato con un'icona per ciascuna, sempre in vista. */}
       <div className="andamento-screen__tabs" role="tablist" aria-label={t('andamento.view')}>
         <button
           type="button"
@@ -63,6 +73,7 @@ export function AndamentoScreen({ onClose }) {
           className={`andamento-screen__tab${view === 'overview' ? ' andamento-screen__tab--active' : ''}`}
           onClick={() => setView('overview')}
         >
+          <svg className="andamento-screen__tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V11M12 19V5M19 19v-6" /></svg>
           {t('andamento.tab.overview')}
         </button>
         <button
@@ -72,6 +83,7 @@ export function AndamentoScreen({ onClose }) {
           className={`andamento-screen__tab${view === 'compare' ? ' andamento-screen__tab--active' : ''}`}
           onClick={() => setView('compare')}
         >
+          <svg className="andamento-screen__tab-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h12l-3-3M17 17H5l3 3" /></svg>
           {t('andamento.tab.compare')}
         </button>
       </div>
@@ -80,7 +92,7 @@ export function AndamentoScreen({ onClose }) {
         {view === 'overview' && (
           <>
             <CycleTrendChart cycles={cycles} selectedKey={selected.key} onSelect={setSelectedKey} />
-            <CycleSummary cycle={selected} />
+            <CycleSummary cycle={selected} timing={selected.isCurrent ? timing : null} />
           </>
         )}
 
