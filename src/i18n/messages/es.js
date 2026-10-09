@@ -6,9 +6,6 @@ export default {
       current: 'Idioma actual: {language}',
       partial: 'La traducción de la app está en curso: algunas pantallas siguen por ahora en italiano.',
     },
-    ai: {
-      italianonly: 'Por ahora Spendy AI solo habla italiano: en este idioma Spendy usa sus propias frases. Tu elección queda guardada.',
-    },
   },
   home: {
     header: {

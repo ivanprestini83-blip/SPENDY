@@ -21,6 +21,14 @@ export const AI_ANIMATIONS = ['gentle', 'playful', 'celebrate', 'concerned']
 export const AI_LAYOUTS = ['left', 'right', 'center', 'overlap']
 export const BUDGET_BANDS = ['ok', 'warning', 'high', 'exceeded']
 
+// Le lingue in cui Spendy AI risponde: le stesse dell'app (LANGUAGE_CODES,
+// che una Edge Function non può importare; un test verifica che coincidano).
+// Qualunque altro valore, o nessun valore, vale l'italiano: la lingua cambia
+// solo le parole della risposta, mai consenso, quota o regole.
+export const SPENDY_LOCALES = ['it', 'en', 'es', 'fr']
+export const DEFAULT_SPENDY_LOCALE = 'it'
+export const normalizeSpendyLocale = (value) => (SPENDY_LOCALES.includes(value) ? value : DEFAULT_SPENDY_LOCALE)
+
 export const MAX_MESSAGE_LENGTH = 240
 export const MAX_SENTENCES = 3
 export const REPEAT_SIMILARITY = 0.85
@@ -55,8 +63,30 @@ const FEAR_OR_JUDGMENT = /\b(rovin\w*|fallit\w*|fallimento|bancarott\w*|disastr\
 // espliciti, temi protetti), qui in forma autonoma per il server.
 const OFFENSIVE = /\b(idiot\w*|stupid\w*|scem\w*|cretin\w*|imbecill\w*|deficient\w*|incapac\w*|patetic\w*|devi smettere|basta con|non capisci|che vergogna|non hai imparato|sesso|porno|nud[oa]|erotic\w*|sexy|religion\w*|etnia|razza|orientamento sessuale|disabilità|identità di genere|nazionalità)\b/i
 
+// Le stesse famiglie in inglese, spagnolo e francese (Spendy AI risponde
+// nella lingua dell'utente). Confini di parola Unicode: \b non conosce le
+// lettere accentate.
+const word = (alternatives) => new RegExp(`(?<![\\p{L}])(?:${alternatives})(?![\\p{L}])`, 'iu')
+const RISKY_ADVICE_INTL = word([
+  'invest\\p{L}*', 'stocks?', 'crypto\\p{L}*', 'bitcoin', 'trading', 'forex', 'loans?', 'mortgages?', 'gambl\\p{L}*', 'betting', 'lotter(?:y|ies)',
+  'invertir', 'inversi[oó]n\\p{L}*', 'criptomoneda\\p{L}*', 'pr[eé]stamos?', 'hipoteca\\p{L}*', 'apuestas?', 'loter[ií]a\\p{L}*',
+  'investir', 'investissement\\p{L}*', 'bourse', 'emprunts?', 'hypoth[eè]que\\p{L}*', 'paris sportifs', 'loterie\\p{L}*',
+].join('|'))
+const FEAR_OR_JUDGMENT_INTL = word([
+  'ruin\\p{L}*', 'bankrupt\\p{L}*', 'disaster\\p{L}*', 'shame\\p{L}*', 'irresponsib\\p{L}*', 'spendthrift', 'your fault', 'you should feel', 'wrong choice', 'you made a mistake',
+  'arruin\\p{L}*', 'bancarrota', 'desastr\\p{L}*', 'verg[uü]enza', 'irresponsable\\p{L}*', 'derrochador\\p{L}*', 'culpa tuya', 'deber[ií]as sentirte', 'mala decisi[oó]n', 'te has equivocado',
+  'faillite', 'd[ée]sastr\\p{L}*', 'honte\\p{L}*', 'irresponsable\\p{L}*', 'd[ée]pensi[eè]r\\p{L}*', 'ta faute', 'votre faute', 'vous devriez vous sentir', 'mauvais choix', 'vous vous [eê]tes tromp[ée]\\p{L}*',
+].join('|'))
+const OFFENSIVE_INTL = word([
+  'idiot\\p{L}*', 'stupid\\p{L}*', 'dumb', 'moron\\p{L}*', 'pathetic', 'loser', 'sex', 'porn\\p{L}*', 'nude', 'erotic\\p{L}*', 'religio\\p{L}*', 'ethnicity', 'sexual orientation', 'disabilit\\p{L}*', 'gender identity', 'nationality',
+  'idiota', 'est[uú]pid\\p{L}*', 'imb[eé]cil\\p{L}*', 'pat[eé]tic\\p{L}*', 'sexo', 'desnud\\p{L}*', 'er[oó]tic\\p{L}*', 'religi[oó]n', 'orientaci[oó]n sexual', 'discapacidad', 'identidad de g[eé]nero', 'nacionalidad',
+  'stupide\\p{L}*', 'cr[eé]tin\\p{L}*', 'imb[eé]cile\\p{L}*', 'd[eé]bile\\p{L}*', 'path[eé]tique', 'sexe', '[eé]rotique', 'ethnie', 'orientation sexuelle', 'handicap\\p{L}*', 'identit[eé] de genre', 'nationalit[eé]',
+].join('|'))
+const isRiskyAdvice = (text) => RISKY_ADVICE.test(text) || RISKY_ADVICE_INTL.test(text)
+const isFearOrOffensive = (text) => FEAR_OR_JUDGMENT.test(text) || OFFENSIVE.test(text) || FEAR_OR_JUDGMENT_INTL.test(text) || OFFENSIVE_INTL.test(text)
+
 export function passesToneRules(text) {
-  return !RISKY_ADVICE.test(text) && !FEAR_OR_JUDGMENT.test(text) && !OFFENSIVE.test(text)
+  return !isRiskyAdvice(text) && !isFearOrOffensive(text)
 }
 
 // --- Numeri ------------------------------------------------------------
@@ -208,12 +238,19 @@ const END_CLAIM = /ultim[oi]\s+giorn|agli\s+sgoccioli|quasi\s+(alla\s+)?fine\s+(
 const DAYS_LEFT_CLAIM = /(restano|mancano|ancora)\s+\d+\s+giorn|per\s+\d+\s+giorn|(i\s+)?prossimi\s+giorni/i
 const JUST_STARTED_CLAIM = /appena\s+(iniziat|cominciat|partit)|inizio\s+(del\s+)?(mese|ciclo)|primi\s+giorni/i
 
+// Le stesse affermazioni sul tempo in inglese, spagnolo e francese.
+const TIME_LEFT_CLAIM_INTL = /long way to go|still (?:a lot of|plenty of|lots of) time|(?:cycle|month) (?:has |is )?(?:only )?just (?:started|begun)|beginning of the cycle|first (?:few )?days|halfway through|queda mucho camino|todav[ií]a (?:queda|hay) mucho|(?:el )?ciclo (?:acaba de|reci[eé]n) empez|principio del ciclo|primeros d[ií]as|mitad del ciclo|encore (?:un )?long chemin|la route est (?:encore )?longue|(?:le )?cycle vient (?:juste |tout juste )?de commencer|d[ée]but du cycle|premiers jours|moiti[ée] du cycle/i
+const END_CLAIM_INTL = /last days?|almost (?:at )?the end of the cycle|(?:cycle|month) is (?:almost|nearly) over|only a few days left|[uú]ltimos? d[ií]as?|casi al final del ciclo|el ciclo est[aá] por terminar|quedan pocos d[ií]as|derniers? jours?|presque (?:à )?la fin du cycle|(?:le )?cycle (?:touche|arrive) à sa fin|il (?:ne )?reste (?:que )?(?:quelques|peu de) jours/i
+const DAYS_LEFT_CLAIM_INTL = /\d+ days? (?:left|to go)|for \d+ days|(?:the )?next few days|quedan \d+ d[ií]as|durante \d+ d[ií]as|pr[oó]ximos d[ií]as|il (?:te |vous )?reste \d+ jours|pendant \d+ jours|prochains jours/i
+const JUST_STARTED_CLAIM_INTL = /just (?:started|begun)|beginning of the cycle|first (?:few )?days|acaba de empezar|principio del ciclo|primeros d[ií]as|vient (?:juste |tout juste )?de commencer|d[ée]but du cycle|premiers jours/i
+const claims = (italian, intl, message) => italian.test(message) || intl.test(message)
+
 export function contradictsCyclePhase(message, phase) {
   if (typeof message !== 'string' || !CYCLE_PHASES.includes(phase)) return false
-  if (LATE_PHASES.includes(phase) && TIME_LEFT_CLAIM.test(message)) return true
-  if (phase === 'last_day' && DAYS_LEFT_CLAIM.test(message)) return true
-  if (EARLY_PHASES.includes(phase) && END_CLAIM.test(message)) return true
-  if ((phase === 'mid' || phase === 'second_half') && JUST_STARTED_CLAIM.test(message)) return true
+  if (LATE_PHASES.includes(phase) && claims(TIME_LEFT_CLAIM, TIME_LEFT_CLAIM_INTL, message)) return true
+  if (phase === 'last_day' && claims(DAYS_LEFT_CLAIM, DAYS_LEFT_CLAIM_INTL, message)) return true
+  if (EARLY_PHASES.includes(phase) && claims(END_CLAIM, END_CLAIM_INTL, message)) return true
+  if ((phase === 'mid' || phase === 'second_half') && claims(JUST_STARTED_CLAIM, JUST_STARTED_CLAIM_INTL, message)) return true
   return false
 }
 
@@ -253,8 +290,8 @@ export function validateSpendyResponse(raw, context, { history = [], previous = 
   const labels = knownLabels(context)
   if (quotedNames(message).some((name) => !labels.has(name))) errors.push('unknown_reference')
 
-  if (RISKY_ADVICE.test(message)) errors.push('risky_advice')
-  if (FEAR_OR_JUDGMENT.test(message) || OFFENSIVE.test(message)) errors.push('offensive_or_judgmental')
+  if (isRiskyAdvice(message)) errors.push('risky_advice')
+  if (isFearOrOffensive(message)) errors.push('offensive_or_judgmental')
 
   const band = context?.budget?.band
   if (band === 'exceeded' && (state === 'celebrating' || state === 'happy')) errors.push('incoherent_state')
@@ -334,7 +371,7 @@ export function sanitizeSpendyContext(input) {
   const primaryEvent = pick(input.primaryEvent, EVENT_SPEC)
   return {
     version: num(input.version) ?? 1,
-    locale: input.locale === 'it' ? 'it' : 'it',
+    locale: normalizeSpendyLocale(input.locale),
     today: typeof input.today === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.today) ? input.today : undefined,
     budget,
     spending: pick(input.spending, { today: num, usualCycle: num }) ?? {},
@@ -369,7 +406,7 @@ Ricevi un riassunto della situazione (contesto), non le spese. Leggilo tutto ins
 - Una frase semplice e naturale è meglio di una battuta forzata. Se non c'è niente di interessante da dire: shouldShow = false.
 
 STILE
-- Italiano naturale, 1-3 frasi brevi, massimo 220 caratteri: una battuta da fumetto, non un paragrafo.
+- Lingua naturale (quella indicata in LINGUA), 1-3 frasi brevi, massimo 220 caratteri: una battuta da fumetto, non un paragrafo.
 - Ironia leggera, curiosità, sorpresa. Mai insulti, giudizi, paura, sensi di colpa o moralismi.
 - Non dire mai che una scelta è giusta o sbagliata. Niente consigli finanziari professionali, investimenti, crediti, trading, scommesse, cosa comprare o vendere, niente diagnosi.
 
@@ -409,6 +446,60 @@ export const STYLE_EXAMPLES = [
   'Oggi il portafoglio può dormire tranquillo.',
 ]
 
+// Gli stessi esempi di voce nelle altre lingue: il modello prende il tono
+// dalla lingua in cui deve rispondere.
+export const STYLE_EXAMPLES_BY_LOCALE = {
+  it: STYLE_EXAMPLES,
+  en: [
+    '150 € of shopping today: hard to miss. The budget is holding up… but how excited were you?',
+    'Japan is getting closer. And this time it’s not thanks to shopping.',
+    'Did you buy the chef dinner too? 😂',
+    'The oven at home worked harder than delivery this time.',
+    '120 € left for 9 days: doable, with a bit of calm.',
+    'Small expenses don’t show one by one: they show at the end of the cycle.',
+    'You spent less than expected. I’m getting emotional.',
+    'Your wallet can sleep soundly today.',
+  ],
+  es: [
+    '150 € de compras hoy: se nota. El presupuesto aguanta… pero ¿cuánta ilusión tenías?',
+    'Japón está más cerca. Y esta vez no es gracias a las compras.',
+    '¿También le pagaste la cena al cocinero? 😂',
+    'El horno de casa ha trabajado más que el delivery esta vez.',
+    'Quedan 120 € para 9 días: se puede, con un poco de calma.',
+    'Los gastos pequeños no se notan uno a uno: se notan al final del ciclo.',
+    'Has gastado menos de lo previsto. Me estoy emocionando.',
+    'Hoy la cartera puede dormir tranquila.',
+  ],
+  fr: [
+    '150 € de shopping aujourd’hui\u00a0: ça se remarque. Le budget tient bon… mais quel enthousiasme\u00a0!',
+    'Le Japon se rapproche. Et cette fois, ce n’est pas grâce au shopping.',
+    'Vous avez aussi offert le dîner au chef\u00a0? 😂',
+    'Le four de la maison a travaillé plus que la livraison, cette fois.',
+    'Il reste 120 € pour 9 jours\u00a0: c’est faisable, avec un peu de calme.',
+    'Les petites dépenses ne se voient pas une par une\u00a0: elles se voient en fin de cycle.',
+    'Vous avez dépensé moins que prévu. Ça m’émeut.',
+    'Aujourd’hui, le portefeuille peut dormir tranquille.',
+  ],
+}
+
+const LANGUAGE_NAMES = { it: 'italiano', en: 'inglese (English)', es: 'spagnolo (español)', fr: 'francese (français)' }
+
+// La sezione LINGUA del prompt: la sola parte che cambia con la lingua.
+export function spendyLanguageInstructions(locale) {
+  const code = normalizeSpendyLocale(locale)
+  const name = LANGUAGE_NAMES[code]
+  const lines = [
+    'LINGUA',
+    `- Rispondi esclusivamente in ${name} (context.locale = "${code}"): tutto il campo message è in ${name}, anche se queste istruzioni sono scritte in italiano.`,
+    '- Scrivi i numeri esattamente come compaiono nel contesto, senza separatori delle migliaia.',
+  ]
+  if (code !== 'it') {
+    lines.push(`- Le regole di TEMPO e VARIETÀ valgono anche per le frasi equivalenti in ${name}: per "ciclo" usa la parola equivalente in ${name}.`)
+    lines.push(`- I nomi delle categorie e degli obiettivi nel contesto si scrivono così come sono.`)
+  }
+  return lines.join('\n')
+}
+
 // JSON Schema della risposta (per gli output strutturati del modello).
 export const SPENDY_RESPONSE_SCHEMA = {
   type: 'object',
@@ -425,14 +516,16 @@ export const SPENDY_RESPONSE_SCHEMA = {
   additionalProperties: false,
 }
 
-export function buildSpendyPrompt(context, { previous = null, history = [], styleExamples = STYLE_EXAMPLES } = {}) {
+export function buildSpendyPrompt(context, { previous = null, history = [], styleExamples } = {}) {
+  const locale = normalizeSpendyLocale(context?.locale)
+  const examples = styleExamples ?? STYLE_EXAMPLES_BY_LOCALE[locale]
   return {
-    system: SPENDY_PERSONALITY,
+    system: `${SPENDY_PERSONALITY}\n\n${spendyLanguageInstructions(locale)}`,
     input: {
       context,
       previous,
       recentMessages: history.slice(-RECENT_WINDOW),
-      styleExamples: styleExamples.slice(0, 12),
+      styleExamples: examples.slice(0, 12),
     },
   }
 }

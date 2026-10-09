@@ -6,9 +6,6 @@ export default {
       current: 'Langue actuelle : {language}',
       partial: 'La traduction de l’app est en cours : certains écrans restent pour l’instant en italien.',
     },
-    ai: {
-      italianonly: 'Pour l’instant, Spendy AI ne parle qu’italien\u00a0: dans cette langue, Spendy utilise ses propres phrases. Votre choix reste enregistré.',
-    },
   },
   // Espaces insécables (\u00a0) devant ? ! : pour que le signe ne passe
   // jamais seul à la ligne sur un petit écran.

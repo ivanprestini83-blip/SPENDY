@@ -660,7 +660,8 @@ section('Prompt per la Fase B')
 // =====================================================================
 {
   const prompt = buildSpendyPrompt(categoryRun.context, { previous: 'Frase di prima.', history: ['a', 'b'] })
-  check('system = personalità di Spendy', prompt.system === SPENDY_PERSONALITY)
+  // Fase 4B-3: alla personalità segue la sezione LINGUA (qui: italiano).
+  check('system = personalità di Spendy + lingua della risposta', prompt.system.startsWith(SPENDY_PERSONALITY) && prompt.system.includes('Rispondi esclusivamente in italiano'))
   check('porta la frase precedente', prompt.input.previous === 'Frase di prima.')
   check('porta il contesto, non i dati grezzi', prompt.input.context === categoryRun.context)
   check('vieta esplicitamente lo schema "è tornata"', /non si vedeva da un po/i.test(SPENDY_PERSONALITY))

@@ -16,6 +16,7 @@
 import { getCategory } from '../data/categories.js'
 import { getCycleTiming } from '../utils/cycle.js'
 import { todaysExpenses } from '../utils/budgetCalculations.js'
+import { normalizeSpendyLocale } from '../../supabase/functions/_shared/spendyAIRules.js'
 import { SPENDY_EVENTS } from './spendyEvents.js'
 
 export const SPENDY_AI_CONTEXT_VERSION = 1
@@ -165,8 +166,10 @@ function fingerprintOf({ band, primary, others }) {
 // oggi, dettagli degli eventi e dell'obiettivo. NON entrano nell'impronta
 // (un caffè in più non deve chiedere una frase nuova): servono solo a non
 // riproporre dalla cache una frase con numeri che nel frattempo sono cambiati.
+// C'è anche la lingua: una frase generata in un'altra lingua non si ripropone.
 function financialFactsOf(context) {
   return JSON.stringify({
+    locale: context.locale,
     budget: context.budget,
     spending: context.spending,
     primaryEvent: context.primaryEvent,
@@ -186,6 +189,7 @@ export function buildSpendyAIContext({
   today,
   cycleStartDay = 1,
   goals = [],
+  locale,
 } = {}) {
   const monthly = financialData?.monthlyBudget ?? 0
   const available = financialData?.available ?? 0
@@ -219,7 +223,8 @@ export function buildSpendyAIContext({
 
   const context = {
     version: SPENDY_AI_CONTEXT_VERSION,
-    locale: 'it',
+    // La lingua scelta nell'app: il server la ricontrolla (it/en/es/fr, altrimenti it).
+    locale: normalizeSpendyLocale(locale),
     today,
     budget,
     spending,

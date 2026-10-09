@@ -205,7 +205,8 @@ section('Edge Function: il modello riceve solo il contesto sintetico')
     JSON.stringify(server.model.calls[0].input.context.goal) === JSON.stringify({ label: 'Viaggio Giappone', percent: 40, missing: 1800 }))
   check('arrivano la frase precedente e le ultime dette',
     server.model.calls[0].input.previous === 'Frase di prima.' && server.model.calls[0].input.recentMessages.length === 2)
-  check('system = personalità di Spendy', server.model.calls[0].system === SPENDY_PERSONALITY)
+  // Fase 4B-3: alla personalità segue la sezione LINGUA (qui: italiano).
+  check('system = personalità di Spendy + lingua della risposta', server.model.calls[0].system.startsWith(SPENDY_PERSONALITY) && server.model.calls[0].system.includes('Rispondi esclusivamente in italiano'))
   check('schema JSON della risposta passato al modello', server.model.calls[0].schema?.required?.includes('shouldShow'))
   const logText = JSON.stringify(server.logs)
   check('i log non contengono frasi, importi o nomi', !logText.includes('Giappone') && !logText.includes('160') && !logText.includes('€'))

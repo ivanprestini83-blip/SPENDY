@@ -8,9 +8,6 @@ export default {
       current: 'Lingua attuale: {language}',
       partial: 'La traduzione dell’app è in corso: alcune schermate restano per ora in italiano.',
     },
-    ai: {
-      italianonly: 'Per ora Spendy AI parla solo italiano: in questa lingua Spendy usa le sue frasi. La tua scelta resta salvata.',
-    },
   },
   // Fase 2: la Home e la cornice che la circonda (intestazione, barra in basso).
   home: {

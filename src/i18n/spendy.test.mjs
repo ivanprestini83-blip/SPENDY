@@ -115,9 +115,12 @@ check('reazioni: l\'italiano è identico (stesse esportazioni, 97 frasi)', react
   }
 }
 check('HumorLibrary non modificata: 307/306/307/307 frasi', flat(humorLibrary.it).length === 307 && flat(humorLibrary.en).length === 306 && flat(humorLibrary.fr).length === 307 && flat(humorLibrary.es).length === 307)
-check('Spendy AI: con una lingua diversa dall\'italiano la chiamata non parte (useSpendyVoice)',
-  /const italian = useAppStore\(\(state\) => normalizeLanguage\(state\.language\) === 'it'\)/.test(read('src/ai/useSpendyVoice.js'))
-  && /const aiEnabled = aiChosen && italian/.test(read('src/ai/useSpendyVoice.js'))
+// Fase 4B-3: Spendy AI risponde nella lingua dell'app (useSpendyVoice passa la
+// lingua, il server la ricontrolla): non c'è più il blocco "solo italiano".
+check('Spendy AI: useSpendyVoice passa la lingua dell\'app e non blocca le altre lingue',
+  /prepareSpendyVoice\(\{[^}]*locale: language,/.test(read('src/ai/useSpendyVoice.js'))
+  && /const aiEnabled = useAppStore\(\(state\) => state\.spendyAIEnabled === true\)/.test(read('src/ai/useSpendyVoice.js'))
+  && !read('src/ai/useSpendyVoice.js').includes("=== 'it'")
   && !read('supabase/functions/_shared/spendyAIRules.js').includes('i18n'))
 
 // =====================================================================
@@ -411,15 +414,13 @@ try {
   const saved = JSON.stringify(S().notifications)
   for (const lang of ['fr', 'es', 'it']) await act(() => S().setLanguage(lang))
   check('   cambiando lingua le notifiche salvate NON vengono riscritte', JSON.stringify(S().notifications) === saved)
-  // Spendy AI: preferenza attiva, app in inglese → frase locale tradotta, nessuna chiamata; la preferenza resta.
+  // Spendy AI: preferenza attiva, app in inglese → finché non c'è una frase AI
+  // (qui: ospite, nessuna chiamata) Spendy usa la sua frase locale in inglese.
   await act(() => { useAppStore.setState({ spendyAIEnabled: true }); S().setLanguage('en'); S().setActiveTab('home') })
-  check('AI attiva + inglese: Spendy usa la frase locale in inglese, la preferenza resta salvata', LIB.en.SPESA_100.concat(LIB.en.SPESA_INUTILE, LIB.en.BUDGET_SUPERATO, LIB.en.SPESA_ENORME_1000, LIB.en.SPESA_ENORME_500, LIB.en.RARE_SPECIALI).includes(hero()) && S().spendyAIEnabled === true, hero())
-  // Impostazioni → Spendy AI: in inglese la scheda dice chiaramente che l'AI parla solo italiano.
+  check('AI attiva + inglese: senza frase AI Spendy usa la frase locale in inglese, la preferenza resta salvata', LIB.en.SPESA_100.concat(LIB.en.SPESA_INUTILE, LIB.en.BUDGET_SUPERATO, LIB.en.SPESA_ENORME_1000, LIB.en.SPESA_ENORME_500, LIB.en.RARE_SPECIALI).includes(hero()) && S().spendyAIEnabled === true, hero())
+  // Impostazioni → Spendy AI: la nota "parla solo italiano" della Fase 4A non c'è più.
   await act(() => S().openModal('settings'))
-  const aiNote = () => text(container).includes(translate('en', 'settings.ai.italianonly'))
-  check('Impostazioni (inglese, AI attiva): nota "Spendy AI only speaks Italian"', aiNote())
-  await act(() => S().setLanguage('it'))
-  check('   in italiano nessuna nota (l\'AI funziona come prima)', !text(container).includes(translate('it', 'settings.ai.italianonly')))
+  check('Impostazioni (inglese, AI attiva): nessuna nota "solo italiano"', !text(container).includes('only speaks Italian') && translate('en', 'settings.ai.italianonly') === 'settings.ai.italianonly')
   await act(() => S().closeModal())
   await act(() => { useAppStore.setState({ spendyAIEnabled: false }); S().setLanguage('it') })
   // Posso permettermelo? (schermata vera): il verdetto nella lingua scelta al momento della domanda.

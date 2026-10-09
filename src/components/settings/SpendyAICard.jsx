@@ -1,6 +1,5 @@
 import { useAppStore } from '../../store/useAppStore.js'
 import { LEGAL_DOCUMENTS } from '../../legal/legal.js'
-import { useLanguage } from '../../i18n/useLanguage.js'
 import './SettingsCards.css'
 
 // "Spendy AI" in Impostazioni: la scelta dell'utente, spenta di default.
@@ -9,10 +8,6 @@ import './SettingsCards.css'
 export function SpendyAICard() {
   const enabled = useAppStore((state) => state.spendyAIEnabled === true)
   const setEnabled = useAppStore((state) => state.setSpendyAIEnabled)
-  // Spendy AI per ora risponde solo in italiano: in un'altra lingua la
-  // preferenza resta salvata ma Spendy usa le sue frasi (vedi useSpendyVoice).
-  const { language, t } = useLanguage()
-  const italianOnly = enabled && language !== 'it'
 
   return (
     <div className="settings-screen__card settings-cards">
@@ -40,7 +35,6 @@ export function SpendyAICard() {
         <a href={LEGAL_DOCUMENTS.privacy.url} target="_blank" rel="noopener noreferrer">Dettagli nella Privacy Policy</a>.
       </p>
       <p className="settings-cards__state">{enabled ? 'Attiva' : 'Disattivata: Spendy usa solo le sue frasi'}</p>
-      {italianOnly && <p className="settings-cards__state">{t('settings.ai.italianonly')}</p>}
     </div>
   )
 }

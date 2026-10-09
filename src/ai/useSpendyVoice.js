@@ -6,7 +6,6 @@ import { requestAndStoreVoice } from './spendyVoiceRequest.js'
 import { getSpendyVoiceDevConfig } from './devTools.js'
 import { useAppStore } from '../store/useAppStore.js'
 import { aiNotification } from '../notifications/notificationRules.js'
-import { normalizeLanguage } from '../i18n/languages.js'
 
 // Il ponte tra il flusso di Spendy AI e la Home.
 //
@@ -25,18 +24,15 @@ export function useSpendyVoice({ coach, financialData, expenses, today, monthlyB
   const cacheRef = useRef(cache)
   cacheRef.current = cache
   const inFlight = useRef(null)
+  // La lingua dell'app: Spendy AI risponde in questa lingua (il server la
+  // ricontrolla; una lingua non prevista vale l'italiano).
+  const language = useAppStore((state) => state.language)
 
   const { events, context, meta } = prepareSpendyVoice({
-    coach, financialData, expenses, today, monthlyBudget, cycleStartDay, goals,
+    coach, financialData, expenses, today, monthlyBudget, cycleStartDay, goals, locale: language,
   })
   // Spendy AI spenta (scelta dell'utente, default): solo frasi locali.
-  // Il server di Spendy AI risponde solo in italiano: con l'app in un'altra
-  // lingua si usa la frase locale (c'è sempre, nella lingua scelta) invece di
-  // chiedere una frase italiana. La preferenza salvata non cambia: tornando
-  // all'italiano l'AI riprende come prima. (Fase 4A del multilingue.)
-  const aiChosen = useAppStore((state) => state.spendyAIEnabled === true)
-  const italian = useAppStore((state) => normalizeLanguage(state.language) === 'it')
-  const aiEnabled = aiChosen && italian
+  const aiEnabled = useAppStore((state) => state.spendyAIEnabled === true)
   const decision = decideSpendyVoiceFor({ aiEnabled, coach, meta, today, cache, limits: dev.limits })
   const voice = resolveSpendyVoice({ decision, coach, cache })
 

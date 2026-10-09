@@ -6,9 +6,6 @@ export default {
       current: 'Current language: {language}',
       partial: 'The app is being translated: some screens are still in Italian for now.',
     },
-    ai: {
-      italianonly: 'For now Spendy AI only speaks Italian: in this language Spendy uses its own phrases. Your choice stays saved.',
-    },
   },
   home: {
     header: {
