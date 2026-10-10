@@ -4,6 +4,7 @@ import { getCategory } from '../../data/categories.js'
 import './EditExpenseModal.css'
 import { isValidAmount } from '../../utils/amounts.js'
 import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
+import { currencySymbol } from '../../utils/format.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 
 // Reachable by tapping any row in ExpensesPage's list — "modificare
@@ -57,7 +58,7 @@ export function EditExpenseModal({ expense, onClose }) {
         <label className="edit-expense__field">
           <span>{t('expenses.edit.amount')}</span>
           <div className="edit-expense__amount-input">
-            <span>€</span>
+            <span>{currencySymbol()}</span>
             <input
               type="number"
               inputMode="decimal"

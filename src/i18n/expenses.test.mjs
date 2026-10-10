@@ -16,7 +16,8 @@ import { createElement as h } from 'react'
 import { check, section, report } from '../sync/testkit.mjs'
 import { installFakeDom } from '../store/fakeDom.mjs'
 import { MESSAGES, translate } from './translate.js'
-import { AMOUNT_LIMIT_MESSAGE } from '../utils/amounts.js'
+import { AMOUNT_LIMIT_MESSAGE, MAX_AMOUNT } from '../utils/amounts.js'
+import { formatCurrencyWhole } from '../utils/format.js'
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const read = (path) => readFileSync(join(ROOT, path), 'utf8')
@@ -49,7 +50,10 @@ for (const lang of ['it', 'en', 'es', 'fr']) {
   const orphans = PAGE_KEYS.filter((key) => !used.has(key))
   check('ogni chiave nuova è usata', orphans.length === 0, orphans.join(', '))
 }
-check('l\'avviso sul limite in italiano è identico ad AMOUNT_LIMIT_MESSAGE', translate('it', 'expenses.limit') === AMOUNT_LIMIT_MESSAGE)
+// Il limite è scritto nel formato della lingua: in italiano il testo resta identico ad AMOUNT_LIMIT_MESSAGE.
+const limitText = (lang) => translate(lang, 'expenses.limit', { amount: formatCurrencyWhole(MAX_AMOUNT, lang) })
+check('l\'avviso sul limite in italiano è identico ad AMOUNT_LIMIT_MESSAGE', limitText('it') === AMOUNT_LIMIT_MESSAGE)
+check('   negli altri formati: "Maximum amount: €1,000,000", "Importe máximo: 1.000.000 €", "Montant maximum : 1 000 000 €"', limitText('en') === 'Maximum amount: €1,000,000' && limitText('es') === 'Importe máximo: 1.000.000 €' && limitText('fr') === 'Montant maximum\u00a0: 1\u00a0000\u00a0000 €')
 check('parametro {cycle}', translate('en', 'expenses.page.pastcycle', { cycle: '7 Set – 6 Ott' }) === 'Spending for the 7 Set – 6 Ott cycle' && translate('fr', 'expenses.page.pastcycle', { cycle: 'X' }) === 'Dépenses du cycle X')
 
 // =====================================================================
@@ -107,6 +111,8 @@ try {
   const { default: App } = await server.ssrLoadModule('/src/App.jsx')
   const { expensesForPeriod } = await server.ssrLoadModule('/src/utils/budgetCalculations.js')
   const LIVE = (await server.ssrLoadModule('/src/i18n/translate.js')).MESSAGES
+  // Gli importi come li mostra l'app nella lingua scelta (formatter vero): cambia solo la scrittura, non il valore.
+  const { formatCurrency } = await server.ssrLoadModule('/src/utils/format.js')
   const S = useAppStore.getState
   const caught = []
   const container = dom.createContainer()
@@ -154,13 +160,14 @@ try {
     check(`   ${lang}: Oggi mostra le stesse spese (${descs(expected.today)})`, items() === descs(expected.today) && button(tr('expenses.page.today')).attributes.get('aria-selected') === 'true')
     // Ciclo in corso.
     await act(() => propsOf(button(tr('expenses.page.cycle'))).onClick({}))
-    check(`   ${lang}: Ciclo — "${tr('expenses.summary.cycle')}", "${tr('expenses.summary.of', { amount: '2451,00 €' })}"`, summary().startsWith(tr('expenses.summary.cycle')) && summary().includes(tr('expenses.summary.of', { amount: '2451,00 €' })) && items() === descs(expected.cycle))
+    check(`   ${lang}: Ciclo — "${tr('expenses.summary.cycle')}", "${tr('expenses.summary.of', { amount: formatCurrency(2451, lang) })}"`, summary().startsWith(tr('expenses.summary.cycle')) && summary().includes(tr('expenses.summary.of', { amount: formatCurrency(2451, lang) })) && items() === descs(expected.cycle))
     check(`   ${lang}: frecce con aria-label tradotte, "successivo" spento sul ciclo in corso`, Boolean(button(tr('expenses.page.prev'))) && button(tr('expenses.page.next')).attributes.has('disabled'))
     // Ciclo precedente.
     await act(() => propsOf(button(tr('expenses.page.prev'))).onClick({}))
     const cycleLabel = text(nodes(container).find((n) => cls(n) === 'expenses-page__cycle-label'))
     check(`   ${lang}: ← "${tr('expenses.page.pastcycle', { cycle: cycleLabel })}" con le sue spese`, summary().startsWith(tr('expenses.page.pastcycle', { cycle: cycleLabel })) && items() === descs(expected.prev) && button(tr('expenses.page.prev')).attributes.has('disabled'))
-    totals[lang] = summary().match(/-?[\d.]+,\d{2} €/)?.[0]
+    // Il valore mostrato (134), scritto nel formato della lingua.
+    totals[lang] = summary().includes(formatCurrency(134, lang)) ? 134 : summary()
     await act(() => propsOf(button(tr('expenses.page.next'))).onClick({}))
     check(`   ${lang}: → di nuovo il ciclo in corso`, items() === descs(expected.cycle) && button(tr('expenses.page.next')).attributes.has('disabled'))
     if (lang !== 'it') {
@@ -173,10 +180,11 @@ try {
     }
     check(`   ${lang}: nessun segnaposto {…} non sostituito`, !/\{\w+\}/.test(html()))
     // Fase 4A: il nome di una categoria PREDEFINITA segue la lingua (nei dati c'è solo l'id).
-    check(`   ${lang}: importi e descrizioni restano quelli dei dati, la categoria predefinita è "${tr('categories.carburante')}"`, text(page()).includes('30,00 €') && text(page()).includes('inizio-ciclo') && text(page()).includes(tr('categories.carburante')))
+    check(`   ${lang}: importi e descrizioni restano quelli dei dati, la categoria predefinita è "${tr('categories.carburante')}"`, text(page()).includes(formatCurrency(30, lang)) && text(page()).includes('inizio-ciclo') && text(page()).includes(tr('categories.carburante')))
     shown.push(html())
   }
-  check('totale del ciclo precedente identico in ogni lingua', new Set(Object.values(totals)).size === 1 && totals.it === '134,00 €', JSON.stringify(totals))
+  check('totale del ciclo precedente identico in ogni lingua (stesso valore, 134)', new Set(Object.values(totals)).size === 1 && totals.it === 134, JSON.stringify(totals))
+  check('   in italiano scritto come prima: "134,00 €"; il ciclo in corso: "2.451,00 €"', formatCurrency(134, 'it') === '134,00 €' && formatCurrency(2451, 'it') === '2.451,00 €')
   check('it → … → it: la pagina torna identica', shown[0] === shown[4])
   check('nessun dato toccato da tutti i cambi di lingua e dalla navigazione', dataOf(S()) === dataBefore)
 
@@ -195,7 +203,7 @@ try {
     check(`   ${lang}: primo tocco su elimina → "${tr('expenses.edit.confirm')}", niente cancellato`, Boolean(button(tr('expenses.edit.confirm'))) && dataOf(S()) === dataBefore)
     const input = nodes(modal()).find((n) => n.localName === 'input') // il primo campo: l'importo
     await act(() => propsOf(input).onChange({ target: { value: '2000000' } }))
-    check(`   ${lang}: importo oltre il limite → "${tr('expenses.limit')}", Salva spento`, text(modal()).includes(tr('expenses.limit')) && button(tr('expenses.edit.save')).attributes.has('disabled'))
+    check(`   ${lang}: importo oltre il limite → "${limitText(lang)}", Salva spento`, text(modal()).includes(limitText(lang)) && button(tr('expenses.edit.save')).attributes.has('disabled'))
     await act(() => propsOf(button(tr('expenses.edit.close'))).onClick({}))
     check(`   ${lang}: chiusa senza salvare: nessun dato toccato`, !modal() && dataOf(S()) === dataBefore)
   }

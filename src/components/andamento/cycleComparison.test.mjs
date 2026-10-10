@@ -139,15 +139,15 @@ try {
 
   const spent = fmt.describeChange(cmp.spent, { newLabel: 'Nuova spesa' })
   check(`Spese: ${values(card('Spese'))} · ${change(card('Spese'))}`, values(card('Spese')) === `${formatCurrency(A.spent)}→${formatCurrency(B.spent)}` && change(card('Spese')) === `${spent.arrow} ${spent.text}`)
-  check('   cioè 2117,23 € → 17,00 €, ▼ -2100,23 € · -99,2%', values(card('Spese')) === '2117,23 €→17,00 €' && change(card('Spese')) === '▼ -2100,23 € · -99,2%')
+  check('   cioè 2.117,23 € → 17,00 €, ▼ -2.100,23 € · -99,2%', values(card('Spese')) === '2.117,23 €→17,00 €' && change(card('Spese')) === '▼ -2.100,23 € · -99,2%')
 
   const income = fmt.describeChange(cmp.income, { higherIsBetter: true, newLabel: 'Nuove entrate', goneLabel: 'Nessuna entrata' })
   check(`Entrate: ${values(card('Entrate'))} · ${change(card('Entrate'))}`, values(card('Entrate')) === `${formatCurrency(A.income)}→${formatCurrency(B.income)}` && change(card('Entrate')) === `${income.arrow} ${income.text}`)
-  check('   cioè 2537,00 € → 2451,00 €, ▼ -86,00 € · -3,4%', values(card('Entrate')) === '2537,00 €→2451,00 €' && change(card('Entrate')) === '▼ -86,00 € · -3,4%')
+  check('   cioè 2.537,00 € → 2.451,00 €, ▼ -86,00 € · -3,4%', values(card('Entrate')) === '2.537,00 €→2.451,00 €' && change(card('Entrate')) === '▼ -86,00 € · -3,4%')
 
   const savings = fmt.describeDiff(cmp.savings.diff, { higherIsBetter: true })
   check(`Risparmio: ${values(card('Risparmio'))} · ${change(card('Risparmio'))}`, values(card('Risparmio')) === `${signedMoney(A.savings)}→${signedMoney(B.savings)}` && change(card('Risparmio')) === `${savings.arrow} ${savings.text}`)
-  check('   cioè 419,77 € → 2434,00 €, ▲ +2014,23 €', values(card('Risparmio')) === '419,77 €→2434,00 €' && change(card('Risparmio')) === '▲ +2014,23 €')
+  check('   cioè 419,77 € → 2.434,00 €, ▲ +2.014,23 €', values(card('Risparmio')) === '419,77 €→2.434,00 €' && change(card('Risparmio')) === '▲ +2.014,23 €')
 
   const points = Math.round(cmp.budgetUsed.diffPoints)
   check(`Budget utilizzato: ${values(card('Budget utilizzato'))} · ${change(card('Budget utilizzato'))}`, values(card('Budget utilizzato')) === `${fmt.formatPercent(A.budgetUsed)}→${fmt.formatPercent(B.budgetUsed)}`
@@ -181,7 +181,7 @@ try {
   check('stesso periodo su entrambi: l\'avviso al posto del confronto', screen().includes('Scegli due periodi diversi per vedere cosa è cambiato.') && byClass(container, 'cycle-comparison__metric').length === 0)
   await act(() => propsOf(selects()[0]).onChange({ target: { value: B.key } }))
   check('ordine invertito (B, poi A): il più vecchio resta il riferimento, stessi numeri', text(byClass(container, 'cycle-comparison__verdict-text')[0]) === `Hai speso ${formatCurrency(Math.abs(cmp.spent.diff))} in meno`
-    && values(byClass(container, 'cycle-comparison__metric')[0]) === '2117,23 €→17,00 €')
+    && values(byClass(container, 'cycle-comparison__metric')[0]) === '2.117,23 €→17,00 €')
   check('   e i badge seguono i periodi scelti', byClass(container, 'cycle-comparison__status').map(text).join('|') === '● In corso|✓ Completo')
   check('   come le etichette: il primo selettore ora è il "Periodo attuale", il secondo il "Periodo precedente"', roles().join('|') === 'Periodo attuale|Periodo precedente', roles().join('|'))
 
@@ -218,10 +218,10 @@ try {
   check('2. tocco su "Spese": compare il grafico "Andamento delle spese"', charts().length === 1 && text(byClass(charts()[0], 'metric-chart__title')[0]) === 'Andamento delle spese'
     && buttonOf('Spese').attributes.get('aria-expanded') === 'true' && cls(buttonOf('Spese')).includes('cycle-comparison__metric--open'))
   check('   collegato al riquadro (aria-controls → id del grafico)', buttonOf('Spese').attributes.get('aria-controls') === charts()[0].attributes.get('id'))
-  check('3. due punti con i valori del motore: 2117,23 € (7 Set) → 17,00 € (7 Ott)', chartValues().join('|') === `${formatCurrency(A.spent)}|${formatCurrency(B.spent)}`
-    && chartValues().join('|') === '2117,23 €|17,00 €' && chartLabels().join('|') === `${A.shortLabel}|${B.shortLabel}`)
+  check('3. due punti con i valori del motore: 2.117,23 € (7 Set) → 17,00 € (7 Ott)', chartValues().join('|') === `${formatCurrency(A.spent)}|${formatCurrency(B.spent)}`
+    && chartValues().join('|') === '2.117,23 €|17,00 €' && chartLabels().join('|') === `${A.shortLabel}|${B.shortLabel}`)
   check('   periodi "7 Set – 6 Ott → 7 Ott – 6 Nov" e una linea che li unisce', text(byClass(charts()[0], 'metric-chart__periods')[0]) === `${A.label} → ${B.label}` && byClass(charts()[0], 'metric-chart__line').length === 1)
-  check('   sotto: la stessa variazione del riquadro (▼ -2100,23 € · -99,2%) e la frase', text(byClass(charts()[0], 'metric-chart__summary')[0]) === `${spent.arrow} ${spent.text}`
+  check('   sotto: la stessa variazione del riquadro (▼ -2.100,23 € · -99,2%) e la frase', text(byClass(charts()[0], 'metric-chart__summary')[0]) === `${spent.arrow} ${spent.text}`
     && chartText().includes('Hai speso meno rispetto al periodo precedente.'))
   check('   il grafico sta sotto la prima riga (dopo Spese ed Entrate)', byClass(container, 'cycle-comparison__metrics')[0].childNodes.map((n) => (cls(n).includes('metric-chart') ? 'grafico' : text(byClass(n, 'cycle-comparison__metric-label')[0]))).join('|') === 'Spese|Entrate|grafico|Risparmio|Budget utilizzato')
 
@@ -232,11 +232,11 @@ try {
   await tap('Entrate')
   check('5. "Spese" aperto, poi "Entrate": resta un solo grafico, quello delle entrate', charts().length === 1 && text(byClass(charts()[0], 'metric-chart__title')[0]) === 'Andamento delle entrate'
     && buttonOf('Spese').attributes.get('aria-expanded') === 'false' && buttonOf('Entrate').attributes.get('aria-expanded') === 'true')
-  check('6. entrate: 2537,00 € → 2451,00 €, ▼ -86,00 € · -3,4%', chartValues().join('|') === '2537,00 €|2451,00 €' && text(byClass(charts()[0], 'metric-chart__summary')[0]) === `${income.arrow} ${income.text}`
+  check('6. entrate: 2.537,00 € → 2.451,00 €, ▼ -86,00 € · -3,4%', chartValues().join('|') === '2.537,00 €|2.451,00 €' && text(byClass(charts()[0], 'metric-chart__summary')[0]) === `${income.arrow} ${income.text}`
     && chartText().includes('Le entrate sono diminuite.'))
 
   await tap('Risparmio')
-  check('7. risparmio: 419,77 € → 2434,00 €, ▲ +2014,23 €', charts().length === 1 && chartValues().join('|') === '419,77 €|2434,00 €'
+  check('7. risparmio: 419,77 € → 2.434,00 €, ▲ +2.014,23 €', charts().length === 1 && chartValues().join('|') === '419,77 €|2.434,00 €'
     && text(byClass(charts()[0], 'metric-chart__summary')[0]) === `${savings.arrow} ${savings.text}` && chartText().includes('Hai messo da parte di più.'))
   check('   sotto la seconda riga (dopo Risparmio e Budget)', byClass(container, 'cycle-comparison__metrics')[0].childNodes.map((n) => (cls(n).includes('metric-chart') ? 'grafico' : text(byClass(n, 'cycle-comparison__metric-label')[0]))).join('|') === 'Spese|Entrate|Risparmio|Budget utilizzato|grafico')
 
@@ -254,12 +254,12 @@ try {
   await act(() => propsOf(selects()[0]).onChange({ target: { value: B.key } }))
   await act(() => propsOf(selects()[1]).onChange({ target: { value: A.key } }))
   check('12-13. periodi invertiti: il grafico resta aperto e segue i periodi (il più vecchio a sinistra)', charts().length === 1
-    && chartValues().join('|') === '2117,23 €|17,00 €' && chartLabels().join('|') === `${A.shortLabel}|${B.shortLabel}`)
-  check('14. coerente con il riquadro dopo il cambio', values(buttonOf('Spese')) === '2117,23 €→17,00 €' && text(byClass(charts()[0], 'metric-chart__summary')[0]) === change(buttonOf('Spese')))
+    && chartValues().join('|') === '2.117,23 €|17,00 €' && chartLabels().join('|') === `${A.shortLabel}|${B.shortLabel}`)
+  check('14. coerente con il riquadro dopo il cambio', values(buttonOf('Spese')) === '2.117,23 €→17,00 €' && text(byClass(charts()[0], 'metric-chart__summary')[0]) === change(buttonOf('Spese')))
   await act(() => propsOf(selects()[1]).onChange({ target: { value: B.key } }))
   check('   stesso periodo su entrambi: l\'avviso, nessun grafico', screen().includes('Scegli due periodi diversi') && charts().length === 0)
   await act(() => propsOf(selects()[0]).onChange({ target: { value: A.key } }))
-  check('   tornati a A → B: il grafico aperto ricompare con i valori giusti', charts().length === 1 && chartValues().join('|') === '2117,23 €|17,00 €')
+  check('   tornati a A → B: il grafico aperto ricompare con i valori giusti', charts().length === 1 && chartValues().join('|') === '2.117,23 €|17,00 €')
 
   // =====================================================================
   section('9. Periodo senza entrate né stipendio')
@@ -268,18 +268,18 @@ try {
   const noIncome = buildAndamento({ ...state, incomes: [salary('i-a', 2537, '2026-09-07')] })
   check('premessa: per il motore B non ha entrate né budget', noIncome.cycles[1].income === 0 && noIncome.cycles[1].budgetUsed === null)
   if (buttonOf('Spese').attributes.get('aria-expanded') === 'true') await tap('Spese')
-  check('riquadro chiuso "Entrate": 2537,00 € → — (nessuna entrata registrata, non "0,00 €")', values(buttonOf('Entrate')) === '2537,00 €→—'
+  check('riquadro chiuso "Entrate": 2.537,00 € → — (nessuna entrata registrata, non "0,00 €")', values(buttonOf('Entrate')) === '2.537,00 €→—'
     && !values(buttonOf('Entrate')).includes('0,00 €') && buttonOf('Entrate').attributes.get('aria-label').includes('7 Ott —'))
   check('   la variazione resta quella del motore ("Nessuna entrata")', change(buttonOf('Entrate')).includes('Nessuna entrata'))
   await tap('Entrate')
-  check('11. entrate di B assenti: punto vuoto "—", nessuna linea, mai "0,00 €"', chartValues().join('|') === '2537,00 €|—'
+  check('11. entrate di B assenti: punto vuoto "—", nessuna linea, mai "0,00 €"', chartValues().join('|') === '2.537,00 €|—'
     && byClass(charts()[0], 'metric-chart__dot--missing').length === 1 && byClass(charts()[0], 'metric-chart__line').length === 0 && !chartText().includes('0,00 €'))
   check('   "Nessuna entrata registrata" per 7 Ott – 6 Nov', chartText().includes(`${B.label}: Nessuna entrata registrata`))
   await tap('Budget utilizzato')
   check('10. budget senza stipendio in B: "Budget non confrontabile", con la spiegazione, nessun valore', chartText().includes('Budget non confrontabile')
     && chartText().includes(`${B.label} non ha uno stipendio registrato`) && nodes(charts()[0]).every((n) => n.localName !== 'svg'))
   await act(() => useAppStore.setState({ incomes: state.incomes }))
-  check('tornate le entrate di B: il riquadro torna a 2537,00 € → 2451,00 €', values(buttonOf('Entrate')) === '2537,00 €→2451,00 €')
+  check('tornate le entrate di B: il riquadro torna a 2.537,00 € → 2.451,00 €', values(buttonOf('Entrate')) === '2.537,00 €→2.451,00 €')
 
   await act(() => root.unmount())
 } finally {

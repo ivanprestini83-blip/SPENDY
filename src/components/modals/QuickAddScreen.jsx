@@ -6,6 +6,7 @@ import './QuickAddScreen.css'
 import { isValidAmount } from '../../utils/amounts.js'
 import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
 import { SALARY_CATEGORY_ID, lastKnownSalary } from '../../utils/salary.js'
+import { currencySymbol } from '../../utils/format.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 
 // "tenendole premute" — how long a press on a custom category tile has
@@ -313,7 +314,7 @@ export function QuickAddScreen({ type, initialCategoryId = null, onClose }) {
           <p className="quick-add__prompt">{isExpense ? t('quickadd.prompt.expense') : t('quickadd.prompt.income')}</p>
 
           <div className="quick-add__amount-input">
-            <span>€</span>
+            <span>{currencySymbol()}</span>
             {/* eslint-disable-next-line jsx-a11y/no-autofocus -- the whole point of this screen is landing straight in the amount field */}
             <input
               type="number"

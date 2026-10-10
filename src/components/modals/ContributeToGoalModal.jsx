@@ -30,7 +30,7 @@ export function ContributeToGoalModal({ goal, onClose }) {
         label={t('goalspage.contribute.amount')}
         type="number"
         inputMode="decimal"
-        placeholder="€ 0,00"
+        placeholder={formatCurrency(0)}
         value={amount}
         onChange={(event) => setAmount(event.target.value)}
       />

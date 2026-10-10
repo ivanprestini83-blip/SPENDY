@@ -72,7 +72,7 @@ function resolveTemplates(insight, lang) {
 //
 // La stragrande maggioranza delle frasi in libreria non contiene
 // segnaposto ed e' del tutto indifferente a questa funzione.
-export function buildInsightVars(insight) {
+export function buildInsightVars(insight, lang) {
   const facts = insight.facts ?? {}
   const vars = {}
 
@@ -83,10 +83,10 @@ export function buildInsightVars(insight) {
   if (typeof facts.days === 'number') vars.days = String(facts.days)
 
   const amount = facts.total ?? facts.saved ?? (typeof insight.current === 'number' ? insight.current : null)
-  if (typeof amount === 'number' && Number.isFinite(amount)) vars.amount = formatCurrency(amount)
+  if (typeof amount === 'number' && Number.isFinite(amount)) vars.amount = formatCurrency(amount, lang)
 
   const remaining = facts.missing ?? facts.remaining
-  if (typeof remaining === 'number' && Number.isFinite(remaining)) vars.remaining = formatCurrency(remaining)
+  if (typeof remaining === 'number' && Number.isFinite(remaining)) vars.remaining = formatCurrency(remaining, lang)
 
   const percent = facts.percent ?? (typeof insight.changePercent === 'number' ? Math.abs(insight.changePercent) : null)
   if (typeof percent === 'number' && Number.isFinite(percent)) vars.percentage = `${Math.round(percent)}%`
@@ -122,7 +122,8 @@ export function interpolate(template, vars) {
 // finale, che e' quello che l'utente leggera'.
 export function generateJokeCandidates(insight, lang = 'it') {
   const { templates, source } = resolveTemplates(insight, lang)
-  const vars = buildInsightVars(insight)
+  // Gli importi nella lingua della battuta (separatori e posizione del simbolo).
+  const vars = buildInsightVars(insight, lang)
 
   return templates
     .map((template, index) => {

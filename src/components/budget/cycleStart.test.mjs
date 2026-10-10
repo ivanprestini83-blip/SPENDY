@@ -33,6 +33,9 @@ const FAKE_MODULES = {
   // La lingua dallo stesso store finto, con il translate vero (dizionari veri).
   '../../i18n/useLanguage.js': `
   import { translate } from '/src/i18n/translate.js'
+  import { setCurrentLanguageSource } from '/src/i18n/currentLanguage.js'
+  // Come il vero useLanguage: importi e messaggi fuori da React seguono la stessa lingua.
+  setCurrentLanguageSource(() => globalThis.__cycleTest.store.getState().language)
   export const useLanguage = () => {
     const language = globalThis.__cycleTest.store.getState().language
     return { language, t: (key, params) => translate(language, key, params) }
@@ -44,7 +47,8 @@ const harnessPlugin = {
   enforce: 'pre',
   resolveId(source, importer) {
     if (source === '/__cycle-fake/react') return '\0cycle-fake:react'
-    const ours = importer && (importer.includes('CycleStartCard.jsx') || importer.includes('CurrentSalaryCard.jsx'))
+    // Anche AmountLimitHint (dentro CurrentSalaryCard): una sola lingua finta per tutto il banco di prova.
+    const ours = importer && (importer.includes('CycleStartCard.jsx') || importer.includes('CurrentSalaryCard.jsx') || importer.includes('AmountLimitHint.jsx'))
     if (ours && source in FAKE_MODULES) return `\0cycle-fake:${source}`
     return null
   },
@@ -213,7 +217,7 @@ try {
     const tree = render(CycleStartCard, d)
     const html = renderToStaticMarkup(tree)
     check('inizia B: compare la richiesta di conferma', html.includes('È iniziato un nuovo ciclo'))
-    check('   dice che il ciclo precedente resta in Andamento con i suoi numeri', html.includes('resta salvato in Andamento') && html.includes('entrate 2000,00 €') && html.includes('spese 300,00 €'))
+    check('   dice che il ciclo precedente resta in Andamento con i suoi numeri', html.includes('resta salvato in Andamento') && html.includes('entrate 2.000,00 €') && html.includes('spese 300,00 €'))
     check('   e che il nuovo parte da 0 € finché non si inserisce lo stipendio', html.includes('parte da 0 €') && Boolean(buttonOf(tree, 'Inserisci il nuovo stipendio')) && Boolean(buttonOf(tree, 'Inizia il ciclo da 0 €')))
     const outboxBefore = d.S().sync.outbox.length
     const dataBefore = fingerprint(d.S)
@@ -409,15 +413,15 @@ try {
 
     check('sezione sempre presente, con il titolo "Stipendio di questo ciclo"', html().includes('Stipendio di questo ciclo'))
     // 1. Con lo stipendio: importo, Modifica, Elimina.
-    check('1. con lo stipendio: mostra l\'importo (2250,00 €) e i pulsanti Modifica ed Elimina', html().includes('2250,00 €') && Boolean(buttonOf(ui(), 'Modifica')) && Boolean(buttonOf(ui(), 'Elimina')))
-    check('   mostra solo il ciclo in corso: una sola riga, anche se il ciclo precedente ha uno stipendio uguale', (html().match(/2250,00 €/g) ?? []).length === 1)
+    check('1. con lo stipendio: mostra l\'importo (2.250,00 €) e i pulsanti Modifica ed Elimina', html().includes('2.250,00 €') && Boolean(buttonOf(ui(), 'Modifica')) && Boolean(buttonOf(ui(), 'Elimina')))
+    check('   mostra solo il ciclo in corso: una sola riga, anche se il ciclo precedente ha uno stipendio uguale', (html().match(/2.250,00 €/g) ?? []).length === 1)
 
     // 2. Modifica: si cambia la cifra.
     buttonOf(ui(), 'Modifica').props.onClick()
     check('2. "Modifica" apre il campo con la cifra attuale', input(ui())?.props.value === '2250' && Boolean(buttonOf(ui(), 'Salva')))
     input(ui()).props.onChange({ target: { value: '2000' } })
     buttonOf(ui(), 'Salva').props.onClick()
-    check('   salvato 2000: la sezione mostra 2000,00 €, il ciclo in corso vale 2000', html().includes('2000,00 €') && !input(ui()) && homeSalary(d.S) === 2000)
+    check('   salvato 2000: la sezione mostra 2.000,00 €, il ciclo in corso vale 2000', html().includes('2.000,00 €') && !input(ui()) && homeSalary(d.S) === 2000)
     check('   Andamento: il ciclo precedente mantiene il suo importo originale (2250)', previousIncome() === 2250 && cycleAt(d.S, '2026-12-07').income === 2000)
     buttonOf(ui(), 'Modifica').props.onClick()
     input(ui()).props.onChange({ target: { value: '2e10' } })
@@ -440,7 +444,7 @@ try {
     check('5. "Inserisci stipendio" apre il campo, con l\'ultimo stipendio proposto e nessuna entrata ancora creata', input(ui())?.props.value === '2250' && homeSalary(d.S) === 0)
     input(ui()).props.onChange({ target: { value: '2100' } })
     buttonOf(ui(), 'Salva').props.onClick()
-    check('   salvato: lo stipendio torna visibile (2100,00 €, con Modifica ed Elimina)', html().includes('2100,00 €') && Boolean(buttonOf(ui(), 'Modifica')) && homeSalary(d.S) === 2100)
+    check('   salvato: lo stipendio torna visibile (2.100,00 €, con Modifica ed Elimina)', html().includes('2.100,00 €') && Boolean(buttonOf(ui(), 'Modifica')) && homeSalary(d.S) === 2100)
     const reinserted = d.S().incomes.find((i) => isSalary(i) && i.amount === 2100)
     check('   è una normale entrata stipendio datata oggi, nel ciclo in corso', reinserted?.date === '2026-12-10' && reinserted?.categoryId === 'stipendio')
 

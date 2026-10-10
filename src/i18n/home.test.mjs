@@ -127,6 +127,8 @@ try {
   const { default: App } = await server.ssrLoadModule('/src/App.jsx')
   // La stessa istanza dei dizionari che usa l'App (caricata da Vite).
   const LIVE = (await server.ssrLoadModule('/src/i18n/translate.js')).MESSAGES
+  // Gli importi come li mostra l'app in ogni lingua (formatter vero): cambia la scrittura, non il valore.
+  const { formatCurrency } = await server.ssrLoadModule('/src/utils/format.js')
   const S = useAppStore.getState
   const caught = []
   const container = dom.createContainer()
@@ -138,7 +140,10 @@ try {
     .replace(/<p class="spendy-hero__message">[\s\S]*?<\/p>/g, '')
     .replace(/<p class="spendy-hero__secondary">[\s\S]*?<\/p>/g, '')
     .replace(/<span class="radar-preview__tile-(?:title|value|label)">[\s\S]*?<\/span>/g, '')
-  const money = () => (html().match(/-?[\d.]+,\d{2} €/g) ?? []).join(' | ')
+  // I valori degli importi a schermo, letti nel formato della lingua ("12,50 €", "€12.50", "1 794,00 €").
+  const moneyValues = (code) => (html().match(code === 'en' ? /-?€[\d,]+\.\d{2}/g : /-?[\d.\u00a0]+,\d{2} €/g) ?? [])
+    .map((token) => Number(token.replace(/[€\s\u00a0]/g, '').replace(code === 'en' ? /,/g : /\./g, '').replace(',', '.')))
+    .join(' | ')
 
   S().switchScope('u:utente-home-i18n')
   await act(() => root.render(h(App)))
@@ -162,7 +167,7 @@ try {
   check('   la scheda del nuovo ciclo è a schermo (anche lei va tradotta)', html().includes('cycle-start'))
 
   const dataBefore = dataOf(S())
-  const moneyIt = money()
+  let moneyIt = null
   // Il periodo e i cicli della scheda "nuovo ciclo": stessi confini in ogni
   // lingua, solo i nomi dei mesi tradotti (le funzioni vere, come in Andamento).
   const { formatCycleLabel, getCycleRange, getPreviousCycleRange } = await server.ssrLoadModule('/src/utils/cycle.js')
@@ -185,11 +190,11 @@ try {
       tr('budget.available'),
       `aria-label="${tr('budget.hide')}"`,
       tr('budget.nosalary'),
-      tr('budget.spentof', { spent: '12,50 €', budget: '0,00 €' }),
+      tr('budget.spentof', { spent: formatCurrency(12.5, code), budget: formatCurrency(0, code) }),
       tr('expenses.summary.today'),
       tr('expenses.summary.countone', { count: 1 }),
       tr('expenses.summary.cycle'),
-      tr('expenses.summary.of', { amount: '0,00 €' }),
+      tr('expenses.summary.of', { amount: formatCurrency(0, code) }),
       tr('radar.preview.title'),
       tr('home.emergency'),
       tr('goals.eta', { months: 8 }),
@@ -230,7 +235,8 @@ try {
       check(`   ${code}: nessun testo italiano rimasto`, left.length === 0, left.join(' | '))
     }
     check(`   ${code}: nessun segnaposto {…} non sostituito`, !/\{\w+\}/.test(html()))
-    check(`   ${code}: importi identici a quelli in italiano (${moneyIt})`, money() === moneyIt)
+    if (moneyIt === null && code === 'it') moneyIt = moneyValues('it')
+    check(`   ${code}: importi con gli stessi valori dell'italiano (${moneyIt}), nel formato della lingua`, Boolean(moneyIt) && moneyValues(code) === moneyIt, moneyValues(code))
     check(`   ${code}: nomi restano quelli dei dati, periodo nella lingua scelta (Lisbona, ${labelIn(code)})`, html().includes('Lisbona') && shownLabel() === labelIn(code))
     check(`   ${code}: scheda "nuovo ciclo" con i cicli nella lingua scelta (${labelIn(code, previousRange)} → ${labelIn(code)})`,
       screen.includes(translate(code, 'budget.cycle.fresh.current', { cycle: labelIn(code) })) && screen.includes(labelIn(code, previousRange)))
@@ -248,13 +254,13 @@ try {
   check('importo nascosto: "Show amount"', html().includes('aria-label="Show amount"'))
   await act(() => S().toggleAmountHidden())
   await act(() => S().addSalary({ amount: 2451, date: today }))
-  check('stipendio del ciclo inserito: "Monthly budget 2451,00 €"', html().includes('Monthly budget 2451,00 €') && html().includes('of 2451,00 €'))
+  check(`stipendio del ciclo inserito: "Monthly budget ${formatCurrency(2451, 'en')}"`, formatCurrency(2451, 'en') === '€2,451.00' && html().includes(`Monthly budget ${formatCurrency(2451, 'en')}`) && html().includes(`of ${formatCurrency(2451, 'en')}`))
   await act(() => S().deleteGoal(S().goals.find((goal) => goal.label === 'PC').id))
   check('due obiettivi: "and one more goal →"', html().includes('and one more goal →'))
   await act(() => S().setLanguage('es'))
-  check('   in spagnolo: "y otro objetivo más →", "Presupuesto mensual 2451,00 €"', html().includes('y otro objetivo más →') && html().includes('Presupuesto mensual 2451,00 €'))
+  check('   in spagnolo: "y otro objetivo más →", "Presupuesto mensual 2.451,00 €"', html().includes('y otro objetivo más →') && html().includes('Presupuesto mensual 2.451,00 €'))
   await act(() => S().setLanguage('fr'))
-  check('   in francese: "Budget mensuel 2451,00 €", "Vous respectez votre budget !"', html().includes('Budget mensuel 2451,00 €') && html().includes('Vous respectez votre budget\u00a0!'))
+  check('   in francese: "Budget mensuel 2 451,00 €", "Vous respectez votre budget !"', html().includes('Budget mensuel 2\u00a0451,00 €') && html().includes('Vous respectez votre budget\u00a0!'))
 
   // =====================================================================
   section('6. Fallback: una traduzione mancante mostra l\'italiano')

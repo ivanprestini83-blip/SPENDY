@@ -100,7 +100,7 @@ export default {
       delete: '🗑️ Delete expense',
       confirm: 'Tap again to confirm',
     },
-    limit: 'Maximum amount: 1.000.000 €',
+    limit: 'Maximum amount: {amount}',
   },
   goals: {
     eta: 'At this rate, you’ll reach it in about {months} months.',
@@ -122,7 +122,7 @@ export default {
     goalreached: '🎉 Goal "{goal}" reached! This one’s on me... virtually 😂',
     ontrack: '😎 Nice! You’re under budget this cycle, for now.',
     drop: {
-      goal: 'You cut your {category} spending by {percent}%. You could move {amount} € to "{goal}".',
+      goal: 'You cut your {category} spending by {percent}%. You could move {amount} to "{goal}".',
       plain: 'You cut your {category} spending by {percent}%. Great job!',
     },
     warning: {
@@ -142,11 +142,11 @@ export default {
       },
     },
     insight: {
-      high: '{category}: {current} € instead of the usual {baseline} €.',
-      low: '{category}: only {current} € instead of the usual {baseline} €.',
+      high: '{category}: {current} instead of the usual {baseline}.',
+      low: '{category}: only {current} instead of the usual {baseline}.',
       above: 'It’s your biggest {category} expense this cycle.',
       below: 'An expense well below average for {category}.',
-      savings: '{amount} € less than usual this cycle.',
+      savings: '{amount} less than usual this cycle.',
       unusual: 'First {category} expense in several cycles.',
       frequency: 'Unusually frequent {category} spending this cycle.',
       positivestreak: 'Several cycles in a row under budget.',
@@ -229,8 +229,8 @@ export default {
       high: 'In recent cycles you spent around {baseline} on {category}. This cycle you’re at {current}.',
       low: 'You usually spend {baseline} here. This cycle you’re at {current}: {diff} less.',
       above: 'A single expense of {current}, compared with the {baseline} you usually spend each time in this category.',
-      small: '{count} expenses under 15 €, adding up to {total}.',
-      smallcategory: '{count} expenses under 15 €, adding up to {total}. Most of them on {category}.',
+      small: '{count} expenses under {limit}, adding up to {total}.',
+      smallcategory: '{count} expenses under {limit}, adding up to {total}. Most of them on {category}.',
       frequency: 'Here it’s how often, not how much: {current} purchases against the usual {baseline}.',
       unusual: 'You hadn’t spent anything on {category} for several cycles.',
       budgetover: 'You’ve spent {spent} against a budget of {budget}: you’re {over} over.',
@@ -267,16 +267,16 @@ export default {
     },
     goalhint: 'Keep "{goal}" in mind too: you’re still working on it.',
     wait: 'Better wait',
-    over: 'This purchase would put you {amount} € over budget.',
+    over: 'This purchase would put you {amount} over budget.',
     ok: {
       title: 'You can afford it',
-      message: 'You’d still have {amount} € this cycle: totally manageable.',
+      message: 'You’d still have {amount} this cycle: totally manageable.',
     },
     careful: {
       title: 'You can, but careful',
-      message: 'After this purchase you’d only have {amount} € left until the end of the cycle.',
+      message: 'After this purchase you’d only have {amount} left until the end of the cycle.',
     },
-    most: 'This purchase alone would use almost all of your remaining budget ({amount} €).',
+    most: 'This purchase alone would use almost all of your remaining budget ({amount}).',
   },
   notifications: {
     action: {

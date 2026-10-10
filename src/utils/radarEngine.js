@@ -1,10 +1,11 @@
 import { BEHAVIOR_ENGINE_CONFIG, BEHAVIOR_TYPES, analyzeBehavior } from './behaviorEngine.js'
 import { rankInsightsByImportance, computeImportance } from './importantEventSelector.js'
 import { translate } from '../i18n/translate.js'
+import { normalizeLanguage } from '../i18n/languages.js'
 import { generateJokeCandidates } from './humorEngine.js'
 import { pickBestJoke } from './jokeEvaluator.js'
 import { getInsightTopicKey } from './spendyCoach.js'
-import { formatCurrency } from './format.js'
+import { formatCurrency, formatCurrencyWhole } from './format.js'
 import { lastCycles, isWithinRange } from './cycle.js'
 
 // RADAR SPENDY — "quali sono le cose più importanti che Spendy ha
@@ -156,6 +157,8 @@ const percentText = (value) => `${value > 0 ? '+' : ''}${round(value)}%`
 // percentuali arrivano già formattati, come prima.
 
 const textIn = (ctx) => (key, params) => translate(ctx?.lang, `radarcard.${key}`, params)
+// Gli importi nella stessa lingua dei testi (separatori e posizione del simbolo).
+const moneyIn = (ctx) => (value) => formatCurrency(value, normalizeLanguage(ctx?.lang))
 
 // Il nome della categoria in minuscolo, come nelle frasi di sempre.
 const categoryName = (insight, t) => insight.category?.label?.toLowerCase() ?? t('thiscategory')
@@ -166,15 +169,16 @@ function categoryTitle(insight, t) {
 
 function narrateCategoryHigh(insight, ctx) {
   const t = textIn(ctx)
+  const money = moneyIn(ctx)
   return {
     title: categoryTitle(insight, t),
-    metric: { value: formatCurrency(insight.current), label: t('metric.thiscycle') },
+    metric: { value: money(insight.current), label: t('metric.thiscycle') },
     comparison: {
       text: t('comparison.vsaverage', { percent: percentText(insight.changePercent) }),
       direction: 'up',
-      baselineText: t('baseline.average', { amount: formatCurrency(insight.baseline) }),
+      baselineText: t('baseline.average', { amount: money(insight.baseline) }),
     },
-    explanation: t('explanation.high', { baseline: formatCurrency(insight.baseline), category: categoryName(insight, t), current: formatCurrency(insight.current) }),
+    explanation: t('explanation.high', { baseline: money(insight.baseline), category: categoryName(insight, t), current: money(insight.current) }),
     advice: t('advice.high'),
     action: RADAR_ACTIONS.CATEGORY,
   }
@@ -182,15 +186,16 @@ function narrateCategoryHigh(insight, ctx) {
 
 function narrateCategoryLow(insight, ctx) {
   const t = textIn(ctx)
+  const money = moneyIn(ctx)
   return {
     title: categoryTitle(insight, t),
-    metric: { value: formatCurrency(insight.current), label: t('metric.thiscycle') },
+    metric: { value: money(insight.current), label: t('metric.thiscycle') },
     comparison: {
       text: t('comparison.vsaverage', { percent: percentText(insight.changePercent) }),
       direction: 'down',
-      baselineText: t('baseline.average', { amount: formatCurrency(insight.baseline) }),
+      baselineText: t('baseline.average', { amount: money(insight.baseline) }),
     },
-    explanation: t('explanation.low', { baseline: formatCurrency(insight.baseline), current: formatCurrency(insight.current), diff: formatCurrency(Math.abs(insight.changeAmount)) }),
+    explanation: t('explanation.low', { baseline: money(insight.baseline), current: money(insight.current), diff: money(Math.abs(insight.changeAmount)) }),
     advice: t('advice.low'),
     action: RADAR_ACTIONS.GOALS,
   }
@@ -198,15 +203,16 @@ function narrateCategoryLow(insight, ctx) {
 
 function narrateAmountAboveAverage(insight, ctx) {
   const t = textIn(ctx)
+  const money = moneyIn(ctx)
   return {
     title: categoryTitle(insight, t),
-    metric: { value: formatCurrency(insight.current), label: t('metric.single') },
+    metric: { value: money(insight.current), label: t('metric.single') },
     comparison: {
       text: t('comparison.vstypical', { percent: percentText(insight.changePercent) }),
       direction: 'up',
-      baselineText: t('baseline.pertime', { category: categoryName(insight, t), amount: formatCurrency(insight.baseline) }),
+      baselineText: t('baseline.pertime', { category: categoryName(insight, t), amount: money(insight.baseline) }),
     },
-    explanation: t('explanation.above', { current: formatCurrency(insight.current), baseline: formatCurrency(insight.baseline) }),
+    explanation: t('explanation.above', { current: money(insight.current), baseline: money(insight.baseline) }),
     advice: null,
     action: RADAR_ACTIONS.EXPENSES,
   }
@@ -214,18 +220,21 @@ function narrateAmountAboveAverage(insight, ctx) {
 
 function narrateSmallExpenses(insight, ctx) {
   const t = textIn(ctx)
+  const money = moneyIn(ctx)
+  // "sotto i 15 €": la soglia è quella del motore (BEHAVIOR_ENGINE_CONFIG), scritta nella lingua.
+  const smallLimit = formatCurrencyWhole(BEHAVIOR_ENGINE_CONFIG.smallExpenseMaxAmount, normalizeLanguage(ctx?.lang))
   const { count, total, average, categoryLabel } = insight.facts
   return {
     title: t('title.small'),
-    metric: { value: t('metric.purchases', { count }), label: formatCurrency(total) },
+    metric: { value: t('metric.purchases', { count }), label: money(total) },
     comparison: {
-      text: t('comparison.average', { amount: formatCurrency(average) }),
+      text: t('comparison.average', { amount: money(average) }),
       direction: 'up',
       baselineText: categoryLabel ? t('baseline.mostly', { category: categoryLabel.toLowerCase() }) : null,
     },
     explanation: categoryLabel
-      ? t('explanation.smallcategory', { count, total: formatCurrency(total), category: categoryLabel.toLowerCase() })
-      : t('explanation.small', { count, total: formatCurrency(total) }),
+      ? t('explanation.smallcategory', { count, total: money(total), limit: smallLimit, category: categoryLabel.toLowerCase() })
+      : t('explanation.small', { count, total: money(total), limit: smallLimit }),
     advice: t('advice.small'),
     action: RADAR_ACTIONS.EXPENSES,
   }
@@ -250,9 +259,10 @@ function narrateFrequency(insight, ctx) {
 
 function narrateUnusualPurchase(insight, ctx) {
   const t = textIn(ctx)
+  const money = moneyIn(ctx)
   return {
     title: categoryTitle(insight, t),
-    metric: { value: formatCurrency(insight.current), label: t('metric.silence') },
+    metric: { value: money(insight.current), label: t('metric.silence') },
     comparison: null,
     explanation: t('explanation.unusual', { category: categoryName(insight, t) }),
     advice: null,
@@ -262,23 +272,24 @@ function narrateUnusualPurchase(insight, ctx) {
 
 function narrateBudget(insight, ctx) {
   const t = textIn(ctx)
+  const money = moneyIn(ctx)
   const { budget, spent, remaining, percent } = insight.facts
   const exceeded = insight.type === BEHAVIOR_TYPES.BUDGET_EXCEEDED
 
   return {
     title: t('title.budget'),
     metric: {
-      value: exceeded ? formatCurrency(Math.abs(remaining)) : formatCurrency(remaining),
+      value: exceeded ? money(Math.abs(remaining)) : money(remaining),
       label: exceeded ? t('metric.over') : t('metric.left'),
     },
     comparison: {
       text: t('comparison.used', { percent: round(percent) }),
       direction: exceeded ? 'up' : 'flat',
-      baselineText: t('baseline.spentof', { spent: formatCurrency(spent), budget: formatCurrency(budget) }),
+      baselineText: t('baseline.spentof', { spent: money(spent), budget: money(budget) }),
     },
     explanation: exceeded
-      ? t('explanation.budgetover', { spent: formatCurrency(spent), budget: formatCurrency(budget), over: formatCurrency(Math.abs(remaining)) })
-      : t(ctx.cycleEndLabel ? 'explanation.budgetleftuntil' : 'explanation.budgetleft', { percent: round(percent), left: formatCurrency(remaining), cycleEnd: ctx.cycleEndLabel }),
+      ? t('explanation.budgetover', { spent: money(spent), budget: money(budget), over: money(Math.abs(remaining)) })
+      : t(ctx.cycleEndLabel ? 'explanation.budgetleftuntil' : 'explanation.budgetleft', { percent: round(percent), left: money(remaining), cycleEnd: ctx.cycleEndLabel }),
     advice: exceeded ? t('advice.budgetover') : t('advice.budgetleft'),
     action: exceeded ? RADAR_ACTIONS.BUDGET : RADAR_ACTIONS.AFFORDABILITY,
   }
@@ -286,14 +297,15 @@ function narrateBudget(insight, ctx) {
 
 function narrateBudgetRespected(insight, ctx) {
   const t = textIn(ctx)
+  const money = moneyIn(ctx)
   const { budget, spent, remaining, percent } = insight.facts
   return {
     title: t('title.budget'),
-    metric: { value: formatCurrency(remaining), label: t('metric.left') },
+    metric: { value: money(remaining), label: t('metric.left') },
     comparison: {
       text: t('comparison.usedonly', { percent: round(percent) }),
       direction: 'down',
-      baselineText: t('baseline.spentof', { spent: formatCurrency(spent), budget: formatCurrency(budget) }),
+      baselineText: t('baseline.spentof', { spent: money(spent), budget: money(budget) }),
     },
     explanation: t('explanation.respected', { percent: round(percent) }),
     advice: null,
@@ -303,17 +315,18 @@ function narrateBudgetRespected(insight, ctx) {
 
 function narrateSavings(insight, ctx) {
   const t = textIn(ctx)
+  const money = moneyIn(ctx)
   const saved = Math.abs(insight.changeAmount)
   return {
     title: t('title.savings'),
-    metric: { value: formatCurrency(saved), label: t('metric.lessusual') },
+    metric: { value: money(saved), label: t('metric.lessusual') },
     comparison: {
       text: t('comparison.vsaverage', { percent: percentText(insight.changePercent) }),
       direction: 'down',
-      baselineText: t('baseline.atthispoint', { amount: formatCurrency(insight.baseline) }),
+      baselineText: t('baseline.atthispoint', { amount: money(insight.baseline) }),
     },
-    explanation: t('explanation.savings', { current: formatCurrency(insight.current), baseline: formatCurrency(insight.baseline) }),
-    advice: t('advice.savings', { amount: formatCurrency(saved) }),
+    explanation: t('explanation.savings', { current: money(insight.current), baseline: money(insight.baseline) }),
+    advice: t('advice.savings', { amount: money(saved) }),
     action: RADAR_ACTIONS.GOALS,
   }
 }
@@ -339,19 +352,20 @@ function narrateStreak(insight, ctx) {
 
 function narrateGoalProgress(insight, ctx) {
   const t = textIn(ctx)
+  const money = moneyIn(ctx)
   const { goalLabel, saved, target, percent, missing } = insight.facts
   return {
     title: t('title.goal'),
     metric: { value: `${round(percent)}%`, label: goalLabel },
     comparison: {
-      text: `${formatCurrency(saved)} / ${formatCurrency(target)}`,
+      text: `${money(saved)} / ${money(target)}`,
       // Non 'up': l'avanzamento di un obiettivo non è né un aumento da
       // temere né un calo da festeggiare, ha un colore tutto suo.
       direction: 'goal',
-      baselineText: t('baseline.missing', { amount: formatCurrency(missing) }),
+      baselineText: t('baseline.missing', { amount: money(missing) }),
     },
-    explanation: t('explanation.goal', { goal: goalLabel, saved: formatCurrency(saved), target: formatCurrency(target) }),
-    advice: t('baseline.missing', { amount: formatCurrency(missing) }),
+    explanation: t('explanation.goal', { goal: goalLabel, saved: money(saved), target: money(target) }),
+    advice: t('baseline.missing', { amount: money(missing) }),
     action: RADAR_ACTIONS.GOALS,
   }
 }

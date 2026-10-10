@@ -3,6 +3,7 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { totalForMonth } from '../../utils/budgetCalculations.js'
 import { currentCycleSalary } from '../../utils/salary.js'
 import { evaluateAffordability } from '../../utils/affordability.js'
+import { currencySymbol } from '../../utils/format.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import './AffordabilityScreen.css'
 
@@ -47,7 +48,7 @@ export function AffordabilityScreen({ onClose }) {
         <label className="affordability-screen__field">
           <span>Quanto vuoi spendere?</span>
           <div className="affordability-screen__amount-input">
-            <span>€</span>
+            <span>{currencySymbol()}</span>
             <input
               type="number"
               inputMode="decimal"

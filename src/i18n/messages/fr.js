@@ -102,7 +102,7 @@ export default {
       delete: '🗑️ Supprimer la dépense',
       confirm: 'Touchez à nouveau pour confirmer',
     },
-    limit: 'Montant maximum\u00a0: 1.000.000\u00a0€',
+    limit: 'Montant maximum\u00a0: {amount}',
   },
   goals: {
     eta: 'À ce rythme, vous l’atteindrez dans environ {months} mois.',
@@ -124,7 +124,7 @@ export default {
     goalreached: '🎉 Objectif "{goal}" atteint ! Cette fois, c’est moi qui offre... virtuellement 😂',
     ontrack: '😎 Bravo ! Pour l’instant, vous êtes sous le budget ce cycle-ci.',
     drop: {
-      goal: 'Vous avez réduit vos dépenses {category} de {percent} %. Vous pourriez transférer {amount} € vers "{goal}".',
+      goal: 'Vous avez réduit vos dépenses {category} de {percent} %. Vous pourriez transférer {amount} vers "{goal}".',
       plain: 'Vous avez réduit vos dépenses {category} de {percent} %. Beau travail !',
     },
     warning: {
@@ -144,11 +144,11 @@ export default {
       },
     },
     insight: {
-      high: '{category} : {current} € au lieu des {baseline} € habituels.',
-      low: '{category} : seulement {current} € au lieu des {baseline} € habituels.',
+      high: '{category} : {current} au lieu des {baseline} habituels.',
+      low: '{category} : seulement {current} au lieu des {baseline} habituels.',
       above: 'C’est la dépense la plus élevée du cycle en {category}.',
       below: 'Une dépense bien en dessous de la moyenne en {category}.',
-      savings: '{amount} € de moins que d’habitude ce cycle-ci.',
+      savings: '{amount} de moins que d’habitude ce cycle-ci.',
       unusual: 'Première dépense en {category} depuis plusieurs cycles.',
       frequency: 'Fréquence inhabituelle en {category} ce cycle-ci.',
       positivestreak: 'Plusieurs cycles d’affilée sous le budget.',
@@ -231,8 +231,8 @@ export default {
       high: 'Ces derniers cycles, vous dépensiez environ {baseline} en {category}. Ce cycle-ci, vous en êtes à {current}.',
       low: 'D’habitude, vous dépensez {baseline} ici. Ce cycle-ci, vous en êtes à {current} : {diff} de moins.',
       above: 'Une seule dépense de {current}, contre les {baseline} que vous dépensez d’habitude à chaque fois dans cette catégorie.',
-      small: '{count} dépenses de moins de 15 €, pour un total de {total}.',
-      smallcategory: '{count} dépenses de moins de 15 €, pour un total de {total}. La plupart en {category}.',
+      small: '{count} dépenses de moins de {limit}, pour un total de {total}.',
+      smallcategory: '{count} dépenses de moins de {limit}, pour un total de {total}. La plupart en {category}.',
       frequency: 'Ici, c’est la fréquence qui compte, pas le montant : {current} achats contre {baseline} d’habitude.',
       unusual: 'Vous n’aviez rien dépensé en {category} depuis plusieurs cycles.',
       budgetover: 'Vous avez dépensé {spent} pour un budget de {budget} : vous le dépassez de {over}.',
@@ -269,16 +269,16 @@ export default {
     },
     goalhint: 'Pensez aussi à "{goal}" : vous y travaillez encore.',
     wait: 'Mieux vaut attendre',
-    over: 'Avec cette dépense, vous dépasseriez le budget de {amount} €.',
+    over: 'Avec cette dépense, vous dépasseriez le budget de {amount}.',
     ok: {
       title: 'Vous pouvez vous le permettre',
-      message: 'Il vous reste {amount} € ce cycle-ci : une dépense raisonnable.',
+      message: 'Il vous reste {amount} ce cycle-ci : une dépense raisonnable.',
     },
     careful: {
       title: 'C’est possible, mais attention',
-      message: 'Après cette dépense, il ne vous resterait que {amount} € jusqu’à la fin du cycle.',
+      message: 'Après cette dépense, il ne vous resterait que {amount} jusqu’à la fin du cycle.',
     },
-    most: 'Cette dépense à elle seule utiliserait presque tout le budget restant ({amount} €).',
+    most: 'Cette dépense à elle seule utiliserait presque tout le budget restant ({amount}).',
   },
   notifications: {
     action: {

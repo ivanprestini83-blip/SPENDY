@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ProgressBar } from '../ProgressBar/ProgressBar.jsx'
-import { formatCurrency } from '../../utils/format.js'
+import { formatCurrency, maskedCurrency } from '../../utils/format.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import './BudgetCard.css'
 
@@ -70,7 +70,7 @@ export function BudgetCard({ available, spent, monthlyBudget, period, hidden, on
       </div>
 
       <p className={`budget-card__amount ${barState === 'danger' ? 'budget-card__amount--alarm' : ''}`}>
-        {hidden ? '•••• €' : formatCurrency(available)}
+        {hidden ? maskedCurrency() : formatCurrency(available)}
       </p>
 
       {/* Il budget è lo stipendio di QUESTO ciclo (utils/salary.js): a inizio

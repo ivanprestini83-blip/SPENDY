@@ -61,9 +61,24 @@ export function similarity(a, b) {
   return union > 0 ? shared / union : 0
 }
 
+// I numeri come li scrive l'app in qualunque lingua (utils/format.js):
+// "1.794,00 €" (it, es), "€1,794.00" (en), "1 794,00 €" (fr, spazio stretto),
+// "12,50", "18". Un gruppo di migliaia è sempre di tre cifre dopo un punto,
+// una virgola o uno spazio stretto; un decimale è l'ultimo separatore seguito
+// da una o due cifre. Uno spazio normale NON unisce due numeri ("2 spese da
+// 100" resta 2 e 100).
+const NUMBER = /\d{1,3}(?:[.,\u202f\u00a0]\d{3})+(?:[.,]\d{1,2})?(?!\d)|\d+(?:[.,]\d+)?/g
+
+export function parseShownNumber(token) {
+  const last = Math.max(token.lastIndexOf(','), token.lastIndexOf('.'))
+  const decimals = last >= 0 && /^[.,]\d{1,2}$/.test(token.slice(last)) ? token.slice(last + 1) : null
+  const integer = (decimals === null ? token : token.slice(0, last)).replace(/[.,\u202f\u00a0]/g, '')
+  return Number(decimals === null ? integer : `${integer}.${decimals}`)
+}
+
 function extractAmounts(text) {
-  const matches = text.match(/\d+(?:[.,]\d+)?/g) ?? []
-  return matches.map((match) => Math.round(parseFloat(match.replace(',', '.'))))
+  const matches = text.match(NUMBER) ?? []
+  return matches.map((match) => Math.round(parseShownNumber(match)))
 }
 
 // "non deve contenere informazioni non presenti nei dati" — every € or %

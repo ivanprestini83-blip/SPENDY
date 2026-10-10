@@ -17,6 +17,8 @@ import { createServer } from 'vite'
 import reactPlugin from '@vitejs/plugin-react'
 import { createElement as h } from 'react'
 import { check, section, report, italianDevice } from '../sync/testkit.mjs'
+import { formatCurrencyWhole } from '../utils/format.js'
+import { parseShownNumber } from '../utils/jokeEvaluator.js'
 import { MESSAGES, translate } from './translate.js'
 import { humorLibrary } from '../utils/humorLibrary.js'
 import * as reactionLibrary from '../data/spendyReactionLibrary.js'
@@ -177,9 +179,11 @@ section('4. Coach: le frasi fisse, stesse soglie')
   }, { lang }))
   const drops = LANGS.map(drop)
   check('spese ridotte: stesso consiglio, {category} {percent} {amount} {goal} sostituiti', same(drops.map((r) => [r.state, r.reason]))
-    && drops.every((r, i) => r.message === translate(LANGS[i], 'coach.drop.goal', { category: withLanguage(LANGS[i], () => getCategory('bar').label), percent: 40, amount: 30, goal: 'Auto' })),
+    && drops.every((r, i) => r.message === translate(LANGS[i], 'coach.drop.goal', { category: withLanguage(LANGS[i], () => getCategory('bar').label), percent: 40, amount: formatCurrencyWhole(30, LANGS[i]), goal: 'Auto' })),
   drops.map((r) => r.message).join(' | '))
-  check('   in inglese: "You cut your Café spending by 40%. You could move 30 € to "Auto"."', drops[1].message === 'You cut your Café spending by 40%. You could move 30 € to "Auto".')
+  // L'importo nel formato della lingua: "30 €" in italiano (come prima), "€30" in inglese.
+  check('   in inglese: "You cut your Café spending by 40%. You could move €30 to "Auto"."', drops[1].message === 'You cut your Café spending by 40%. You could move €30 to "Auto".'
+    && drops[0].message.includes('Potresti spostare 30 € verso "Auto"'))
   check('   in italiano identico a prima', drops[0].message === 'Hai ridotto le spese Bar del 40%. Potresti spostare 30 € verso "Auto".')
 }
 
@@ -240,7 +244,8 @@ section('6. Radar: stesse schede, testi nella lingua scelta')
       return buildRadar({ expenses, goals, today: TODAY, monthlyBudget, cycleStartDay: 1, financialData, jokeHistory: [], rng: () => 0, lang })
     }))
     // Il valore principale a volte contiene una parola ("10 acquisti"): si confrontano i numeri.
-    const numbers = (value) => String(value ?? '').match(/[\d.,]+/g)?.join(' ') ?? ''
+    // I valori delle cifre, qualunque sia il formato della lingua ("2.571,00 €", "€2,571.00", "2 571,00 €").
+    const numbers = (value) => (String(value ?? '').match(/\d{1,3}(?:[.,\u202f\u00a0]\d{3})+(?:[.,]\d{1,2})?(?!\d)|\d+(?:[.,]\d+)?/g) ?? []).map(parseShownNumber).join(' ')
     const shape = (radar) => radar.cards.map((c) => [c.id, c.type, c.tone, c.priority, numbers(c.metric?.value), c.comparison?.direction, c.action])
     check(`${name}: stesse schede, stesso ordine, stessi valori e azioni in ogni lingua (${radars[0].cards.length})`, radars[0].cards.length > 0 && same(radars.map(shape))
       && radars.every((r) => r.cards.every((c, i) => c.action === radars[0].cards[i].action)), radars.map((r) => r.cards.map((c) => c.type).join(',')).join(' | '))
@@ -273,16 +278,17 @@ section('7. Posso permettermelo? — stessi verdetti, nella lingua scelta')
   const goals = [{ id: 'g', label: 'Lisbona', saved: 100, target: 1000 }]
   const cases = [
     ['nessun importo', { amount: NaN, availableBudget: 500, goals: [] }, 'yellow', (t) => [t('noamount.title'), t('noamount.message')]],
-    ['sforerebbe il budget', { amount: 700, availableBudget: 500, goals }, 'red', (t) => [t('wait'), `${t('over', { amount: 200 })} ${t('goalhint', { goal: 'Lisbona' })}`]],
-    ['spesa gestibile', { amount: 100, availableBudget: 500, goals }, 'green', (t) => [t('ok.title'), t('ok.message', { amount: 400 })]],
-    ['attenzione', { amount: 300, availableBudget: 500, goals }, 'yellow', (t) => [t('careful.title'), `${t('careful.message', { amount: 200 })} ${t('goalhint', { goal: 'Lisbona' })}`]],
-    ['quasi tutto il budget', { amount: 450, availableBudget: 500, goals: [] }, 'red', (t) => [t('wait'), t('most', { amount: 500 })]],
+    ['sforerebbe il budget', { amount: 700, availableBudget: 500, goals }, 'red', (t, money) => [t('wait'), `${t('over', { amount: money(200) })} ${t('goalhint', { goal: 'Lisbona' })}`]],
+    ['spesa gestibile', { amount: 100, availableBudget: 500, goals }, 'green', (t, money) => [t('ok.title'), t('ok.message', { amount: money(400) })]],
+    ['attenzione', { amount: 300, availableBudget: 500, goals }, 'yellow', (t, money) => [t('careful.title'), `${t('careful.message', { amount: money(200) })} ${t('goalhint', { goal: 'Lisbona' })}`]],
+    ['quasi tutto il budget', { amount: 450, availableBudget: 500, goals: [] }, 'red', (t, money) => [t('wait'), t('most', { amount: money(500) })]],
   ]
   for (const [name, input, level, expected] of cases) {
     const results = LANGS.map((lang) => evaluateAffordability({ ...input, lang }))
     check(`${name}: stesso verdetto (${level}), testi nella lingua scelta`, results.every((r) => r.level === level)
       && results.every((r, i) => {
-        const [title, message] = expected((key, params) => translate(LANGS[i], `affordability.${key}`, params))
+        // Gli stessi importi arrotondati, nel formato della lingua ("200 €", "€200").
+        const [title, message] = expected((key, params) => translate(LANGS[i], `affordability.${key}`, params), (value) => formatCurrencyWhole(value, LANGS[i]))
         return r.title === title && r.message === message
       }), results.map((r) => `${r.title} — ${r.message}`).join(' | '))
   }

@@ -1,4 +1,5 @@
 import { translate } from '../i18n/translate.js'
+import { formatCurrencyWhole } from './format.js'
 
 // Deliberately simple, non-AI simulation: it only ever looks at numbers
 // already in the store (remaining budget this month + the closest goal),
@@ -7,6 +8,8 @@ import { translate } from '../i18n/translate.js'
 // unknown → Italian): levels and thresholds are the same in every language.
 export function evaluateAffordability({ amount, availableBudget, goals, lang = 'it' }) {
   const t = (key, params) => translate(lang, `affordability.${key}`, params)
+  // Gli stessi importi arrotondati all'euro, scritti nel formato della lingua.
+  const money = (value) => formatCurrencyWhole(Math.round(value), lang)
 
   if (!Number.isFinite(amount) || amount <= 0) {
     return {
@@ -28,7 +31,7 @@ export function evaluateAffordability({ amount, availableBudget, goals, lang = '
     return {
       level: 'red',
       title: t('wait'),
-      message: `${t('over', { amount: Math.round(-remainingAfter) })}${goalHint}`,
+      message: `${t('over', { amount: money(-remainingAfter) })}${goalHint}`,
     }
   }
 
@@ -36,7 +39,7 @@ export function evaluateAffordability({ amount, availableBudget, goals, lang = '
     return {
       level: 'green',
       title: t('ok.title'),
-      message: t('ok.message', { amount: Math.round(remainingAfter) }),
+      message: t('ok.message', { amount: money(remainingAfter) }),
     }
   }
 
@@ -44,13 +47,13 @@ export function evaluateAffordability({ amount, availableBudget, goals, lang = '
     return {
       level: 'yellow',
       title: t('careful.title'),
-      message: `${t('careful.message', { amount: Math.round(remainingAfter) })}${goalHint}`,
+      message: `${t('careful.message', { amount: money(remainingAfter) })}${goalHint}`,
     }
   }
 
   return {
     level: 'red',
     title: t('wait'),
-    message: `${t('most', { amount: Math.round(availableBudget) })}${goalHint}`,
+    message: `${t('most', { amount: money(availableBudget) })}${goalHint}`,
   }
 }

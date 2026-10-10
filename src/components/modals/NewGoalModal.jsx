@@ -5,6 +5,7 @@ import { useAppStore } from '../../store/useAppStore.js'
 import './modalForm.css'
 import { isValidAmount } from '../../utils/amounts.js'
 import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
+import { formatCurrency } from '../../utils/format.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 
 function monthsUntil(targetDateStr, todayStr) {
@@ -55,7 +56,7 @@ export function NewGoalModal({ onClose }) {
         label={t('goalspage.modal.target')}
         type="number"
         inputMode="decimal"
-        placeholder="€ 0,00"
+        placeholder={formatCurrency(0)}
         value={target}
         onChange={(event) => setTarget(event.target.value)}
       />
@@ -72,7 +73,7 @@ export function NewGoalModal({ onClose }) {
         label={t('goalspage.modal.saved')}
         type="number"
         inputMode="decimal"
-        placeholder="€ 0,00"
+        placeholder={formatCurrency(0)}
         value={saved}
         onChange={(event) => setSaved(event.target.value)}
       />

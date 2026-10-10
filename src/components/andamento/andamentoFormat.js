@@ -1,34 +1,33 @@
 import { translate } from '../../i18n/translate.js'
-import { formatCurrency } from '../../utils/format.js'
+import { formatCurrency, formatDecimal1, formatInteger } from '../../utils/format.js'
 
-// Formattazioni usate solo da Andamento. Gli importi passano comunque da
-// formatCurrency (centesimi inclusi, come nel resto dell'app); qui c'è
-// solo il pezzo in più: segno esplicito e percentuale con un decimale
-// ("-12,9%"), perché in un confronto il segno è l'informazione.
+// Formattazioni usate solo da Andamento. Importi e numeri passano dal
+// formatter centrale (utils/format.js), nella lingua `lang` (assente: la
+// lingua corrente dell'app); qui c'è solo il pezzo in più: segno esplicito
+// e percentuale con un decimale ("-12,9%", "-12.9%"), perché in un confronto
+// il segno è l'informazione.
 
-const percentFormatter = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 })
-const compactFormatter = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0 })
-
-export function formatSignedCurrency(value) {
-  if (value === 0) return formatCurrency(0)
-  return `${value > 0 ? '+' : '-'}${formatCurrency(Math.abs(value))}`
+export function formatSignedCurrency(value, lang) {
+  if (value === 0) return formatCurrency(0, lang)
+  return `${value > 0 ? '+' : '-'}${formatCurrency(Math.abs(value), lang)}`
 }
 
-export function formatSignedPercent1(value) {
+export function formatSignedPercent1(value, lang) {
   const rounded = Math.round(value * 10) / 10
   if (rounded === 0) return '0%'
-  return `${rounded > 0 ? '+' : '-'}${percentFormatter.format(Math.abs(rounded))}%`
+  return `${rounded > 0 ? '+' : '-'}${formatDecimal1(Math.abs(rounded), lang)}%`
 }
 
 export function formatPercent(value) {
   return value === null ? '—' : `${Math.round(value)}%`
 }
 
-// Etichetta corta per le colonne del grafico: "1.080" senza decimali né
-// simbolo, perché sei colonne su uno schermo da telefono non ne hanno lo
-// spazio. L'importo preciso resta nel riepilogo e nell'aria-label.
-export function formatCompactAmount(value) {
-  return compactFormatter.format(Math.round(value))
+// Etichetta corta per le colonne del grafico: "1.080" (it), "1,080" (en)
+// senza decimali né simbolo, perché sei colonne su uno schermo da telefono
+// non ne hanno lo spazio. L'importo preciso resta nel riepilogo e
+// nell'aria-label.
+export function formatCompactAmount(value, lang) {
+  return formatInteger(value, lang)
 }
 
 // Come leggere una variazione (vedi computeChange nell'engine).
@@ -43,11 +42,11 @@ export function describeChange(change, { higherIsBetter = false, lang, newLabel 
   const good = higherIsBetter ? diff > 0 : diff < 0
   const tone = good ? 'good' : 'bad'
   const arrow = diff > 0 ? '▲' : '▼'
-  const amount = formatSignedCurrency(diff)
+  const amount = formatSignedCurrency(diff, lang)
   let detail = null
   if (kind === 'new') detail = newLabel
   else if (kind === 'gone') detail = goneLabel
-  else if (percent !== null) detail = formatSignedPercent1(percent)
+  else if (percent !== null) detail = formatSignedPercent1(percent, lang)
 
   // `text` per le righe larghe (metriche), `amount`/`detail` separati per
   // quelle strette (categorie), dove vanno su due righe.
@@ -61,5 +60,5 @@ export function describeChange(change, { higherIsBetter = false, lang, newLabel 
 export function describeDiff(diff, { higherIsBetter = false, lang } = {}) {
   if (diff === 0) return { arrow: '=', text: translate(lang, 'andamento.change.unchanged'), tone: 'flat' }
   const good = higherIsBetter ? diff > 0 : diff < 0
-  return { arrow: diff > 0 ? '▲' : '▼', text: formatSignedCurrency(diff), tone: good ? 'good' : 'bad' }
+  return { arrow: diff > 0 ? '▲' : '▼', text: formatSignedCurrency(diff, lang), tone: good ? 'good' : 'bad' }
 }

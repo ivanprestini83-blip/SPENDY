@@ -85,15 +85,16 @@ check('sei immagini distinte, nessuna riusata', new Set(Object.values(spendyStat
 // =====================================================================
 section('3. Gli importi mostrano i centesimi')
 // =====================================================================
-check('175,50 resta 175,50 (non 176)', formatCurrency(175.5) === '175,50 €', formatCurrency(175.5))
-check('un intero mostra comunque i decimali', formatCurrency(7).endsWith('7,00 €'), formatCurrency(7))
-check('zero', formatCurrency(0) === '0,00 €')
-check('negativo', formatCurrency(-50.2) === '-50,20 €', formatCurrency(-50.2))
+// Il formato italiano (la matrice delle quattro lingue è in utils/format.test.mjs).
+check('175,50 resta 175,50 (non 176)', formatCurrency(175.5, 'it') === '175,50 €', formatCurrency(175.5, 'it'))
+check('un intero mostra comunque i decimali', formatCurrency(7, 'it').endsWith('7,00 €'), formatCurrency(7, 'it'))
+check('zero', formatCurrency(0, 'it') === '0,00 €')
+check('negativo', formatCurrency(-50.2, 'it') === '-50,20 €', formatCurrency(-50.2, 'it'))
 check('sempre due cifre decimali, mai una o tre',
-  [1.005, 0.1, 12, 9999.999].every((v) => /^-?[\d.]+,\d{2} €$/.test(formatCurrency(v))),
-  [1.005, 0.1, 12, 9999.999].map(formatCurrency).join(' | '))
-check('virgola decimale italiana, non punto', !formatCurrency(1234.5).includes('.5'))
-check('un valore non numerico non rompe la schermata', formatCurrency(undefined) === '0,00 €')
+  [1.005, 0.1, 12, 9999.999].every((v) => /^-?[\d.]+,\d{2} €$/.test(formatCurrency(v, 'it'))),
+  [1.005, 0.1, 12, 9999.999].map((v) => formatCurrency(v, 'it')).join(' | '))
+check('virgola decimale italiana, non punto', !formatCurrency(1234.5, 'it').includes('.5'))
+check('un valore non numerico non rompe la schermata', formatCurrency(undefined, 'it') === '0,00 €')
 
 // =====================================================================
 section('4. Una nuova spesa = una sola reaction visibile')

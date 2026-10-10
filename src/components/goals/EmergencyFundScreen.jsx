@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore.js'
 import { SpendyCharacterWithMessage } from '../spendy/SpendyCharacterWithMessage.jsx'
 import { ProgressBar } from '../ProgressBar/ProgressBar.jsx'
-import { formatCurrency } from '../../utils/format.js'
+import { formatCurrency, currencySymbol } from '../../utils/format.js'
 import './EmergencyFundScreen.css'
 import { isValidAmount } from '../../utils/amounts.js'
 import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
@@ -132,7 +132,7 @@ export function EmergencyFundScreen({ onClose }) {
         <label className="emergency-fund-screen__field">
           <span>{t('emergency.addlabel')}</span>
           <div className="emergency-fund-screen__input">
-            <span>€</span>
+            <span>{currencySymbol()}</span>
             <input
               type="number"
               inputMode="decimal"
@@ -162,7 +162,7 @@ export function EmergencyFundScreen({ onClose }) {
                 editingId === contribution.id ? (
                   <li key={contribution.id} className="emergency-fund-screen__history-edit">
                     <div className="emergency-fund-screen__history-edit-input">
-                      <span>€</span>
+                      <span>{currencySymbol()}</span>
                       <input
                         type="number"
                         inputMode="decimal"

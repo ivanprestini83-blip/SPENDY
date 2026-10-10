@@ -1,5 +1,5 @@
 import { useAppStore } from '../../store/useAppStore.js'
-import { formatCurrency } from '../../utils/format.js'
+import { formatCurrency, maskedCurrency } from '../../utils/format.js'
 import { totalForPeriod } from '../../utils/budgetCalculations.js'
 import { formatCycleLabel, getCycleRange, getPreviousCycleRange } from '../../utils/cycle.js'
 import { parseAmountInput, isValidAmount } from '../../utils/amounts.js'
@@ -42,7 +42,7 @@ export function CycleStartCard() {
   const showCycle = needsCycleConfirmation(state)
   if (!showLegacy && !showCycle) return null
 
-  const money = (value) => (amountHidden ? '•••• €' : formatCurrency(value))
+  const money = (value) => (amountHidden ? maskedCurrency() : formatCurrency(value))
   const current = getCycleRange(today, cycleStartDay)
   const previous = getPreviousCycleRange(current, cycleStartDay)
   const legacyCycles = showLegacy ? legacySalaryCycles({ expenses, incomes, today, cycleStartDay }) : []

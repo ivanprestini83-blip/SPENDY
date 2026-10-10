@@ -103,9 +103,9 @@ export default {
       delete: '🗑️ Elimina spesa',
       confirm: 'Tocca di nuovo per confermare',
     },
-    // Stesso testo di AMOUNT_LIMIT_MESSAGE (utils/amounts.js); l'importo resta
-    // scritto così in ogni lingua finché non arriva la fase di date e numeri.
-    limit: 'Importo massimo: 1.000.000 €',
+    // {amount} = MAX_AMOUNT nel formato della lingua (AmountLimitHint): in
+    // italiano il testo resta identico ad AMOUNT_LIMIT_MESSAGE (utils/amounts.js).
+    limit: 'Importo massimo: {amount}',
   },
   goals: {
     eta: 'Se continui così, lo raggiungi in circa {months} mesi.',
@@ -131,7 +131,7 @@ export default {
     goalreached: '🎉 Obiettivo "{goal}" raggiunto! Questa volta offro io... virtualmente 😂',
     ontrack: '😎 Bravo! Per ora sei sotto budget in questo ciclo.',
     drop: {
-      goal: 'Hai ridotto le spese {category} del {percent}%. Potresti spostare {amount} € verso "{goal}".',
+      goal: 'Hai ridotto le spese {category} del {percent}%. Potresti spostare {amount} verso "{goal}".',
       plain: 'Hai ridotto le spese {category} del {percent}%. Ottimo lavoro!',
     },
     warning: {
@@ -151,11 +151,11 @@ export default {
       },
     },
     insight: {
-      high: '{category}: {current} € invece dei soliti {baseline} €.',
-      low: '{category}: solo {current} € invece dei soliti {baseline} €.',
+      high: '{category}: {current} invece dei soliti {baseline}.',
+      low: '{category}: solo {current} invece dei soliti {baseline}.',
       above: 'È la spesa più alta del ciclo in {category}.',
       below: 'Una spesa ben sotto la media per {category}.',
-      savings: '{amount} € in meno del solito in questo ciclo.',
+      savings: '{amount} in meno del solito in questo ciclo.',
       unusual: 'Prima spesa in {category} da diversi cicli.',
       frequency: 'Frequenza fuori dal solito in {category} in questo ciclo.',
       positivestreak: 'Diversi cicli di fila sotto budget.',
@@ -238,8 +238,8 @@ export default {
       high: 'Negli ultimi cicli spendevi intorno a {baseline} in {category}. Questo ciclo sei a {current}.',
       low: 'Di solito qui spendi {baseline}. Questo ciclo sei a {current}: {diff} in meno.',
       above: 'Una singola spesa da {current}, contro le {baseline} che spendi di solito per volta in questa categoria.',
-      small: '{count} spese sotto i 15 €, per un totale di {total}.',
-      smallcategory: '{count} spese sotto i 15 €, per un totale di {total}. La maggior parte in {category}.',
+      small: '{count} spese sotto i {limit}, per un totale di {total}.',
+      smallcategory: '{count} spese sotto i {limit}, per un totale di {total}. La maggior parte in {category}.',
       frequency: "Qui conta la frequenza, non l'importo: {current} acquisti contro i {baseline} abituali.",
       unusual: 'Non spendevi in {category} da diversi cicli.',
       budgetover: 'Hai speso {spent} a fronte di un budget di {budget}: sei oltre di {over}.',
@@ -276,16 +276,16 @@ export default {
     },
     goalhint: 'Occhio anche a "{goal}": ci stai ancora lavorando.',
     wait: 'Meglio aspettare',
-    over: 'Con questa spesa sforeresti il budget di {amount} €.',
+    over: 'Con questa spesa sforeresti il budget di {amount}.',
     ok: {
       title: 'Puoi permettertelo',
-      message: 'Ti restano {amount} € in questo ciclo: una spesa gestibile.',
+      message: 'Ti restano {amount} in questo ciclo: una spesa gestibile.',
     },
     careful: {
       title: 'Puoi farlo, ma attenzione',
-      message: 'Dopo questa spesa ti resterebbero solo {amount} € fino alla fine del ciclo.',
+      message: 'Dopo questa spesa ti resterebbero solo {amount} fino alla fine del ciclo.',
     },
-    most: 'Questa spesa da sola userebbe quasi tutto il budget rimanente ({amount} €).',
+    most: 'Questa spesa da sola userebbe quasi tutto il budget rimanente ({amount}).',
   },
   // Le notifiche si salvano come testo quando nascono: queste valgono per le
   // nuove, quelle già salvate restano nella lingua in cui sono nate.

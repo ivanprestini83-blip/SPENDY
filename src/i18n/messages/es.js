@@ -100,7 +100,7 @@ export default {
       delete: '🗑️ Eliminar gasto',
       confirm: 'Toca de nuevo para confirmar',
     },
-    limit: 'Importe máximo: 1.000.000\u00a0€',
+    limit: 'Importe máximo: {amount}',
   },
   goals: {
     eta: 'Si sigues así, lo alcanzarás en unos {months} meses.',
@@ -122,7 +122,7 @@ export default {
     goalreached: '🎉 ¡Objetivo "{goal}" conseguido! Esta vez invito yo... virtualmente 😂',
     ontrack: '😎 ¡Bien! Por ahora vas por debajo del presupuesto en este ciclo.',
     drop: {
-      goal: 'Has reducido tus gastos en {category} un {percent}%. Podrías pasar {amount} € a "{goal}".',
+      goal: 'Has reducido tus gastos en {category} un {percent}%. Podrías pasar {amount} a "{goal}".',
       plain: 'Has reducido tus gastos en {category} un {percent}%. ¡Buen trabajo!',
     },
     warning: {
@@ -142,11 +142,11 @@ export default {
       },
     },
     insight: {
-      high: '{category}: {current} € en lugar de los {baseline} € habituales.',
-      low: '{category}: solo {current} € en lugar de los {baseline} € habituales.',
+      high: '{category}: {current} en lugar de los {baseline} habituales.',
+      low: '{category}: solo {current} en lugar de los {baseline} habituales.',
       above: 'Es el gasto más alto del ciclo en {category}.',
       below: 'Un gasto muy por debajo de la media en {category}.',
-      savings: '{amount} € menos de lo habitual en este ciclo.',
+      savings: '{amount} menos de lo habitual en este ciclo.',
       unusual: 'Primer gasto en {category} desde hace varios ciclos.',
       frequency: 'Frecuencia fuera de lo normal en {category} en este ciclo.',
       positivestreak: 'Varios ciclos seguidos por debajo del presupuesto.',
@@ -229,8 +229,8 @@ export default {
       high: 'En los últimos ciclos gastabas unos {baseline} en {category}. Este ciclo vas por {current}.',
       low: 'Normalmente aquí gastas {baseline}. Este ciclo vas por {current}: {diff} menos.',
       above: 'Un solo gasto de {current}, frente a los {baseline} que sueles gastar cada vez en esta categoría.',
-      small: '{count} gastos de menos de 15 €, por un total de {total}.',
-      smallcategory: '{count} gastos de menos de 15 €, por un total de {total}. La mayoría en {category}.',
+      small: '{count} gastos de menos de {limit}, por un total de {total}.',
+      smallcategory: '{count} gastos de menos de {limit}, por un total de {total}. La mayoría en {category}.',
       frequency: 'Aquí cuenta la frecuencia, no el importe: {current} compras frente a las {baseline} habituales.',
       unusual: 'No gastabas en {category} desde hacía varios ciclos.',
       budgetover: 'Has gastado {spent} con un presupuesto de {budget}: te has pasado {over}.',
@@ -267,16 +267,16 @@ export default {
     },
     goalhint: 'Ojo también con "{goal}": todavía estás trabajando en ello.',
     wait: 'Mejor esperar',
-    over: 'Con este gasto te pasarías del presupuesto en {amount} €.',
+    over: 'Con este gasto te pasarías del presupuesto en {amount}.',
     ok: {
       title: 'Te lo puedes permitir',
-      message: 'Te quedan {amount} € en este ciclo: un gasto asumible.',
+      message: 'Te quedan {amount} en este ciclo: un gasto asumible.',
     },
     careful: {
       title: 'Puedes, pero con cuidado',
-      message: 'Después de este gasto solo te quedarían {amount} € hasta el final del ciclo.',
+      message: 'Después de este gasto solo te quedarían {amount} hasta el final del ciclo.',
     },
-    most: 'Este gasto por sí solo usaría casi todo el presupuesto restante ({amount} €).',
+    most: 'Este gasto por sí solo usaría casi todo el presupuesto restante ({amount}).',
   },
   notifications: {
     action: {

@@ -5,6 +5,7 @@ import { formatCycleLabel, getCycleRange, isWithinRange } from '../../utils/cycl
 import { isValidAmount, parseAmountInput } from '../../utils/amounts.js'
 import { isSalary, lastKnownSalary } from '../../utils/salary.js'
 import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
+import { useLanguage } from '../../i18n/useLanguage.js'
 
 // Impostazioni → Stipendio di questo ciclo: sempre presente. Mostra lo
 // stipendio DEL CICLO IN CORSO e permette, qui dentro, di modificarne la
@@ -21,6 +22,9 @@ export function CurrentSalaryCard() {
   const addSalary = useAppStore((state) => state.addSalary)
   const editIncome = useAppStore((state) => state.editIncome)
   const deleteIncome = useAppStore((state) => state.deleteIncome)
+  // La lingua letta qui (non solo dentro formatCurrency): cambiandola con le
+  // Impostazioni aperte, la cifra si riscrive subito nel nuovo formato.
+  const { language } = useLanguage()
 
   // editingId: id dello stipendio in modifica, 'new' per un inserimento.
   const [editingId, setEditingId] = useState(null)
@@ -95,7 +99,7 @@ export function CurrentSalaryCard() {
 
       {salaries.map((salary) => (
         <div key={salary.id} className="settings-screen__salary">
-          <p className="settings-screen__salary-amount">{formatCurrency(salary.amount)}</p>
+          <p className="settings-screen__salary-amount">{formatCurrency(salary.amount, language)}</p>
           {editingId === salary.id ? editor : (
             <div className="settings-screen__salary-actions">
               <button type="button" className="settings-screen__salary-edit" onClick={() => startEdit(salary)}>

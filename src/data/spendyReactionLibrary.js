@@ -194,13 +194,13 @@ const EN_GOAL_DAMAGED = [
 
 const EN = {
   SPESA_100: [
-    'Oops. Over 100 € just vanished. Did you see them go?',
-    'Over 100 €? Just like that, without even warning me?',
+    'Oops. Over €100 just vanished. Did you see them go?',
+    'Over €100? Just like that, without even warning me?',
     'Wait… how much did you just spend?!',
-    '100 € and counting. Your account just gulped.',
+    '€100 and counting. Your account just gulped.',
     'Well, your bank account isn’t celebrating today.',
     'This isn’t a small purchase anymore. It’s a statement.',
-    'More than 100 €? Have we lost all sense of proportion?',
+    'More than €100? Have we lost all sense of proportion?',
     'I’d have at least asked your wallet for permission.',
     'Interesting… did we really decide to spend that much?',
     'This amount deserves at least an explanation.',
@@ -245,15 +245,15 @@ const EN = {
     'The budget’s gone. The spending, on the other hand, seems to be doing great.',
   ],
   SPESA_ENORME_500: [
-    '500 €?! Hang on, I need to sit down.',
+    '€500?! Hang on, I need to sit down.',
     'This isn’t a purchase. It’s an event.',
     'Your bank account just asked for a break.',
-    '500 € evaporated. At least wave goodbye.',
+    '€500 evaporated. At least wave goodbye.',
     'Okay. This one I really want to understand.',
     'For that amount, I expect at least a good story.',
   ],
   SPESA_ENORME_1000: [
-    '1.000 €?! I’m a fox, not a detective.',
+    '€1,000?! I’m a fox, not a detective.',
     'STOP. We need to talk about this.',
     'A thousand euros?! Your account just saw its life flash before its eyes.',
     'This purchase needs a press conference.',
@@ -513,7 +513,7 @@ const FR = {
     'Pour ce montant, j’exige au moins une belle histoire.',
   ],
   SPESA_ENORME_1000: [
-    '1.000 € ?! Je suis une renarde, pas une détective.',
+    '1 000 € ?! Je suis une renarde, pas une détective.',
     'STOP. Là, il faut qu’on en parle.',
     'Mille euros ?! Votre compte vient de voir sa vie défiler.',
     'Cette dépense mérite une conférence de presse.',

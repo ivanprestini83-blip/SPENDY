@@ -53,6 +53,8 @@ import { rankInsightsByImportance } from './importantEventSelector.js'
 import { evaluateExpenseReaction } from './expenseReactionEngine.js'
 import { getCycleTiming } from './cycle.js'
 import { translate } from '../i18n/translate.js'
+import { normalizeLanguage } from '../i18n/languages.js'
+import { formatCurrencyWhole } from './format.js'
 
 export const SPENDY_STATES = {
   HAPPY: 'happy',
@@ -228,7 +230,9 @@ export function getInsightTopicKey(insight) {
 function describeInsight(insight, lang) {
   const label = insight.category?.label
   const t = (key, params) => translate(lang, `coach.insight.${key}`, params)
-  const amounts = { category: label, current: Math.round(insight.current), baseline: Math.round(insight.baseline) }
+  // Gli stessi importi arrotondati all'euro, scritti nel formato della lingua ("1.794 €", "€1,794").
+  const money = (value) => formatCurrencyWhole(Math.round(value), normalizeLanguage(lang))
+  const amounts = { category: label, current: money(insight.current), baseline: money(insight.baseline) }
   switch (insight.type) {
     case 'recurring_high':
     case 'category_spike':
@@ -243,7 +247,7 @@ function describeInsight(insight, lang) {
     case 'amount_below_average':
       return label ? t('below', { category: label.toLowerCase() }) : null
     case 'savings_vs_usual':
-      return t('savings', { amount: Math.round(Math.abs(insight.changeAmount)) })
+      return t('savings', { amount: money(Math.abs(insight.changeAmount)) })
     case 'unusual_purchase':
       return label ? t('unusual', { category: label.toLowerCase() }) : null
     case 'unusual_frequency':
@@ -371,7 +375,7 @@ export function getSpendyCoach(financialData, behaviorContext = null) {
     const droppedPercent = Math.round(Math.abs(topDecreasingCategory.changePercent))
     const closestGoal = findClosestOpenGoal(goals)
     const descriptiveMessage = closestGoal
-      ? translate(lang, 'coach.drop.goal', { category: topDecreasingCategory.category.label, percent: droppedPercent, amount: savedAmount, goal: closestGoal.label })
+      ? translate(lang, 'coach.drop.goal', { category: topDecreasingCategory.category.label, percent: droppedPercent, amount: formatCurrencyWhole(savedAmount, normalizeLanguage(lang)), goal: closestGoal.label })
       : translate(lang, 'coach.drop.plain', { category: topDecreasingCategory.category.label, percent: droppedPercent })
 
     const behaviorResult = pickBehaviorInsightJoke(

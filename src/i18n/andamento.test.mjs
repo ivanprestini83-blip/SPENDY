@@ -25,6 +25,13 @@ const keysOf = (node, prefix = '') => Object.entries(node).flatMap(([key, value]
 const lookup = (dictionary, key) => key.split('.').reduce((node, part) => node?.[part], dictionary)
 const placeholders = (text) => [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join()
 const same = (values) => new Set(values.map((v) => JSON.stringify(v))).size === 1
+// I VALORI degli importi e delle percentuali in un testo, qualunque sia il formato
+// della lingua ("2.571,00 €", "€2,571.00", "2 571,00 €", "87%"): la scrittura cambia
+// con la lingua, il valore no.
+const amountValues = (shown) => (shown.match(/-?€[\d,]+\.\d{2}|-?[\d.\u00a0]+,\d{2} €|\d+%/g) ?? [])
+  .map((token) => (token.endsWith('%') ? token
+    : token.includes('€') && token.replace('-', '').startsWith('€') ? Number(token.replace(/[€,]/g, ''))
+      : Number(token.replace(/[.\u00a0 €]/g, '').replace(',', '.'))))
 
 const AREAS = ['common', 'analytics', 'andamento']
 const NEW_KEYS = keysOf(MESSAGES.it).filter((key) => AREAS.includes(key.split('.')[0]))
@@ -227,7 +234,7 @@ try {
     overviewTexts[lang] = byClass(container, 'cycle-summary__metric-value').map(text).join('|')
     if (lang !== 'it') check(`   ${lang}: nessun testo italiano rimasto`, leftover(text(container) + html(), lang).length === 0, leftover(text(container) + html(), lang).join(' | '))
   }
-  check('importi e percentuali del riepilogo identici in ogni lingua', same(Object.values(overviewTexts)), JSON.stringify(overviewTexts))
+  check('importi e percentuali del riepilogo: stessi valori in ogni lingua', same(Object.values(overviewTexts).map(amountValues)) && amountValues(overviewTexts.it).length > 0, JSON.stringify(overviewTexts))
   // Il ciclo B: 7 categorie → "+ altre 2 categorie (le trovi in Analisi)", con il nome tradotto della scheda.
   await act(() => propsOf(byClass(container, 'trend-chart__column').at(-2)).onClick({}))
   for (const lang of LANGS) {
@@ -271,7 +278,7 @@ try {
     if (lang === 'es') check('   es: a schermo "(7 sept – 6 oct)", minuscolo come in spagnolo', text(one(container, 'cycle-comparison__verdict-ref')).endsWith('(7 sept – 6 oct)'))
     if (lang !== 'it') check(`   ${lang}: nessun testo italiano rimasto`, leftover(text(container) + html(), lang).length === 0, leftover(text(container) + html(), lang).join(' | '))
   }
-  check('valori dei riquadri identici in ogni lingua (calcoli invariati)', same(Object.values(shown)) && shown.it.includes(formatCurrency(B.spent)) && shown.it.includes(formatCurrency(C.spent)), JSON.stringify(shown))
+  check('valori dei riquadri: stessi valori in ogni lingua (calcoli invariati)', same(Object.values(shown).map(amountValues)) && shown.it.includes(formatCurrency(B.spent)) && shown.it.includes(formatCurrency(C.spent)), JSON.stringify(shown))
   // Grafici: spese (frase), budget (punti percentuali), entrate.
   const card = (i) => byClass(container, 'cycle-comparison__metric')[i]
   const chart = () => one(container, 'metric-chart')
@@ -431,12 +438,14 @@ try {
     await mount(state)
     const cycle = cycleState(state)
     // Con un budget la frase dice quanto è stato usato e quanto resta (il risparmio del ciclo).
-    const params = { percent: fmt.formatPercent(cycle.budgetUsed), amount: formatCurrency(textKey === 'overspenttext' ? Math.abs(cycle.savings) : textKey === 'usedleft' ? cycle.savings : cycle.spent) }
+    // L'importo della frase, scritto nel formato di ciascuna lingua.
+    const amountValue = textKey === 'overspenttext' ? Math.abs(cycle.savings) : textKey === 'usedleft' ? cycle.savings : cycle.spent
+    const params = { percent: fmt.formatPercent(cycle.budgetUsed) }
     check(`${label}: sintesi "${translate('it', `andamento.overview.${titleKey}`)}" (${tone})`, overviewTone() === tone, overviewTone())
     for (const lang of LANGS) {
       await act(() => setLanguage(lang))
       const tr = (key, p) => translate(lang, `andamento.overview.${key}`, p)
-      const ok = text(one(box, 'cycle-summary__overview-title')) === tr(titleKey) && text(one(box, 'cycle-summary__overview-text')) === tr(textKey, params)
+      const ok = text(one(box, 'cycle-summary__overview-title')) === tr(titleKey) && text(one(box, 'cycle-summary__overview-text')) === tr(textKey, { ...params, amount: formatCurrency(amountValue, lang) })
         && Boolean(one(box, 'cycle-summary__progress')) === (cycle.budgetUsed !== null)
       check(`   ${lang}: titolo e frase dai valori di buildAndamento`, ok, `${text(one(box, 'cycle-summary__overview-title'))} | ${text(one(box, 'cycle-summary__overview-text'))}`)
       if (lang !== 'it') check(`   ${lang}: nessun testo italiano`, leftover(text(box), lang).length === 0, leftover(text(box), lang).join(' | '))
@@ -519,7 +528,7 @@ try {
       && aria(navs[0]) === tr('analytics.prev') && aria(navs[1]) === tr('analytics.next') && text(one(page, 'donut-chart__center-label')) === tr('analytics.total'))
     totals[lang] = byClass(page, 'analytics-page__legend-amount').map(text).join('|')
   }
-  check('importi della legenda identici in ogni lingua', same(Object.values(totals)) && totals.it.includes(formatCurrency(17)))
+  check('importi della legenda: stessi valori in ogni lingua', same(Object.values(totals).map(amountValues)) && totals.it.includes(formatCurrency(17)))
   // Dettaglio di una categoria con una sola spesa (ristoranti, ciclo in corso).
   const row = byClass(page, 'analytics-page__legend-row--button').find((n) => text(n).includes(formatCurrency(17)))
   await act(() => propsOf(row).onClick({}))
