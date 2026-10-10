@@ -206,6 +206,13 @@ export function parseModelJson(text) {
   }
 }
 
+// Nei log solo il codice di ogni errore del controllo, mai ciò che lo segue:
+// "invented_numbers:9999" → "invented_numbers", "repeated_structure:open:…"
+// → "repeated_structure" (né importi né parole della risposta del modello).
+export function logErrorCodes(errors) {
+  return [...new Set((Array.isArray(errors) ? errors : []).map((error) => String(error).split(':')[0]))]
+}
+
 // `usage` come lo restituisce l'adattatore del provider: due interi non
 // negativi, oppure niente. Qualunque altra forma vale "senza usage": meglio
 // non registrare che registrare un numero inventato.
@@ -401,7 +408,7 @@ export function createSpendyAIHandler({
     }
     const checked = validateSpendyResponse(parsed, context, { history, previous })
     if (!checked.valid) {
-      log({ outcome: 'invalid', event: eventId, errors: checked.errors, model: result.model ?? config.model, ...usageLog })
+      log({ outcome: 'invalid', event: eventId, errors: logErrorCodes(checked.errors), model: result.model ?? config.model, ...usageLog })
       return json(422, { error: 'invalid', details: checked.errors })
     }
 

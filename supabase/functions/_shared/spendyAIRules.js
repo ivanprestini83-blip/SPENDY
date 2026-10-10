@@ -94,11 +94,56 @@ export function passesToneRules(text) {
 // Numeri scritti all'italiana: "1.179", "1.179,50", "66", "12,5".
 const NUMBER = /\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?/g
 
-export function extractNumbers(text) {
+function extractLegacyNumbers(text) {
   return (text.match(NUMBER) ?? []).map((raw) => {
     const normalized = /^\d{1,3}(?:\.\d{3})+/.test(raw) ? raw.replace(/\./g, '').replace(',', '.') : raw.replace(',', '.')
     return Math.round(Math.abs(parseFloat(normalized)))
   })
+}
+
+// Numeri scritti nella lingua della risposta (context.locale):
+//   it, es  1.794   1.794,50      en  1,794   1,794.50
+//   fr      1 794   1 794,50 (spazio normale, NBSP o spazio stretto NNBSP)
+// Una sequenza di cifre unite da un solo carattere ( . , ' ’ _ o uno spazio)
+// si legge INTERA con la grammatica di quella lingua, mai con quella di
+// un'altra: "€1,234" in inglese è 1234 (non 1,234 → 1); "1,794" in
+// italiano e "1 794" in inglese non sono numeri validi. Un numero fuori
+// grammatica, o con cifre non ASCII ("１２３４"), non viene reinterpretato:
+// vale NaN, che nessun numero consentito eguaglia (risposta scartata).
+// Senza lingua, extractNumbers legge come prima (all'italiana): serve ad
+// allowedNumbers, che legge testi dell'utente di lingua ignota.
+//
+// Un numero seguito da un moltiplicatore ("€40k", "40 mila €", "2 mil €",
+// "40 k€", "€1M", "1,2 million €", "1,5 milliard") vale anch'esso NaN:
+// "40k" non è 40, e il suo valore vero non si confronta (la risposta viene
+// scartata anche quando sarebbe giusto). Basta una sola lettera o parola
+// subito dopo la cifra, con al più uno spazio: "40 km", "2 kg", "9 mesi",
+// "1 Monday", "2 miles", "3 milanesi" non contano (dopo la sigla o la
+// parola viene un'altra lettera); "4K", "40 mila persone", "1 grand café",
+// "2 mille-feuilles" invece sì, per prudenza. I numeri scritti in lettere
+// ("duemila euro") non si vedono qui: servirebbe un altro controllo.
+const NUMBER_RUN = /\p{Nd}+(?:[.,'’_ \u00a0\u202f\u2009]\p{Nd}+)*/gu
+const numberGrammar = (group, decimal) => new RegExp(`^(?:[0-9]{1,3}(?:${group}[0-9]{3})+|[0-9]+)(?:${decimal}[0-9]{1,2})?$`)
+const NUMBER_FORMATS = {
+  it: { grammar: numberGrammar('\\.', ','), group: /\./g, decimal: ',' },
+  es: { grammar: numberGrammar('\\.', ','), group: /\./g, decimal: ',' },
+  en: { grammar: numberGrammar(',', '\\.'), group: /,/g, decimal: '.' },
+  fr: { grammar: numberGrammar('[ \\u00a0\\u202f]', ','), group: /[ \u00a0\u202f]/g, decimal: ',' },
+}
+
+const MULTIPLIER_LETTER = /^[ \u00a0\u202f\u2009]?(?:[kK]|M|B|bn|Mds?|Mrd)(?![\p{L}\p{N}])/u
+const MULTIPLIER_WORD = /^[ \u00a0\u202f\u2009]?(?:thousands?|grand|millions?|billions?|mila|mille|migliaia|milion[ei]|miliard[oi]|mil|millar(?:es)?|mill[oó]n(?:es)?|millardos?|milliers?|milliards?)(?![\p{L}\p{N}])/iu
+const hasMultiplier = (after) => MULTIPLIER_LETTER.test(after) || MULTIPLIER_WORD.test(after)
+
+function readLocalizedNumber(raw, format, after) {
+  if (!format.grammar.test(raw) || hasMultiplier(after)) return Number.NaN
+  return Math.round(Math.abs(parseFloat(raw.replace(format.group, '').replace(format.decimal, '.'))))
+}
+
+export function extractNumbers(text, locale) {
+  if (locale === undefined) return extractLegacyNumbers(text)
+  const format = NUMBER_FORMATS[normalizeSpendyLocale(locale)]
+  return [...text.matchAll(NUMBER_RUN)].map(({ 0: raw, index }) => readLocalizedNumber(raw, format, text.slice(index + raw.length)))
 }
 
 // Ogni numero presente nel contesto, a qualunque profondità, compresi
@@ -284,7 +329,12 @@ export function validateSpendyResponse(raw, context, { history = [], previous = 
   if (/[*_`#]|^\s*[-•]/m.test(message)) errors.push('markdown')
 
   const allowed = allowedNumbers(context)
-  const invented = extractNumbers(message).filter((n) => ![...allowed].some((a) => Math.abs(a - n) <= 1))
+  // Sempre nella lingua della risposta (senza lingua: italiano, come il resto).
+  const numbers = extractNumbers(message, normalizeSpendyLocale(context?.locale))
+  // Un numero fuori dalla grammatica della lingua: scartato, senza
+  // riportarne le cifre.
+  if (numbers.some(Number.isNaN)) errors.push('malformed_number')
+  const invented = numbers.filter((n) => !Number.isNaN(n) && ![...allowed].some((a) => Math.abs(a - n) <= 1))
   if (invented.length > 0) errors.push(`invented_numbers:${invented.join(',')}`)
 
   const labels = knownLabels(context)
@@ -451,11 +501,11 @@ export const STYLE_EXAMPLES = [
 export const STYLE_EXAMPLES_BY_LOCALE = {
   it: STYLE_EXAMPLES,
   en: [
-    '150 € of shopping today: hard to miss. The budget is holding up… but how excited were you?',
+    '€150 of shopping today: hard to miss. The budget is holding up… but how excited were you?',
     'Japan is getting closer. And this time it’s not thanks to shopping.',
     'Did you buy the chef dinner too? 😂',
     'The oven at home worked harder than delivery this time.',
-    '120 € left for 9 days: doable, with a bit of calm.',
+    '€120 left for 9 days: doable, with a bit of calm.',
     'Small expenses don’t show one by one: they show at the end of the cycle.',
     'You spent less than expected. I’m getting emotional.',
     'Your wallet can sleep soundly today.',
