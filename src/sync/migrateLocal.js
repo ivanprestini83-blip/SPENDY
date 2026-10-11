@@ -1,6 +1,7 @@
 import { COLLECTION_KEYS } from './mappers.js'
 import { SETTINGS_KEY } from './outbox.js'
 import { saveAutoBackup } from './backup.js'
+import { DEFAULT_CURRENCY, normalizeCurrency } from '../utils/currency.js'
 
 // Migrazione una-tantum dei dati già presenti in localStorage verso il
 // cloud, al primo accesso su un dispositivo.
@@ -47,8 +48,12 @@ export function countLocalRows(state) {
   // Le impostazioni non hanno una riga con timestamp da guardare: si
   // migrano solo se esistono davvero e questo dispositivo non ha mai
   // completato un sync (altrimenti arrivano dal cloud, non dal passato).
+  // Una valuta scelta (USD, GBP) conta come impostazione anche senza budget
+  // né ciclo, o chi l'ha scelta da ospite la perderebbe registrandosi; EUR
+  // (anche il vecchio '€', o nessuna) è il default e da sola non migra nulla.
+  const chosenCurrency = normalizeCurrency(state.currency) !== DEFAULT_CURRENCY
   const hasSettings =
-    (state.monthlyBudget > 0 || state.cycleStartDay != null) && !state.sync.lastSyncAt
+    (state.monthlyBudget > 0 || state.cycleStartDay != null || chosenCurrency) && !state.sync.lastSyncAt
   return { counts, total, hasSettings }
 }
 
@@ -85,7 +90,7 @@ export function buildMigrationOps(state) {
       row: {
         id: 'me',
         monthlyBudget: state.monthlyBudget,
-        currency: state.currency,
+        currency: normalizeCurrency(state.currency),
         cycleStartDay: state.cycleStartDay,
         amountHidden: state.amountHidden,
         updatedAt: MIGRATION_STAMP,

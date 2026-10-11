@@ -7,6 +7,7 @@
 // del sync layer ragiona solo su "righe locali" e "tabelle".
 
 import { tombstoneToRemote } from './tombstones.js'
+import { normalizeCurrency } from '../utils/currency.js'
 
 // La mappa che tiene insieme le due metà: chiave = nome della collezione
 // nello store, `table` = nome della tabella su Supabase.
@@ -170,7 +171,8 @@ export const toLocalRow = (collection, row) => MAPPERS[collection].toLocal(row)
 export const settingsToRemote = (settings, userId) => ({
   id: userId,
   monthly_budget: settings.monthlyBudget ?? 0,
-  currency: settings.currency ?? '€',
+  // Il codice ISO (utils/currency.js); un vecchio '€' locale parte come 'EUR'.
+  currency: normalizeCurrency(settings.currency),
   cycle_start_day: settings.cycleStartDay ?? null,
   amount_hidden: settings.amountHidden === true,
   // Solo se nota: le impostazioni scritte da backup, migrazione o versioni
@@ -181,7 +183,9 @@ export const settingsToRemote = (settings, userId) => ({
 
 export const settingsToLocal = (row) => ({
   monthlyBudget: number(row.monthly_budget) ?? 0,
-  currency: row.currency ?? '€',
+  // Le righe scritte dalle versioni precedenti hanno '€' (default della
+  // colonna): EUR. Mancante o sconosciuta: EUR.
+  currency: normalizeCurrency(row.currency),
   cycleStartDay: row.cycle_start_day ?? null,
   // `amountHidden` NON viene adottato dal cloud: è la preferenza
   // "nascondi gli importi" del singolo dispositivo (utile sul telefono in

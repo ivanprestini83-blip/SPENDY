@@ -128,7 +128,7 @@ try {
   // La stessa istanza dei dizionari che usa l'App (caricata da Vite).
   const LIVE = (await server.ssrLoadModule('/src/i18n/translate.js')).MESSAGES
   // Gli importi come li mostra l'app in ogni lingua (formatter vero): cambia la scrittura, non il valore.
-  const { formatCurrency } = await server.ssrLoadModule('/src/utils/format.js')
+  const { formatCurrency, formatCurrencyWhole } = await server.ssrLoadModule('/src/utils/format.js')
   const S = useAppStore.getState
   const caught = []
   const container = dom.createContainer()
@@ -204,7 +204,7 @@ try {
       tr('budget.cycle.label'),
       tr('budget.cycle.fresh.title'),
       tr('budget.cycle.fresh.addsalary'),
-      tr('budget.cycle.fresh.startzero'),
+      tr('budget.cycle.fresh.startzero', { zero: formatCurrencyWhole(0, code) }),
       `>${tr('home.nav.home')}<`,
       `>${tr('home.nav.analytics')}<`,
       `aria-label="${tr('home.nav.add')}"`,
@@ -239,7 +239,7 @@ try {
     check(`   ${code}: importi con gli stessi valori dell'italiano (${moneyIt}), nel formato della lingua`, Boolean(moneyIt) && moneyValues(code) === moneyIt, moneyValues(code))
     check(`   ${code}: nomi restano quelli dei dati, periodo nella lingua scelta (Lisbona, ${labelIn(code)})`, html().includes('Lisbona') && shownLabel() === labelIn(code))
     check(`   ${code}: scheda "nuovo ciclo" con i cicli nella lingua scelta (${labelIn(code, previousRange)} → ${labelIn(code)})`,
-      screen.includes(translate(code, 'budget.cycle.fresh.current', { cycle: labelIn(code) })) && screen.includes(labelIn(code, previousRange)))
+      screen.includes(translate(code, 'budget.cycle.fresh.current', { cycle: labelIn(code), zero: formatCurrencyWhole(0, code) })) && screen.includes(labelIn(code, previousRange)))
     check(`   ${code}: nessun errore di rendering`, caught.length === 0, caught[0]?.message)
     shown[code].push(screen)
   }

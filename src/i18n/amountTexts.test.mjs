@@ -16,10 +16,10 @@ import { buildRadar } from '../utils/radarEngine.js'
 import { BEHAVIOR_ENGINE_CONFIG } from '../utils/behaviorEngine.js'
 import { setCategoryLanguageSource } from '../data/categories.js'
 import { REACTION_LIBRARY } from '../data/spendyReactionLibrary.js'
+import { resolveReactionText } from '../utils/expenseReactionEngine.js'
 import { MAX_AMOUNT, AMOUNT_LIMIT_MESSAGE } from '../utils/amounts.js'
 
 const LANGS = ['it', 'en', 'es', 'fr']
-const NNBSP = '\u202f' // lo spazio stretto, nelle frasi scritte a mano (reazioni)
 const NBSP = '\u00a0' // il separatore delle migliaia francese degli importi formattati
 const same = (values) => new Set(values.map((v) => JSON.stringify(v))).size === 1
 const withLanguage = (lang, fn) => { setCategoryLanguageSource(() => lang); try { return fn() } finally { setCategoryLanguageSource(() => 'it') } }
@@ -132,10 +132,12 @@ section('Limite massimo e reazioni alle spese')
   check('limite: in italiano identico ad AMOUNT_LIMIT_MESSAGE', limitIn('it') === AMOUNT_LIMIT_MESSAGE && AMOUNT_LIMIT_MESSAGE === 'Importo massimo: 1.000.000 €')
   check('   "Maximum amount: €1,000,000" / "Importe máximo: 1.000.000 €" / "Montant maximum : 1 000 000 €"', limitIn('en') === 'Maximum amount: €1,000,000'
     && limitIn('es') === 'Importe máximo: 1.000.000 €' && limitIn('fr') === `Montant maximum : 1${NBSP}000${NBSP}000 €`)
-  const phrases = (lang) => Object.values(REACTION_LIBRARY[lang]).flat()
+  // Le frasi come le mostra l'app con la valuta di default (EUR): gli importi
+  // sono segnaposto risolti da expenseReactionEngine (Fase 3D).
+  const phrases = (lang) => Object.values(REACTION_LIBRARY[lang]).flat().map((p) => resolveReactionText(p, lang, 'EUR'))
   check('stesso numero di frasi in ogni lingua (97)', LANGS.every((lang) => phrases(lang).length === 97))
   check('inglese: il simbolo prima della cifra ("€100", "€500", "€1,000"), mai "100 €"', !phrases('en').some((p) => /\d\s?€/.test(p)) && ['€100', '€500', '€1,000'].every((amount) => phrases('en').some((p) => p.includes(amount))))
-  check('francese: "1 000 €", mai "1.000 €"', !phrases('fr').some((p) => p.includes('1.000')) && phrases('fr').some((p) => p.includes(`1${NNBSP}000 €`)))
+  check('francese: "1 000 €" (spazio non separabile, come il formatter), mai "1.000 €"', !phrases('fr').some((p) => p.includes('1.000')) && phrases('fr').some((p) => p.includes(`1${NBSP}000 €`)))
   check('italiano e spagnolo invariati ("100 €", "500 €", "1.000 €")', ['it', 'es'].every((lang) => ['100 €', '500 €', '1.000 €'].every((amount) => phrases(lang).some((p) => p.includes(amount)))))
 }
 

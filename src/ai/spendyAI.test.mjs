@@ -14,7 +14,8 @@ import { prepareSpendyVoice } from './spendyVoice.js'
 import { SPENDY_EVENTS } from './spendyEvents.js'
 import { createSpendyAI } from './spendyAI.js'
 import { createMockProvider, composeMockResponse } from './providers/mockProvider.js'
-import { validateAIResponse, extractNumbers } from './spendyAIGuard.js'
+import { validateAIResponse } from './spendyAIGuard.js'
+import { numberProblems } from '../../supabase/functions/_shared/spendyAIRules.js'
 import {
   decideSpendyVoice, requestSpendyVoice, resolveSpendyVoice, VOICE_LIMITS,
 } from './spendyVoicePolicy.js'
@@ -65,15 +66,18 @@ async function runHome({
     ({ cache: nextCache, result } = await requestSpendyVoice({ ai, context, meta, cache, today: TODAY, now }))
   }
   const after = decideSpendyVoice({ coach, meta, today: TODAY, cache: nextCache, now, limits })
-  const voice = resolveSpendyVoice({ decision: after, coach, cache: nextCache })
+  const voice = resolveSpendyVoice({ decision: after, coach, cache: nextCache, context })
   return { coach, events, context, meta, first, after, result, cache: nextCache, voice }
 }
 
-const allNumbersIn = (text, context) => {
-  const allowed = new Set()
-  JSON.stringify(context).match(/-?\d+(\.\d+)?/g)?.forEach((n) => allowed.add(Math.round(Math.abs(Number(n)))))
-  return extractNumbers(text).every((n) => [...allowed].some((a) => Math.abs(a - n) <= 1))
-}
+// Fase 2B.3: ogni numero della frase passa il controllo VERO degli importi
+// (numberProblems: significato, valore esatto in centesimi, budget sforato,
+// numeri in lettere). Prima era un criterio permissivo — qualunque numero del
+// contesto, ±1 — che non garantiva niente (audit 2B.2).
+// Fase 2B.7: la riga di fatti tiene gli importi su una riga (spazio non
+// separabile dentro l'importo); i confronti qui sotto la leggono con spazi normali.
+const factsText = (voice) => (voice.secondaryText ?? '').replaceAll('\u00a0', ' ')
+const allNumbersIn = (text, context) => numberProblems(text, context).length === 0
 
 // Scenari riusati da più sezioni
 const categoryRise = () => [
@@ -140,7 +144,9 @@ section('4. Budget quasi esaurito')
   check("evento budget_near_limit", run.events[0]?.id === SPENDY_EVENTS.BUDGET_NEAR_LIMIT, run.events[0]?.id)
   check('fascia "high" nel contesto', run.context.budget.band === 'high')
   check('Spendy è preoccupato, non ironico', run.voice.state === 'concerned')
-  check('prima aiuta: percentuale e residuo', /90%/.test(run.voice.message) && /100 €/.test(run.voice.message), run.voice.message)
+  // Fase 2B.4: il residuo è una cifra del budget: lo scrive l'app nella riga di
+  // fatti sotto la frase, non il modello (che dà la percentuale).
+  check('prima aiuta: percentuale nella frase, residuo (100 €) nella riga di fatti dell\'app', /90%/.test(run.voice.message) && !/100 €/.test(run.voice.message) && /100,00 €/.test(factsText(run.voice)), JSON.stringify([run.voice.message, run.voice.secondaryText]))
   check('numeri tutti veri', allNumbersIn(run.voice.message, run.context))
 }
 
@@ -151,7 +157,11 @@ section('5. Budget superato')
   const run = await runHome({ expenses: [expense('2026-09-10', 1200, 'spesa')] })
   check('evento budget_exceeded', run.events[0]?.id === SPENDY_EVENTS.BUDGET_EXCEEDED, run.events[0]?.id)
   check('stato concerned, tono concerned', run.voice.state === 'concerned' && run.voice.tone === 'concerned')
-  check('cita di quanto si è oltre (200 €)', /200 €/.test(run.voice.message), run.voice.message)
+  // Fase 2B.3: con il budget sforato l'importo non sta più nella frase del
+  // modello (il guard lo vieta): lo scrive l'app nella riga di fatti sotto.
+  // Fase 2B.5: con i centesimi, come la BudgetCard ("200,00 €").
+  check('di quanto si è oltre (200 €) lo dice l\'app, sotto la frase', /200,00 €/.test(factsText(run.voice)) && !/\d/.test(run.voice.message.replace(/\d+ giorni/, '')), JSON.stringify([run.voice.message, run.voice.secondaryText]))
+  check('   riga di fatti: "Budget superato di 200,00 €."', factsText(run.voice) === 'Budget superato di 200,00 €.', run.voice.secondaryText)
   check('niente battuta: nessuna frase della reaction library "budget superato"',
     !reactionLibrary.BUDGET_SUPERATO.some((line) => run.voice.message.includes(line)))
   check('layout sovrapposto alla card budget', run.voice.layout === 'overlap')

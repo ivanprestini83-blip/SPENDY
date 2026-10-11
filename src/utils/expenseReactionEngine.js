@@ -38,6 +38,8 @@
 // exactly as specified.
 import { categoryComparison } from './budgetCalculations.js'
 import { REACTION_LIBRARY } from '../data/spendyReactionLibrary.js'
+import { formatCurrencyWhole } from './format.js'
+import { currencyGender, currentCurrency, normalizeCurrency } from './currency.js'
 
 // Combined pools — "quando ci sono più frasi valide" applies within a
 // single priority step too: step 8 draws from BOTH the ">100€" bucket
@@ -67,7 +69,27 @@ function buildPools(L) {
   }
 }
 const POOLS = Object.fromEntries(Object.entries(REACTION_LIBRARY).map(([lang, L]) => [lang, buildPools(L)]))
-const poolsFor = (lang) => POOLS[lang] ?? POOLS.it
+
+// Gli importi della libreria nella lingua e nella valuta dell'account:
+// `{amount:100}` → "100 €" / "$100" / "100 £", `{gender:m|f}` → la parola
+// accordata al nome della valuta. Le frasi si risolvono UNA volta per lingua
+// e valuta, prima della scelta: così il testo scelto, quello mostrato e
+// quello registrato nella cronologia (anti-ripetizione) sono lo stesso.
+export function resolveReactionText(text, lang, currency = currentCurrency()) {
+  const gender = currencyGender(currency, lang)
+  return text
+    .replace(/\{amount:(\d+)\}/g, (_, amount) => formatCurrencyWhole(Number(amount), lang, currency))
+    .replace(/\{gender:([^|}]*)\|([^}]*)\}/g, (_, masculine, feminine) => (gender === 'f' ? feminine : masculine))
+}
+const RESOLVED_POOLS = new Map()
+const poolsFor = (lang, currency = currentCurrency()) => {
+  const code = POOLS[lang] ? lang : 'it'
+  const key = `${code}|${normalizeCurrency(currency)}`
+  if (!RESOLVED_POOLS.has(key)) {
+    RESOLVED_POOLS.set(key, Object.fromEntries(Object.entries(POOLS[code]).map(([name, phrases]) => [name, phrases.map((text) => resolveReactionText(text, code, currency))])))
+  }
+  return RESOLVED_POOLS.get(key)
+}
 
 // --- Tunable thresholds — named so the cascade reads like the spec ---
 const MEGA_1000_AT = 1000 // €
@@ -184,10 +206,11 @@ function buildResult({ bucket, pools, state, reason, insightCategoryId = null, r
   }, pools, bucket, jokeHistory, key, rng)
 }
 
-// The same reaction (same pool, same position) in another language.
-function inLanguage(reaction, lang) {
+// The same reaction (same pool, same position) in another language — or in
+// another currency (same phrase, amounts rewritten).
+function inLanguage(reaction, lang, currency) {
   const ref = REACTION_REF.get(reaction)
-  const text = ref ? poolsFor(lang)[ref.poolName]?.[ref.index] : null
+  const text = ref ? poolsFor(lang, currency)[ref.poolName]?.[ref.index] : null
   if (!text || text === reaction.message) return reaction
   const translated = { ...reaction, message: text }
   REACTION_REF.set(translated, ref)
@@ -231,8 +254,8 @@ export function evaluateExpenseReaction(args) {
 
   const key = reactionEventKey(args.expenses ?? [], args.today, result.reason)
   const alreadyShown = shownReactionByEvent.get(key)
-  // Same event after a language change: the same reaction, translated.
-  if (alreadyShown) return inLanguage(alreadyShown, args.lang)
+  // Same event after a language (or currency) change: the same reaction, rewritten.
+  if (alreadyShown) return inLanguage(alreadyShown, args.lang, args.currency)
 
   shownReactionByEvent.set(key, result)
   if (shownReactionByEvent.size > SHOWN_REACTION_MEMORY) {
@@ -251,9 +274,10 @@ function selectExpenseReaction({
   jokeHistory = [],
   rng = Math.random,
   lang = 'it',
+  currency,
 }) {
   if (!today) return null
-  const pools = poolsFor(lang)
+  const pools = poolsFor(lang, currency)
 
   const available = financialData?.available ?? 0
   const overBudget = monthlyBudget > 0 && available < 0
@@ -320,7 +344,11 @@ function selectExpenseReaction({
   // usual pace, a genuine "buona scelta" signal instead of just "budget
   // happens to still be comfortable" (which would fire constantly and
   // break "€20 normale -> nessuna reazione").
-  if (hasCategoryHistory && categoryRow.changeAmount < 0 && Math.abs(categoryRow.changePercent) >= CATEGORY_ANOMALOUS_AT) {
+  // Fase 2B.7: non con il disponibile a zero ("Soldi rimasti nel conto", "il
+  // portafoglio può dormire tranquillo" non sono veri). Il negativo non arriva
+  // qui (passo 4); senza financialData il comportamento resta quello di prima.
+  const noMoneyLeft = typeof financialData?.available === 'number' && financialData.available <= 0
+  if (!noMoneyLeft && hasCategoryHistory && categoryRow.changeAmount < 0 && Math.abs(categoryRow.changePercent) >= CATEGORY_ANOMALOUS_AT) {
     return buildResult({ bucket: 'POSITIVE_EVENT', pools, state: 'happy', reason: 'positive_event', insightCategoryId: categoryId, jokeHistory, rng })
   }
 

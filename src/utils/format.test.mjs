@@ -6,7 +6,8 @@
 // battute di Spendy con importi grandi non vengano più scartate.
 
 import { check, section, report, installFakeLocalStorage } from '../sync/testkit.mjs'
-import { formatCurrency, formatCurrencyWhole, currencySymbol, maskedCurrency, formatInteger, formatDecimal1, ACTIVE_CURRENCY } from './format.js'
+import { formatCurrency, formatCurrencyWhole, currencySymbol, maskedCurrency, formatInteger, formatDecimal1 } from './format.js'
+import { DEFAULT_CURRENCY, setCurrentCurrencySource } from './currency.js'
 import { setCurrentLanguageSource } from '../i18n/currentLanguage.js'
 import { evaluateJoke, parseShownNumber } from './jokeEvaluator.js'
 import { buildInsightVars } from './humorEngine.js'
@@ -19,7 +20,7 @@ const NBSP = '\u00a0' // quello che l'app mostra al suo posto: leggibile, mai a 
 // =====================================================================
 section('Il formato di ogni lingua, con l\'euro')
 // =====================================================================
-check('una sola valuta attiva: EUR', ACTIVE_CURRENCY === 'EUR')
+check('valuta predefinita: EUR (utils/currency.js, nessuna costante doppia nel formatter)', DEFAULT_CURRENCY === 'EUR')
 const EXPECTED = {
   it: { 1794: '1.794,00 €', 0: '0,00 €', '-12.5': '-12,50 €', '175.5': '175,50 €', 1000000: '1.000.000,00 €', '0.3': '0,30 €' },
   en: { 1794: '€1,794.00', 0: '€0.00', '-12.5': '-€12.50', '175.5': '€175.50', 1000000: '€1,000,000.00', '0.3': '€0.30' },
@@ -69,6 +70,48 @@ section('Francese leggibile: migliaia separate da uno spazio non separabile')
     check(`${lang}: invariato, identico a Intl (${formatCurrency(1234567.891, lang)})`, same)
   }
   check('la cifra francese mostrata si rilegge con lo stesso valore (battute di Spendy)', [1794, 1234567.89, 1000].every((value) => parseShownNumber(formatCurrency(value, 'fr').replace(' €', '')) === value))
+}
+
+// =====================================================================
+section('Lingua × valuta: 4 lingue × EUR, USD, GBP (Fase 3D)')
+// =====================================================================
+{
+  // Stessi numeri, nessuna conversione: cambia solo il simbolo; la lingua
+  // decide separatori e posizione.
+  const SYMBOL = { EUR: '€', USD: '$', GBP: '£' }
+  const expected = (lang, code) => {
+    const sym = SYMBOL[code]
+    return {
+      it: [`1.234.567,89 ${sym}`, `1.794,00 ${sym}`, `-12,50 ${sym}`, `0,00 ${sym}`, `0,30 ${sym}`, `1.794 ${sym}`, sym, `•••• ${sym}`],
+      en: [`${sym}1,234,567.89`, `${sym}1,794.00`, `-${sym}12.50`, `${sym}0.00`, `${sym}0.30`, `${sym}1,794`, sym, `${sym}••••`],
+      es: [`1.234.567,89 ${sym}`, `1.794,00 ${sym}`, `-12,50 ${sym}`, `0,00 ${sym}`, `0,30 ${sym}`, `1.794 ${sym}`, sym, `•••• ${sym}`],
+      fr: [`1${NBSP}234${NBSP}567,89 ${sym}`, `1${NBSP}794,00 ${sym}`, `-12,50 ${sym}`, `0,00 ${sym}`, `0,30 ${sym}`, `1${NBSP}794 ${sym}`, sym, `•••• ${sym}`],
+    }[lang]
+  }
+  for (const code of ['EUR', 'USD', 'GBP']) {
+    for (const lang of LANGS) {
+      const got = [formatCurrency(1234567.891, lang, code), formatCurrency(1794, lang, code), formatCurrency(-12.5, lang, code), formatCurrency(0, lang, code), formatCurrency(0.1 + 0.2, lang, code),
+        formatCurrencyWhole(1794, lang, code), currencySymbol(lang, code), maskedCurrency(lang, code)]
+      check(`${lang} × ${code}: ${got[1]} | ${got[2]} | ${got[0]}`, got.join('|') === expected(lang, code).join('|'), expected(lang, code).join(' | '))
+    }
+    check(`   ${code}: valori non validi (NaN, null, undefined, testo, -0) → zero, mai "NaN" o "undefined"`,
+      LANGS.every((lang) => [NaN, null, undefined, 'x', -0, Infinity].every((value) => formatCurrency(value, lang, code) === formatCurrency(0, lang, code) && !/NaN|undefined|Infinity/.test(formatCurrency(value, lang, code)))))
+  }
+  check('valori grandi: 1.000.000,00 $ / £1,000,000.00 / 1 000 000,00 € ', formatCurrency(1000000, 'it', 'USD') === '1.000.000,00 $' && formatCurrency(1000000, 'en', 'GBP') === '£1,000,000.00' && formatCurrency(1000000, 'fr', 'EUR') === `1${NBSP}000${NBSP}000,00 €`)
+  check('vecchi simboli e valori non validi: "€" → EUR, "$" → USD, "£" → GBP, "CHF"/vuota → EUR', formatCurrency(1, 'en', '€') === '€1.00' && formatCurrency(1, 'en', '$') === '$1.00' && formatCurrency(1, 'en', '£') === '£1.00'
+    && formatCurrency(1, 'en', 'CHF') === '€1.00' && formatCurrency(1, 'en', '') === '€1.00')
+  check('lingua e valuta indipendenti: italiano + USD, inglese + EUR, francese + GBP, spagnolo + USD', formatCurrency(2000, 'it', 'USD') === '2.000,00 $' && formatCurrency(2000, 'en', 'EUR') === '€2,000.00'
+    && formatCurrency(2000, 'fr', 'GBP') === `2${NBSP}000,00 £` && formatCurrency(2000, 'es', 'USD') === '2.000,00 $')
+  check('interi e decimali senza simbolo (assi, percentuali): non dipendono dalla valuta', ['EUR', 'USD', 'GBP'].every(() => formatInteger(3000, 'it') === '3.000' && formatDecimal1(12.94, 'en') === '12.9'))
+  // Senza valuta esplicita: quella dell'account (registrata da useLanguage nell'app).
+  setCurrentCurrencySource(() => 'USD')
+  check('valuta corrente USD → formatCurrency(1794, "it") = "1.794,00 $", simbolo e importo nascosto in $', formatCurrency(1794, 'it') === '1.794,00 $' && currencySymbol('en') === '$' && maskedCurrency('en') === '$••••' && formatCurrencyWhole(15, 'en') === '$15')
+  setCurrentCurrencySource(() => '£')
+  check('valuta corrente salvata alla vecchia maniera ("£") → GBP', formatCurrency(1794, 'en') === '£1,794.00')
+  setCurrentCurrencySource(() => undefined)
+  check('valuta corrente mancante → EUR', formatCurrency(1794, 'en') === '€1,794.00')
+  setCurrentCurrencySource(null)
+  check('nessuna sorgente → EUR (moduli usati da soli)', formatCurrency(1794, 'it') === '1.794,00 €')
 }
 
 // =====================================================================
@@ -133,7 +176,7 @@ section('Nessun valore salvato cambia (cambio di lingua, visualizzazione)')
   const shownBefore = formatCurrency(rent().amount, 'it')
   for (const lang of ['en', 'es', 'fr', 'it']) S().setLanguage(lang)
   check('importi, stipendio, obiettivi, fondo, valuta e coda di sync identici dopo quattro cambi di lingua', snapshot() === before)
-  check('   valori salvati come numeri (1234.56, 0.1, 1794), valuta "€"', S().expenses.some((e) => e.amount === 1234.56) && S().expenses.some((e) => e.amount === 0.1) && S().incomes[0].amount === 1794 && S().currency === '€')
+  check('   valori salvati come numeri (1234.56, 0.1, 1794), valuta "EUR" (codice ISO, utils/currency.js)', S().expenses.some((e) => e.amount === 1234.56) && S().expenses.some((e) => e.amount === 0.1) && S().incomes[0].amount === 1794 && S().currency === 'EUR')
   check('   la stessa spesa si legge 1.234,56 € / €1,234.56: cambia solo la scrittura', shownBefore === '1.234,56 €' && formatCurrency(rent().amount, 'en') === '€1,234.56')
 }
 

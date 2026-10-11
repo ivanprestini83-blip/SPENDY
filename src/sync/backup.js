@@ -1,4 +1,6 @@
 import { todayStr } from '../utils/date.js'
+import { normalizeCurrency } from '../utils/currency.js'
+import { goalReachedOn } from '../utils/goalReached.js'
 
 // Fase 0 del passaggio al cloud: export/import di tutto lo stato
 // persistito, in un JSON leggibile da un umano.
@@ -334,7 +336,8 @@ export function parseBackup(text) {
       .map((row, index) => sanitizeContribution(row, index, warnings, fallbackDate, contributionId))
       .filter(Boolean),
     monthlyBudget: toNumber(raw.monthlyBudget) ?? 0,
-    currency: typeof raw.currency === 'string' && raw.currency ? raw.currency : '€',
+    // Codice ISO; i backup delle versioni precedenti hanno '€' (o niente): EUR.
+    currency: normalizeCurrency(raw.currency),
     cycleStartDay:
       Number.isInteger(raw.cycleStartDay) && raw.cycleStartDay >= 1 && raw.cycleStartDay <= 31
         ? raw.cycleStartDay
@@ -452,9 +455,12 @@ export function buildImportPatch(state, snapshot, mode = 'merge') {
   patch.customCategories = [...patch.customCategories].sort(pinnedFirst)
   // Mai presi dal file: sono sempre la somma dei versamenti effettivi.
   patch.emergencyFundSaved = sumAmounts(patch.emergencyFundContributions)
+  // Fase 2B.8: anche il giorno di raggiungimento, ricalcolato dai versamenti
+  // (un valore nel file non conta), come fa lo store in recomputeGoals.
   patch.goals = patch.goals.map((goal) => ({
     ...goal,
     saved: sumAmounts(patch.goalContributions.filter((contribution) => contribution.goalId === goal.id)),
+    reachedOn: goalReachedOn(goal, patch.goalContributions),
   }))
 
   return { patch, report }

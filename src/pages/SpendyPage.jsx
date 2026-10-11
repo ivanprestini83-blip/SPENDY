@@ -21,7 +21,7 @@ import './SpendyPage.css'
 // fire here too, instead of this page being stuck on the flat
 // percentage-only tiers HomePage isn't limited to.
 export function SpendyPage() {
-  const { language, t } = useLanguage()
+  const { language, currency, t } = useLanguage()
   const today = useAppStore((state) => state.today)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
@@ -41,7 +41,7 @@ export function SpendyPage() {
   // Spendy ha notato (vedi components/radar/RadarScreen.jsx). Qui serve
   // solo sapere QUANTE segnalazioni ci sono, per poterlo scrivere sul
   // pulsante e per non invitare l'utente ad aprire una lista vuota.
-  const radar = buildRadar({ expenses, goals, today, monthlyBudget, cycleStartDay, financialData, jokeHistory, lang: language })
+  const radar = buildRadar({ expenses, goals, today, monthlyBudget, cycleStartDay, financialData, jokeHistory, lang: language, currency })
   const radarCount = radar.cards.length
   const hasSomethingToShow = radar.status === RADAR_STATUS.ACTIVE
 

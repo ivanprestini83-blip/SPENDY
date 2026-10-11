@@ -27,14 +27,20 @@ export function useSpendyVoice({ coach, financialData, expenses, today, monthlyB
   // La lingua dell'app: Spendy AI risponde in questa lingua (il server la
   // ricontrolla; una lingua non prevista vale l'italiano).
   const language = useAppStore((state) => state.language)
+  // La valuta dell'account, indipendente dalla lingua: gli importi del
+  // contesto sono in questa valuta (il server la ricontrolla: EUR se non valida).
+  const currency = useAppStore((state) => state.currency)
 
   const { events, context, meta } = prepareSpendyVoice({
-    coach, financialData, expenses, today, monthlyBudget, cycleStartDay, goals, locale: language,
+    coach, financialData, expenses, today, monthlyBudget, cycleStartDay, goals, locale: language, currency,
   })
   // Spendy AI spenta (scelta dell'utente, default): solo frasi locali.
   const aiEnabled = useAppStore((state) => state.spendyAIEnabled === true)
   const decision = decideSpendyVoiceFor({ aiEnabled, coach, meta, today, cache, limits: dev.limits })
-  const voice = resolveSpendyVoice({ decision, coach, cache })
+  // Il contesto serve alla frase di fatti sotto la risposta; "nascondi gli
+  // importi" (la stessa preferenza della BudgetCard) li maschera anche lì.
+  const amountHidden = useAppStore((state) => state.amountHidden === true)
+  const voice = resolveSpendyVoice({ decision, coach, cache, context, hideAmounts: amountHidden })
 
   const shouldCallAI = decision.action === 'ai'
   const { fingerprint } = meta

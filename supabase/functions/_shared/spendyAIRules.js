@@ -29,6 +29,20 @@ export const SPENDY_LOCALES = ['it', 'en', 'es', 'fr']
 export const DEFAULT_SPENDY_LOCALE = 'it'
 export const normalizeSpendyLocale = (value) => (SPENDY_LOCALES.includes(value) ? value : DEFAULT_SPENDY_LOCALE)
 
+// La valuta dell'account (le stesse di src/utils/currency.js, che una Edge
+// Function non può importare; un test verifica che coincidano). Indipendente
+// dalla lingua: gli importi del contesto sono numeri in questa valuta, mai
+// convertiti. Il server non si fida del client: codice ISO o vecchio simbolo
+// ('€', '$', '£'); qualunque altro valore, o nessuno, vale EUR.
+export const SPENDY_CURRENCIES = { EUR: '€', USD: '$', GBP: '£' }
+export const DEFAULT_SPENDY_CURRENCY = 'EUR'
+export function normalizeSpendyCurrency(value) {
+  if (typeof value !== 'string') return DEFAULT_SPENDY_CURRENCY
+  const text = value.trim()
+  if (Object.hasOwn(SPENDY_CURRENCIES, text.toUpperCase())) return text.toUpperCase()
+  return Object.keys(SPENDY_CURRENCIES).find((code) => SPENDY_CURRENCIES[code] === text) ?? DEFAULT_SPENDY_CURRENCY
+}
+
 export const MAX_MESSAGE_LENGTH = 240
 export const MAX_SENTENCES = 3
 export const REPEAT_SIMILARITY = 0.85
@@ -89,9 +103,75 @@ export function passesToneRules(text) {
   return !isRiskyAdvice(text) && !isFearOrOffensive(text)
 }
 
+// --- Valuta ------------------------------------------------------------
+
+// Le valute nominate in una risposta (simbolo, codice o nome, in it/en/es/fr).
+// Una risposta parla solo della valuta del contesto: un'altra valuta, anche
+// accanto a quella giusta ("2000 €, circa $2,150"), è un errore. Una risposta
+// senza simboli (solo numeri) va bene.
+//
+// Il controllo lavora su una COPIA del testo (quello mostrato non cambia):
+//   - normalizzata NFKC, così "＄" e "￡" (a larghezza piena) sono "$" e "£";
+//     "₤" (lira/sterlina) conta come sterlina;
+//   - senza i nomi scelti dall'utente che il contesto conosce (obiettivo,
+//     categorie): un obiettivo "Euro Disney" non è una valuta. Si toglie solo
+//     il nome: un importo accanto ("1000 € per Euro Disney") resta controllato.
+// Parole sempre monetarie: simboli, codici, euro/euri, dollaro/dólar,
+// sterlina, "pound(s) sterling", "livre(s) sterling", "libra(s) esterlina(s)".
+// Parole che possono voler dire altro ("pounds" peso, "libra" segno zodiacale,
+// "quid", "bucks") contano solo subito dopo un numero ("120 quid"), e
+// "pounds" non quando è un peso ("5 pounds of", "lost 2 pounds"). "Livre" da
+// sola è un libro: non conta.
+const CURRENCY_MENTIONS = {
+  EUR: word('€|eur|euros?|euri'),
+  USD: word('\\$|us\\$|usd|d[oó]ll?ar\\p{L}*'),
+  GBP: word('£|₤|gbp|sterlin\\p{L}*|pounds? sterling|livres? sterling|libras? esterlinas?'),
+}
+const AMBIGUOUS_AMOUNT = /(\d[\d.,  ]*)[   ]?(pounds?|quid|bucks|libras?)(?![\p{L}])/giu
+const AMBIGUOUS_CURRENCY = { pound: 'GBP', pounds: 'GBP', quid: 'GBP', libra: 'GBP', libras: 'GBP', bucks: 'USD' }
+const WEIGHT_BEFORE = /(?:lost|lose|losing|gained|gain|gaining|weighs?|weighed|weighing)\s+$/i
+const WEIGHT_AFTER = /^\s+of(?![\p{L}])/iu
+// Conversioni: Spendy non conosce i tassi di cambio e non deve inventarli.
+const EXCHANGE_RATE = word('tass[oi] di cambio|cambio valut\\p{L}*|exchange rates?|conversion rates?|tipos? de cambio|taux de change')
+
+function currencyText(message, labels) {
+  let text = String(message ?? '').normalize('NFKC')
+  for (const label of labels) {
+    const name = String(label ?? '').normalize('NFKC').trim()
+    if (name.length < 3) continue
+    text = text.replace(new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'giu'), ' ')
+  }
+  return text
+}
+
+function mentionedCurrencies(text) {
+  const found = new Set(Object.keys(CURRENCY_MENTIONS).filter((code) => CURRENCY_MENTIONS[code].test(text)))
+  for (const match of text.matchAll(AMBIGUOUS_AMOUNT)) {
+    const word = match[2].toLowerCase()
+    const before = text.slice(0, match.index)
+    const after = text.slice(match.index + match[0].length)
+    if (word.startsWith('pound') && (WEIGHT_BEFORE.test(before) || WEIGHT_AFTER.test(after))) continue
+    found.add(AMBIGUOUS_CURRENCY[word])
+  }
+  return found
+}
+
+// `labels`: i nomi scelti dall'utente noti al contesto (vedi knownLabels).
+export function currencyProblems(message, currency, labels = []) {
+  const code = normalizeSpendyCurrency(currency)
+  const text = currencyText(message, labels)
+  const problems = []
+  if ([...mentionedCurrencies(text)].some((other) => other !== code)) problems.push('wrong_currency')
+  if (EXCHANGE_RATE.test(text)) problems.push('currency_conversion')
+  return problems
+}
+
 // --- Numeri ------------------------------------------------------------
 
 // Numeri scritti all'italiana: "1.179", "1.179,50", "66", "12,5".
+// Lettura STORICA (arrotondata, senza segno), rimasta solo per compatibilità
+// di extractNumbers(text) senza lingua: dalla Fase 2B.1 il controllo delle
+// risposte non la usa più (vedi numberProblems e authorizedNumbers).
 const NUMBER = /\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?/g
 
 function extractLegacyNumbers(text) {
@@ -110,8 +190,11 @@ function extractLegacyNumbers(text) {
 // italiano e "1 794" in inglese non sono numeri validi. Un numero fuori
 // grammatica, o con cifre non ASCII ("１２３４"), non viene reinterpretato:
 // vale NaN, che nessun numero consentito eguaglia (risposta scartata).
-// Senza lingua, extractNumbers legge come prima (all'italiana): serve ad
-// allowedNumbers, che legge testi dell'utente di lingua ignota.
+// Senza lingua, extractNumbers legge come prima (all'italiana, arrotondato).
+//
+// Fase 2B.1: con la lingua il valore è ESATTO e CON SEGNO — "1.794,50" è
+// 1794.5 (non 1795), "-150 €" è -150. Nessun arrotondamento, nessun
+// valore assoluto: il confronto con il contesto avviene in centesimi.
 //
 // Un numero seguito da un moltiplicatore ("€40k", "40 mila €", "2 mil €",
 // "40 k€", "€1M", "1,2 million €", "1,5 milliard") vale anch'esso NaN:
@@ -121,7 +204,7 @@ function extractLegacyNumbers(text) {
 // "1 Monday", "2 miles", "3 milanesi" non contano (dopo la sigla o la
 // parola viene un'altra lettera); "4K", "40 mila persone", "1 grand café",
 // "2 mille-feuilles" invece sì, per prudenza. I numeri scritti in lettere
-// ("duemila euro") non si vedono qui: servirebbe un altro controllo.
+// hanno un controllo a parte (numberWordProblems).
 const NUMBER_RUN = /\p{Nd}+(?:[.,'’_ \u00a0\u202f\u2009]\p{Nd}+)*/gu
 const numberGrammar = (group, decimal) => new RegExp(`^(?:[0-9]{1,3}(?:${group}[0-9]{3})+|[0-9]+)(?:${decimal}[0-9]{1,2})?$`)
 const NUMBER_FORMATS = {
@@ -135,29 +218,515 @@ const MULTIPLIER_LETTER = /^[ \u00a0\u202f\u2009]?(?:[kK]|M|B|bn|Mds?|Mrd)(?![\p
 const MULTIPLIER_WORD = /^[ \u00a0\u202f\u2009]?(?:thousands?|grand|millions?|billions?|mila|mille|migliaia|milion[ei]|miliard[oi]|mil|millar(?:es)?|mill[oó]n(?:es)?|millardos?|milliers?|milliards?)(?![\p{L}\p{N}])/iu
 const hasMultiplier = (after) => MULTIPLIER_LETTER.test(after) || MULTIPLIER_WORD.test(after)
 
+// Il segno meno. "-" e "−" valgono anche con uno spazio ("- 150 €"), come
+// prima. I trattini e i meno tipografici o a larghezza piena (– — ‒ － ﹣)
+// valgono come segno quando sono ATTACCATI alla cifra o al simbolo ("–494 €",
+// "–€494", "€–494"): con uno spazio intorno sono punteggiatura ("Oggi – 150 €
+// di shopping"). Fase 2B.3: prima "–494 €" si leggeva +494 (bypass R4).
+// Un trattino fra due cifre ("10-20", "2026-10-11") o attaccato a una parola
+// ("pre-150") non è un segno.
+const SIGN_BEFORE = /(?:^|[^\p{L}\p{N}])(?:[-−][ \u00a0\u202f]?|[–—‒－﹣])(?:[€$£₤][ \u00a0\u202f]?)?$|[€$£₤][ \u00a0\u202f]?[-−–—‒－﹣]$/u
+
 function readLocalizedNumber(raw, format, after) {
   if (!format.grammar.test(raw) || hasMultiplier(after)) return Number.NaN
-  return Math.round(Math.abs(parseFloat(raw.replace(format.group, '').replace(format.decimal, '.'))))
+  return parseFloat(raw.replace(format.group, '').replace(format.decimal, '.'))
 }
+
+const signedValue = (text, index, magnitude) => (SIGN_BEFORE.test(text.slice(0, index)) ? -magnitude : magnitude)
 
 export function extractNumbers(text, locale) {
   if (locale === undefined) return extractLegacyNumbers(text)
   const format = NUMBER_FORMATS[normalizeSpendyLocale(locale)]
-  return [...text.matchAll(NUMBER_RUN)].map(({ 0: raw, index }) => readLocalizedNumber(raw, format, text.slice(index + raw.length)))
+  return [...text.matchAll(NUMBER_RUN)].map(({ 0: raw, index }) => signedValue(text, index, readLocalizedNumber(raw, format, text.slice(index + raw.length))))
 }
 
-// Ogni numero presente nel contesto, a qualunque profondità, compresi
-// quelli dentro le stringhe (un obiettivo chiamato "Vacanze 2027").
-export function allowedNumbers(context) {
-  const out = new Set()
-  const visit = (value) => {
-    if (typeof value === 'number' && Number.isFinite(value)) out.add(Math.round(Math.abs(value)))
-    else if (typeof value === 'string') extractNumbers(value).forEach((n) => out.add(n))
-    else if (Array.isArray(value)) value.forEach(visit)
-    else if (value && typeof value === 'object') Object.values(value).forEach(visit)
+// Cifre che non sono 0-9 e che il lettore dei numeri non vede: apici (¹²³),
+// pedici, cerchiate (①), frazioni (½), numeri romani Unicode (Ⅻ) — \p{No} e
+// \p{Nl}. E caratteri invisibili o spazi insoliti ATTACCATI a una cifra
+// (zero-width space, word joiner, soft hyphen, figure space, spazi
+// tipografici): "150\u200b494 €" si vede come "150494 €" ma si leggerebbe 150
+// e 494. Fase 2B.3 (R7, R8): un importo che non si legge senza ambiguità è
+// malformed_number. Il resto del testo non viene toccato.
+const ODD_NUMERAL = /[\p{No}\p{Nl}]/u
+// "(€494)", "(,200)": tra parentesi con il simbolo davanti è il modo contabile
+// di scrivere un importo NEGATIVO. Non si legge come positivo: ambiguo.
+const ACCOUNTING_NEGATIVE = /\([ \u00a0\u202f]?[€$£₤][ \u00a0\u202f]?\p{Nd}[\p{Nd}., \u00a0\u202f]*\)/u
+const INVISIBLE = '[\\p{Cf}\\u2000-\\u2008\\u200a\\u205f\\u3000\\u180e]'
+const INVISIBLE_NEAR_DIGIT = new RegExp(`\\p{Nd}${INVISIBLE}|${INVISIBLE}\\p{Nd}`, 'u')
+
+// --- Numeri: che cosa può dire la risposta ----------------------------
+//
+// Fase 2B.1. Un numero del contesto autorizza la risposta SOLO con il suo
+// significato. Prima ogni numero valeva come importo: "72 €" passava perché
+// 72 era l'importanza dell'evento, "2026 €" per la data di oggi, "108 € da
+// spendere" per la percentuale del budget. Ora:
+//   money    importi (esatti, in centesimi)
+//   percent  percentuali
+//   days     giorni del ciclo (giorni che restano, anche compreso oggi;
+//            giorno del ciclo, primo giorno, durata)
+//   count    conteggi (acquisti, piccole spese, cicli di fila)
+//   date     oggi e le date del ciclo che ne derivano (inizio, fine, inizio
+//            del prossimo): Fase 2B.3, FP4
+// Non autorizzano NIENTE: version, importance (anche degli altri eventi),
+// priority, suggestedState, le cifre dentro i nomi ("Vacanze 2027": il
+// nome si può citare, la cifra non diventa un importo). Un campo nuovo del
+// contesto non autorizza nulla finché non viene classificato qui.
+//
+// Fase 2B.3: con il budget SFORATO la risposta non contiene importi (vedi
+// numberProblems): l'importo dello sforamento lo scrive l'app, non il modello.
+//
+// Fase 2B.4: le CIFRE DEL BUDGET (disponibile, quota giornaliera, budget del
+// ciclo, totale speso nel ciclo) sono 'reserved': le scrive solo l'app, nella
+// riga di fatti sotto la frase (spendyVoicePolicy.budgetFactLine). Il modello
+// può scrivere gli importi dell'evento (spesa, categoria, media, differenza,
+// spesa di oggi, quanto manca all'obiettivo), mai come saldo o disponibilità.
+// Così "Hai in cassa 1.500 €" o "Il tuo saldo è 1.500 €" (1.500 = budget del
+// ciclo) non passano qualunque parola si usi: 1.500 è una cifra riservata.
+const EVENT_NUMBER_KINDS = {
+  amount: 'money',
+  streakCycles: 'count',
+  expense: { amount: 'money', usualAmount: 'money', categoryCycleCurrent: 'money', categoryCycleUsual: 'money' },
+  purchases: { current: 'count', usual: 'count' },
+  singleExpense: { amount: 'money', usualAmount: 'money', changePercent: 'percent' },
+  smallExpenses: { count: 'count', total: 'money' },
+  cycle: { current: 'money', usual: 'money', difference: 'money', changePercent: 'percent' },
+}
+const CONTEXT_NUMBER_KINDS = {
+  budget: {
+    monthly: 'reserved', spent: 'reserved', available: 'reserved', dailyAllowance: 'reserved',
+    spentPercent: 'percent', daysRemaining: 'days', dayOfCycle: 'days', cycleDays: 'days',
+  },
+  spending: { today: 'money', usualCycle: 'money' },
+  primaryEvent: EVENT_NUMBER_KINDS,
+  goal: { percent: 'percent', missing: 'money' },
+}
+
+// Gli importi si confrontano in centesimi interi: 150 ≠ 151, 1,5 ≠ 2,
+// 150,00 = 150 (stesso valore, con certezza). Nessuna tolleranza.
+const cents = (value) => Math.round(value * 100)
+
+// Budget sforato: disponibile negativo, o fascia "exceeded".
+export function isOverBudget(context) {
+  const available = context?.budget?.available
+  return (typeof available === 'number' && available < 0) || context?.budget?.band === 'exceeded'
+}
+
+// Fase 2B.5: la CONDIZIONE del budget, dai dati verificati del contesto e
+// dalle bande/fasi già esistenti (nessuna soglia nuova):
+//   'over'       sforato: disponibile negativo (anche di pochi centesimi) o
+//                fascia exceeded
+//   'exhausted'  disponibile esattamente zero
+//   'fast'       spesa troppo rapida: fascia high, o warning nella prima parte
+//                del ciclo (EARLY_PHASES)
+//   'ok'         il resto
+export function budgetCondition(context) {
+  if (isOverBudget(context)) return 'over'
+  const budget = context?.budget
+  if (budget?.available === 0) return 'exhausted'
+  if (budget?.band === 'high' || (budget?.band === 'warning' && EARLY_PHASES.includes(budget?.cyclePhase))) return 'fast'
+  return 'ok'
+}
+
+const DAY_MS = 86400000
+const dayParts = (ms) => { const d = new Date(ms); return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1, day: d.getUTCDate() } }
+
+// → { money: Set<centesimi> (importi che il modello può scrivere),
+//     reserved: Set<centesimi> (cifre del budget: solo l'app),
+//     percent, days, count: Set<valore>, today, dates: [{year, month, day}],
+//     goalGap: Set<centesimi> (quanto manca all'obiettivo) }
+export function authorizedNumbers(context) {
+  const out = { money: new Set(), reserved: new Set(), percent: new Set(), days: new Set(), count: new Set(), today: null, dates: [], goalGap: new Set() }
+  const visit = (value, spec) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return
+    for (const [key, kind] of Object.entries(spec)) {
+      const item = value[key]
+      if (kind && typeof kind === 'object') visit(item, kind)
+      else if (typeof item === 'number' && Number.isFinite(item)) out[kind].add(kind === 'money' || kind === 'reserved' ? cents(item) : item)
+    }
   }
-  visit(context)
+  visit(context, CONTEXT_NUMBER_KINDS)
+  const missing = context?.goal?.missing
+  if (typeof missing === 'number' && Number.isFinite(missing)) out.goalGap.add(cents(missing))
+  const remaining = context?.budget?.daysRemaining
+  if (typeof remaining === 'number' && Number.isFinite(remaining)) out.days.add(remaining + 1) // compreso oggi
+  if (out.days.size > 0) out.days.add(1) // il primo giorno del ciclo
+  const today = typeof context?.today === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(context.today) : null
+  if (today) {
+    out.today = { year: Number(today[1]), month: Number(today[2]), day: Number(today[3]) }
+    const ms = Date.UTC(out.today.year, out.today.month - 1, out.today.day)
+    out.dates.push(out.today)
+    const dayOfCycle = context?.budget?.dayOfCycle
+    if (typeof dayOfCycle === 'number' && dayOfCycle >= 1) out.dates.push(dayParts(ms - (dayOfCycle - 1) * DAY_MS))
+    if (typeof remaining === 'number' && remaining >= 0) out.dates.push(dayParts(ms + remaining * DAY_MS), dayParts(ms + (remaining + 1) * DAY_MS))
+  }
   return out
+}
+
+// Gli importi che il MODELLO può scrivere (in euro/dollari/sterline). Prima
+// della Fase 2B.1 conteneva ogni numero del contesto; dalla 2B.4 non contiene
+// le cifre del budget, riservate all'app (authorizedNumbers().reserved).
+export function allowedNumbers(context) {
+  return new Set([...authorizedNumbers(context).money].map((value) => value / 100))
+}
+
+// Il significato di un numero nella risposta, da ciò che gli sta intorno.
+// Ordine: percentuale, importo, giorni, conteggio, anno; altrimenti il
+// numero nudo ("Restano 494.", "Hai speso 7 al bar") è un IMPORTO, e solo se
+// è seguito da un nome ("7 caffè", "494 left") può essere anche un conteggio
+// ('quantity'). "di solito 3" / "usually 3" eredita il significato del numero
+// che lo precede nella frase. Le parole sono quelle di it/en/es/fr.
+// Fase 2B.3 (R5, FP2): niente più "una parola qualsiasi + ciclo/spese" →
+// conteggio ("Hai speso 7 questo ciclo" era un conteggio autorizzato).
+const GAP = '[ \\u00a0\\u202f]'
+const PERCENT_AFTER = new RegExp(`^${GAP}?(?:%|(?:per${GAP}?cento|percento|per${GAP}?cent|percent|por${GAP}?ciento|pour${GAP}?cent|pourcent)(?!\\p{L}))`, 'iu')
+const CURRENCY_WORD = '(?:[€$£₤]|(?:eur|euros?|euri|usd|gbp|dollar[is]?|dollaro|d[oó]lar(?:es)?|pounds?|sterlin\\p{L}*|libras?|livres?|quid|bucks)(?!\\p{L}))'
+const MONEY_AFTER = new RegExp(`^${GAP}?${CURRENCY_WORD}`, 'iu')
+const MONEY_BEFORE = new RegExp(`(?:[€$£₤]|(?<!\\p{L})(?:eur|usd|gbp|us\\$))${GAP}?[-−–—‒－﹣]?${GAP}?$`, 'iu')
+const DAY_WORD = '(?:giorn[oi]|days?|d[ií]as?|jours?)'
+const DAYS_AFTER = new RegExp(`^(?:[°ºª]|st|nd|rd|th|er|re|e)?${GAP}${DAY_WORD}(?!\\p{L})`, 'iu')
+const DAYS_BEFORE = new RegExp(`(?<!\\p{L})(?:giorno|day|d[ií]a|jour)${GAP}$|(?<!\\p{L})(?:giorno|day|d[ií]a|jour)${GAP}\\d+(?:${GAP}(?:su|di|of|de|sur)${GAP}|${GAP}?\\/${GAP}?)$`, 'iu')
+const COUNT_WORD = '(?:acquist[oi]|spes[ae]|volt[ae]|transazion[ei]|cicli|purchases?|expenses?|times|transactions?|cycles|compras?|gastos?|veces|transacci[oó]n(?:es)?|ciclos|achats?|d[ée]penses?|fois)'
+// Solo questi aggettivi fra il numero e il nome contato ("5 piccole spese").
+const COUNT_ADJECTIVE = '(?:piccol[ei]|small|little|pequeñ[oa]s|petite?s|micro|nuov[ei]|new|nuev[oa]s|nouveaux|nouvelles)'
+const COUNT_AFTER = new RegExp(`^${GAP}(?:${COUNT_ADJECTIVE}${GAP})?${COUNT_WORD}(?!\\p{L})`, 'iu')
+const COUNT_BEFORE = new RegExp(`(?<!\\p{L})${COUNT_WORD}${GAP}(?:contro|vs\\.?|against|versus|frente a|contre|invece di|instead of|en vez de|au lieu de)${GAP}$`, 'iu')
+// "di solito 55", "usually €55", "d'habitude 3": il numero eredita il significato.
+const USUAL_BEFORE = new RegExp(`(?<!\\p{L})(?:di solito|solitamente|normalmente|in media|invece dei soliti|contro i soliti|usually|normally|typically|on average|lo habitual(?: son| es)?|habitualmente|de costumbre|por lo general|de media|d['’]habitude|habituellement|d['’]ordinaire|en moyenne)[ \\u00a0\\u202f,:]*$`, 'iu')
+// Parole dopo cui un numero nudo resta un importo (preposizioni, articoli,
+// avverbi di tempo, participi di spesa): "Hai speso 7 al bar" non è "7 cose".
+const AFTER_MONEY_WORDS = new Set(`
+  a ad al alla alle allo ai agli in nel nella nei per di del della dei da dal dalla su sul sulla con fino entro tra fra e ed o ma che questo questa quest quel quello quella
+  oggi ieri domani ora già ancora solo circa più meno spesi spese speso tondi pieni netti
+  at on for of to from by with and or but this that today yesterday tomorrow now so already still only about more less spent in total
+  en de del la el los las por para con hasta y o pero este esta ese esa hoy ayer mañana ya todavía solo más menos gastados gastadas
+  au aux à du des le les pour par avec jusqu et ou mais ce cet cette aujourd hier demain déjà encore seulement plus moins environ sur dans dépensés dépensées
+`.trim().split(/\s+/))
+const MONTHS = {
+  gennaio: 1, febbraio: 2, marzo: 3, aprile: 4, maggio: 5, giugno: 6, luglio: 7, agosto: 8, settembre: 9, ottobre: 10, novembre: 11, dicembre: 12,
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+  enero: 1, febrero: 2, abril: 4, mayo: 5, junio: 6, julio: 7, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12,
+  janvier: 1, février: 2, fevrier: 2, mars: 3, avril: 4, mai: 5, juin: 6, juillet: 7, août: 8, aout: 8, septembre: 9, octobre: 10, décembre: 12, decembre: 12,
+}
+const MONTH = `(${Object.keys(MONTHS).sort((a, b) => b.length - a.length).join('|')})`
+// Solo parole che introducono un anno senza ambiguità: "of 2026", "de 2026",
+// "in 2026" possono essere importi ("a total of 2026"), e restano importi.
+const YEAR_BEFORE = new RegExp(`(?<!\\p{L})(?:nel|dal|since|desde|depuis|anno|year|año|année|${MONTH.slice(1, -1)})${GAP}$`, 'iu')
+
+function numberKind(raw, before, after) {
+  if (PERCENT_AFTER.test(after)) return 'percent'
+  if (MONEY_AFTER.test(after) || MONEY_BEFORE.test(before)) return 'money'
+  if (DAYS_AFTER.test(after) || DAYS_BEFORE.test(before)) return 'days'
+  if (COUNT_AFTER.test(after) || COUNT_BEFORE.test(before)) return 'count'
+  if (/^(?:19|20|21)\d{2}$/.test(raw) && YEAR_BEFORE.test(before)) return 'year'
+  const next = /^[ \u00a0\u202f]+(\p{L}+)/u.exec(after)?.[1]?.toLowerCase()
+  return next && !AFTER_MONEY_WORDS.has(next) ? 'quantity' : 'money'
+}
+
+// Le date: oggi e le date del ciclo che ne derivano (context.today,
+// dayOfCycle, daysRemaining). "2026-10-11", "11/10", "11/10/2026" (in
+// inglese anche "10/11"), "11 ottobre", "October 11", "11 de octubre de
+// 2026", "11 octobre". Un'altra data, o una data senza context.today, è
+// inventata. Una frazione di giorni ("giorno 21/30") non è una data. Gli
+// orari ("13:30") non sono dati di Spendy: restano numeri non autorizzati.
+const DATE_PATTERNS = [
+  { re: /(?<![\p{Nd}\-/.])(\d{4})-(\d{1,2})-(\d{1,2})(?![\p{Nd}\-/])/gu, read: (m) => ({ year: m[1], month: m[2], day: m[3] }) },
+  { re: /(?<![\p{Nd}/.,])(\d{1,2})\/(\d{1,2})(?:\/(\d{4}|\d{2}))?(?![\p{Nd}/])/gu, read: (m) => ({ day: m[1], month: m[2], year: m[3], swap: true }) },
+  { re: new RegExp(`(?<![\\p{Nd}.,])(\\d{1,2})(?:º|°|er)?${GAP}(?:de${GAP})?${MONTH}(?!\\p{L})(?:,?${GAP}(?:de${GAP})?(\\d{4})(?!\\p{Nd}))?`, 'giu'), read: (m) => ({ day: m[1], month: MONTHS[m[2].toLowerCase()], year: m[3] }) },
+  { re: new RegExp(`(?<!\\p{L})${MONTH}${GAP}(\\d{1,2})(?:st|nd|rd|th)?(?![\\p{Nd}\\p{L}])(?:,?${GAP}(\\d{4})(?!\\p{Nd}))?`, 'giu'), read: (m) => ({ month: MONTHS[m[1].toLowerCase()], day: m[2], year: m[3] }) },
+]
+
+function isAllowedDate({ day, month, year, swap }, dates, locale) {
+  return dates.some((allowed) => {
+    const sameYear = year === undefined || Number(year) === allowed.year || (String(year).length === 2 && Number(year) === allowed.year % 100)
+    const matches = (d, m) => Number(d) === allowed.day && Number(m) === allowed.month
+    return sameYear && (matches(day, month) || (swap && locale === 'en' && matches(month, day)))
+  })
+}
+
+// Una copia del testo senza i nomi scelti dall'utente (obiettivo,
+// categorie): le cifre di "Vacanze 2027" non sono numeri della risposta.
+// Spazi della stessa lunghezza, così le posizioni restano quelle del testo.
+// Fase 2B.3 (R9): un nome con lettere si toglie solo come parola intera
+// ("Bar" non dentro "Barcellona"); un nome fatto solo di cifre e simboli
+// ("500") solo tra virgolette: prima cancellava ogni "500 €" della risposta.
+function withoutLabels(text, labels) {
+  let out = text
+  for (const label of labels) {
+    const name = String(label ?? '').trim()
+    if (name.length < 3) continue
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const re = /\p{L}/u.test(name)
+      ? new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'giu')
+      : new RegExp(`(?<=["“«]${GAP}?)${escaped}(?=${GAP}?["”»])`, 'giu')
+    out = out.replace(re, (found) => ' '.repeat(found.length))
+  }
+  return out
+}
+
+// I numeri della risposta con il loro significato:
+// → [{ index, value (esatto, con segno; NaN se fuori grammatica), kind, ok? }]
+// `dates`: le date ammesse (authorizedNumbers); `today` resta per chi la passa da sola.
+export function readNumbers(text, locale, { today = null, dates = [], labels = [], cycleDays = null } = {}) {
+  const code = normalizeSpendyLocale(locale)
+  const format = NUMBER_FORMATS[code]
+  const allowedDates = [...(today ? [today] : []), ...dates]
+  let work = withoutLabels(String(text ?? ''), labels)
+  const tokens = []
+  for (const { re, read } of DATE_PATTERNS) {
+    work = work.replace(re, (...args) => {
+      // args = [testo trovato, ...gruppi, posizione, testo intero]
+      const found = args[0]
+      const index = args.at(-2)
+      if (found.includes('/') && DAYS_BEFORE.test(`${work.slice(0, index)}${found.split('/')[0]}/`)) return found
+      tokens.push({ index, value: Number.NaN, kind: 'date', ok: isAllowedDate(read(args), allowedDates, code) })
+      return ' '.repeat(found.length)
+    })
+  }
+  const numbers = []
+  for (const { 0: raw, index } of work.matchAll(NUMBER_RUN)) {
+    const before = work.slice(0, index)
+    const after = work.slice(index + raw.length)
+    numbers.push({ index, end: index + raw.length, before, value: signedValue(work, index, readLocalizedNumber(raw, format, after)), kind: numberKind(raw, before, after) })
+  }
+  numbers.forEach((token, i) => {
+    const previous = numbers[i - 1]
+    // "5 su 31", "day 5 of 31": giorni quando il secondo è la durata del ciclo.
+    const next = numbers[i + 1]
+    if (next && cycleDays !== null && next.value === cycleDays && /^[ \u00a0\u202f]*(?:su|of|de|sur|\/)[ \u00a0\u202f]*$/iu.test(work.slice(token.end, next.index))
+      && ['money', 'quantity'].includes(token.kind) && ['money', 'quantity'].includes(next.kind)) {
+      token.kind = 'days'
+      next.kind = 'days'
+    }
+    // "di solito 3": il significato del numero precedente nella stessa frase.
+    if (previous && ['money', 'quantity'].includes(token.kind) && USUAL_BEFORE.test(token.before) && !/[.!?]/.test(work.slice(previous.end, token.index))) token.kind = previous.kind
+  })
+  for (const { index, value, kind } of numbers) tokens.push({ index, value, kind })
+  return tokens.sort((a, b) => a.index - b.index)
+}
+
+// Le parti di una frase in cui un importo "vive": separate da punteggiatura
+// (non quella dentro un numero), trattini, "ma/but/pero/mais", "e/and/y/et".
+const CLAUSE_BREAK = /[;:!?…]|[.,](?!\p{Nd})|[ \u00a0\u202f][-–—][ \u00a0\u202f]|[ \u00a0\u202f](?:ma|però|but|pero|mais|e|and|y|et)[ \u00a0\u202f]/giu
+function clauseAt(text, index) {
+  let start = 0
+  let end = text.length
+  for (const match of text.matchAll(CLAUSE_BREAK)) {
+    if (match.index + match[0].length <= index) start = match.index + match[0].length
+    else if (match.index >= index) { end = match.index; break }
+  }
+  return text.slice(start, end)
+}
+
+// --- Budget: chi può dire che cosa ------------------------------------
+//
+// Fase 2B.3 (R1–R3). La garanzia principale è STRUTTURALE, non un elenco di
+// parole: con il budget sforato il modello non scrive importi (né in cifre,
+// né a parole, né con un simbolo di valuta) e l'app aggiunge da sola, sotto
+// la frase, "Budget superato di 120 €" calcolato dai suoi dati
+// (spendyVoicePolicy.js). Così un saldo negativo non può diventare
+// "disponibile", qualunque verbo usi il modello. Prima l'importo si
+// autorizzava con parole di sforamento ("oltre", "over", "de plus"), e quelle
+// stesse parole aggiravano il controllo (R2).
+// Gli elenchi qui sotto sono una difesa in più, non la garanzia:
+//   PERMISSION  "puoi spendere / can spend / puedes gastar / tu peux dépenser /
+//               margine": vietato a budget sforato anche senza importi;
+//   REMAINING   "restano / left / quedan / il reste": a budget sforato non
+//               accanto a "soldi / money / dinero / argent"; a budget sano,
+//               se la frase ha importi, uno deve essere il disponibile, la
+//               quota giornaliera o quanto manca all'obiettivo;
+//   OVER_BUDGET "sopra il budget / over budget / por encima del presupuesto /
+//               budget dépassé": vietato a budget sano (R3).
+const REMAINING = /(?<!\p{L})(?:rest(?:a|ano|ava|avano)|rimang\p{L}*|rimast\p{L}*|hai ancora|disponibil\p{L}*|da spendere|a disposizione|avanz\p{L}*|left|remain\p{L}*|still (?:have|got)|to spend|available|leftover|qued(?:a|an|ar[aá]n?)|sobra\p{L}*|todav[ií]a tienes|a[uú]n tienes|para gastar|restante\p{L}*|reste\p{L}*|restant\p{L}*|[àa] d[ée]penser)(?!\p{L})/iu
+// Fase 2B.5 (falsi positivi): "rimast*" in un modo di dire ("ti è rimasta
+// impressa", "ci sono rimasto male") e "left" come verbo dopo un soggetto ("You
+// left €1,500 at the agency") non dicono quanto resta. Si tolgono SOLO queste
+// forme dalla copia usata per REMAINING: "€494 left", "you have €494 left",
+// "left to spend", "ti sono rimasti 160 €" restano affermazioni di disponibilità.
+const NOT_REMAINING = /(?<!\p{L})rimast[oaie] (?:impress[oaie]|colpit[oaie]|sorpres[oaie]|stupit[oaie]|male|senza parole|di stucco|a bocca aperta)(?!\p{L})|(?<!\p{L})(?:you|i|we|they|he|she)(?:['’]ve)? left(?!\p{L})/giu
+const remainingText = (text) => text.replace(NOT_REMAINING, (found) => ' '.repeat(found.length))
+const PERMISSION = /(?<!\p{L})(?:puoi (?:ancora |anche |tranquillamente )?(?:spendere|permetterti|concederti)|ti puoi (?:ancora )?permettere|(?:hai|c['’]è) (?:ancora )?(?:margine|spazio)|margine|budget libero|can (?:still |easily |safely )?(?:spend|afford)|room (?:to spend|in (?:your|the) budget)|free to spend|puedes (?:todav[ií]a |a[uú]n )?(?:gastar|permitirte)|te puedes permitir|margen|(?:tu peux|vous pouvez) (?:encore )?(?:d[ée]penser|te permettre|vous permettre)|marge)(?!\p{L})/iu
+// Fase 2B.4: il saldo, il conto, la cassa. Con REMAINING e PERMISSION formano
+// le affermazioni di DISPONIBILITÀ: a budget sano nessun importo scritto dal
+// modello può accompagnarle (il disponibile lo scrive l'app), salvo "quanto
+// manca" quando la frase parla dell'obiettivo.
+const BALANCE = /(?<!\p{L})(?:saldo|in cassa|sul conto|nel conto|conto corrente|in tasca|nel portafoglio|balance|in (?:your|the) (?:account|bank|wallet|pocket)|en (?:tu |la |el )?(?:cuenta|caja|banco|bolsillo|cartera)|solde|sur (?:ton|votre) compte|en caisse|dans (?:ton|votre) (?:portefeuille|poche))(?!\p{L})/iu
+const GOAL_WORD = /(?<!\p{L})(?:obiettiv\p{L}*|goal|target|objetivo|meta|objectif)(?!\p{L})/iu
+// Fase 2B.5: il budget descritto come SANO o sotto controllo. Vietato quando la
+// condizione (budgetCondition) è over, exhausted o fast. È una difesa a parole
+// che si aggiunge a quelle tipizzate (stato, tono e animazione della mascotte;
+// importi riservati): da sola non basterebbe, insieme riduce le contraddizioni
+// con la riga di fatti che l'app scrive sotto la frase.
+const HEALTHY_CLAIM = /(?<!\p{L})(?:sotto controllo|(?:il )?budget (?:regge|tiene|è in salute|sta bene)|regge alla grande|va tutto bene|tutto (?:ok|bene|a posto)|in perfetta salute|nessun problema col budget|under control|on track|(?:the )?budget is (?:holding up|fine|healthy|in great shape)|all good|doing great|in great shape|nothing to worry about|bajo control|(?:el )?presupuesto (?:aguanta|está bien|va bien)|todo (?:bien|en orden)|vas (?:muy )?bien|sous contrôle|(?:le )?budget tient(?: bon)?|tout va bien|tout roule|en (?:bonne|pleine) (?:santé|forme))(?!\p{L})/iu
+const MONEY_NOUN = /(?<!\p{L})(?:soldi|denaro|contanti|money|cash|funds|dinero|plata|argent|sous|fonds)(?!\p{L})/iu
+const OVER_BUDGET_CLAIM = /(?<!\p{L})(?:(?:sopra|oltre|fuori)(?: (?:il|al|dal))? budget|sforat\p{L}* (?:il )?budget|superat\p{L}* (?:il )?budget|budget (?:è )?(?:sforat|superat|finit|esaurit|sfondat)\p{L}*|in rosso|over(?:[- ](?:your |the )?)budget|exceeded (?:your |the )?budget|budget (?:is |has been )?(?:exceeded|blown|gone)|overspent|in the red|por encima del presupuesto|superad\p{L}* (?:el )?presupuesto|presupuesto (?:est[aá] )?(?:superado|agotado|excedido)|excedid\p{L}* (?:el |del )?presupuesto|te pasaste del presupuesto|en (?:n[uú]meros )?rojos?|au-dessus du budget|d[ée]pass\p{L}* (?:le |ton |votre )?budget|budget (?:est )?d[ée]pass[ée]\p{L}*|hors budget|dans le rouge|[àa] d[ée]couvert)(?!\p{L})/iu
+const CURRENCY_MARK = /[€$£₤]|(?<!\p{L})(?:eur|usd|gbp)(?!\p{L})/iu
+
+// --- Numeri scritti in lettere -----------------------------------------
+//
+// "mille euro", "a thousand euros", "mil euros", "mille euros", "cento
+// euro", "one hundred euros", "cien euros", "cent euros", "duecentocinquanta
+// euro", "two hundred and fifty dollars", "doscientos cincuenta euros",
+// "deux mille cinq cents euros", "quatre-vingt-dix euros", "migliaia di
+// euro", "hundreds of euros", "cinquanta per cento"...: un importo (o una
+// percentuale) a parole non si può confrontare con il contesto, quindi la
+// risposta si scarta e resta la frase locale. Conta:
+//   - una sequenza di parole numeriche attaccata a una valuta (prima o dopo,
+//     anche con "di/de/of/d'", con un trattino: "thousand-euro", o con UNA
+//     parola in mezzo: "mille bei euro") o a "per cento / percent";
+//   - Fase 2B.3 (R6): una parola di GRANDEZZA o approssimativa (cento, mille,
+//     hundred, thousand, mil, cent, centinaio, ventina, vingtaine, decena...)
+//     nella stessa parte di frase di un verbo di spesa: "Hai speso mille in
+//     shopping", "You dropped a thousand on clothes".
+// Restano libere: "tre volte", "un caffè", "one more", "cent fois", "mille
+// grazie", "two pounds" (peso), "un livre" (libro), "150 € une belle somme"
+// (Fase 2B.3, FP1: il simbolo DOPO un importo non apre un numero a parole).
+// Limiti (documentati): solo it/en/es/fr; frazioni a parole ("a quarter of a
+// euro"), ordinali, forme arcaiche e gergo non elencato non sono coperti;
+// "un euro" viene scartato anche quando sarebbe vero (prudenza).
+const NUMBER_WORD_PARTS = [
+  // it (le forme composte si scrivono attaccate: "duecentocinquanta")
+  'zero', 'uno', 'una', 'un', 'due', 'tre', 'tré', 'quattro', 'cinque', 'sei', 'sette', 'otto', 'nove', 'dieci', 'undici', 'dodici', 'tredici',
+  'quattordici', 'quindici', 'sedici', 'diciassette', 'diciotto', 'diciannove', 'venti', 'vent', 'trenta', 'trent', 'quaranta', 'quarant',
+  'cinquanta', 'cinquant', 'sessanta', 'sessant', 'settanta', 'settant', 'ottanta', 'ottant', 'novanta', 'novant', 'cento', 'cent', 'mille',
+  'mila', 'milione', 'milioni', 'miliardo', 'miliardi', 'centinaio', 'centinaia', 'migliaio', 'migliaia', 'mezzo',
+  'decina', 'decine', 'ventina', 'trentina', 'quarantina', 'cinquantina', 'sessantina', 'settantina', 'ottantina', 'novantina', 'dozzina', 'dozzine',
+  // en
+  'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen',
+  'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety', 'hundred',
+  'hundreds', 'thousand', 'thousands', 'million', 'millions', 'billion', 'billions', 'dozen', 'dozens',
+  // es ("doscientos" = dos + cientos, "veintidós" = veinti + dós, "veintiún")
+  'cero', 'unos', 'unas', 'dos', 'dós', 'tres', 'trés', 'cuatro', 'cinco', 'seis', 'séis', 'siete', 'ocho', 'nueve', 'diez', 'once', 'doce', 'trece',
+  'catorce', 'quince', 'dieciséis', 'dieciseis', 'diecisiete', 'dieciocho', 'diecinueve', 'veinte', 'veinti', 'ún', 'treinta', 'cuarenta',
+  'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa', 'cien', 'ciento', 'cientos', 'cientas', 'quinientos', 'quinientas', 'setecientos',
+  'setecientas', 'novecientas', 'mil', 'miles', 'millón', 'millon', 'millones', 'millar', 'millares', 'medio',
+  'decena', 'decenas', 'docena', 'docenas', 'veintena', 'treintena', 'centenar', 'centenares',
+  // fr ("quatre-vingt-dix", "vingt-et-un")
+  'zéro', 'une', 'deux', 'trois', 'quatre', 'cinq', 'sept', 'huit', 'neuf', 'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'vingt',
+  'vingts', 'trente', 'quarante', 'cinquante', 'soixante', 'cents', 'millier', 'milliers', 'milliard', 'milliards', 'centaine', 'centaines', 'demi',
+  'dizaine', 'dizaines', 'douzaine', 'douzaines', 'quinzaine', 'vingtaine', 'trentaine', 'quarantaine', 'cinquantaine', 'soixantaine',
+]
+const NUMBER_WORD = `(?:${[...new Set(NUMBER_WORD_PARTS)].sort((a, b) => b.length - a.length).join('|')})+`
+const NUMBER_WORD_TOKEN = `${NUMBER_WORD}(?:-(?:et-)?${NUMBER_WORD})*`
+const NUMBER_WORDS = `(?<![\\p{L}\\p{N}])${NUMBER_WORD_TOKEN}(?:${GAP}+(?:(?:e|and|y|et)${GAP}+)?${NUMBER_WORD_TOKEN})*(?![\\p{L}\\p{N}])`
+// Senza "pound / libra / livre" da soli: dopo una parola numerica sono più
+// spesso un peso ("two pounds"), un segno zodiacale o un libro ("un livre").
+// Con "sterling / esterlina" invece sono sempre denaro. "balles / pavos /
+// pelas": gergo per euro (fr, es).
+const WORDS_CURRENCY = `(?:[€$£₤]|(?:eur|euros?|euri|usd|gbp|dollar[is]?|dollaro|d[oó]lar(?:es)?|sterlin\\p{L}*|pounds?${GAP}sterling|livres?${GAP}sterling|libras?${GAP}esterlinas?|quid|bucks|balles|pavos|pelas|centesim[oi]|cents?|c[eé]ntimos?|centimes?)(?!\\p{L}))`
+const WORDS_PERCENT = `(?:%|(?:per${GAP}?cento|percento|per${GAP}?cent|percent|por${GAP}?ciento|pour${GAP}?cent|pourcent)(?!\\p{L}))`
+const AMOUNT_IN_WORDS = new RegExp(
+  `${NUMBER_WORDS}(?:${GAP}+\\p{L}+)?(?:${GAP}*|-)(?:(?:di|de|of|del)${GAP}+|d['’])?(?:${WORDS_CURRENCY}|${WORDS_PERCENT})|(?<!\\p{Nd}${GAP}?)[€$£₤]${GAP}*${NUMBER_WORDS}`,
+  'iu',
+)
+const NUMBER_WORDS_ALL = new RegExp(NUMBER_WORDS, 'giu')
+const MAGNITUDE = /cent|mille|mila|milion|miliard|migliai|hundred|thousand|million|billion|cien|mil|mill[oó]n|millar|millier|milliard|decin|dozzin|ventin|trentin|quarantin|cinquantin|sessantin|settantin|ottantin|novantin|dizaine|douzaine|quinzaine|vingtaine|trentaine|quarantaine|cinquantaine|soixantaine|decena|docena|veintena|treintena|centenar/iu
+const SPENDING = /(?<!\p{L})(?:spes[oaie]|spendere|spendi|spendo|spend|spends|spending|spent|dropped|blew|paid|pay|pays|paying|cost|costs|costa|costano|costato|costata|costati|pagat[oaie]|sborsat[oaie]|gastad[oa]s?|gastaste|gastas|gastar|gastaron|gast[oó]|pagad[oa]s?|pagaste|d[ée]pens[ée]e?s?|d[ée]penser|d[ée]penses|d[ée]pensez|pay[ée]e?s?)(?!\p{L})/iu
+// "two grand" (gergo inglese per duemila) è sempre denaro; "a grand" / "one
+// grand" solo accanto a un verbo di spesa ("a grand total", "a grand piano").
+const GRAND = /(?<!\p{L})(?:two|three|four|five|six|seven|eight|nine|ten|a few|a couple of|several) grand(?!\p{L})/iu
+const ONE_GRAND = /(?<!\p{L})(?:a|one) grand(?!\p{L})(?! total)/iu
+
+export function numberWordProblems(message, labels = []) {
+  // Il testo di un modello non supera mai qualche centinaio di caratteri:
+  // il limite tiene il controllo sempre rapido anche su un testo enorme
+  // (che verrebbe comunque rifiutato come too_long).
+  const text = withoutLabels(String(message ?? ''), labels).normalize('NFKC').slice(0, 4 * MAX_MESSAGE_LENGTH)
+  if (AMOUNT_IN_WORDS.test(text)) return ['number_in_words']
+  for (const match of text.matchAll(NUMBER_WORDS_ALL)) {
+    if (MAGNITUDE.test(match[0]) && SPENDING.test(clauseAt(text, match.index))) return ['number_in_words']
+  }
+  if (GRAND.test(text)) return ['number_in_words']
+  for (const match of text.matchAll(new RegExp(ONE_GRAND, 'giu'))) {
+    if (SPENDING.test(clauseAt(text, match.index))) return ['number_in_words']
+  }
+  return []
+}
+
+// Tutti i problemi di numeri di una risposta, con codici senza cifre tranne
+// invented_numbers (che il server non scrive nei log: vedi logErrorCodes).
+export function numberProblems(message, context) {
+  const labels = [...knownLabels(context)]
+  const allowed = authorizedNumbers(context)
+  const locale = normalizeSpendyLocale(context?.locale)
+  const text = String(message ?? '')
+  const work = withoutLabels(text, labels)
+  const cycleDays = typeof context?.budget?.cycleDays === 'number' ? context.budget.cycleDays : null
+  const tokens = readNumbers(text, locale, { dates: allowed.dates, labels, cycleDays })
+  const over = isOverBudget(context)
+  const condition = budgetCondition(context)
+  // Disponibile zero o negativo: nessun permesso di spesa, nessun "resto" (2B.5).
+  const noMoneyLeft = condition === 'over' || condition === 'exhausted'
+  const workForRemaining = remainingText(work)
+  const problems = []
+  const invented = []
+  let moneyWhenOver = over && CURRENCY_MARK.test(work)
+  let incoherent = false
+  let badDate = false
+  let reservedAmount = false
+  const moneyByClause = new Map()
+
+  for (const token of tokens) {
+    if (token.kind === 'date') { if (!token.ok) badDate = true; continue }
+    const { value, kind } = token
+    if (Number.isNaN(value)) continue
+    // Un numero nudo seguito da un nome è un conteggio solo se la frase non
+    // parla di spesa: "Hai speso 7 bei cicli" resta un importo (R5).
+    const isCount = kind === 'quantity' && allowed.count.has(value) && !SPENDING.test(clauseAt(work, token.index))
+    if (kind === 'money' || (kind === 'quantity' && !isCount)) {
+      // Importo. A budget sforato nessuno: lo scrive l'app.
+      if (over) { moneyWhenOver = true; continue }
+      // Una cifra del budget (anche giusta) la scrive solo l'app (2B.4).
+      if (!allowed.money.has(cents(value))) {
+        if (allowed.reserved.has(cents(value))) reservedAmount = true
+        else invented.push(value)
+      }
+      const clause = clauseAt(work, token.index)
+      const entry = moneyByClause.get(clause) ?? { amounts: [], index: token.index }
+      entry.amounts.push(cents(value))
+      moneyByClause.set(clause, entry)
+      continue
+    }
+    let ok
+    if (kind === 'quantity') ok = true // isCount
+    else if (kind === 'percent') ok = allowed.percent.has(value) || (value > 0 && allowed.percent.has(-value))
+    else if (kind === 'days') ok = allowed.days.has(value)
+    else if (kind === 'count') ok = allowed.count.has(value)
+    else if (kind === 'year') { if (!allowed.dates.some((date) => date.year === value)) badDate = true; continue }
+    if (!ok) invented.push(value)
+  }
+
+  // Chi dice "restano / puoi spendere", con quale importo.
+  // Permessi di spesa: mai se il disponibile è zero o negativo, né se si sta
+  // spendendo troppo in fretta (condizione 'fast'); liberi a budget sano.
+  if (condition !== 'ok' && PERMISSION.test(work)) incoherent = true
+  if (noMoneyLeft) {
+    for (const match of workForRemaining.matchAll(new RegExp(REMAINING, 'giu'))) {
+      if (MONEY_NOUN.test(clauseAt(work, match.index))) incoherent = true
+    }
+  }
+  if (condition !== 'ok' && HEALTHY_CLAIM.test(work)) incoherent = true
+  if (!over) {
+    if (OVER_BUDGET_CLAIM.test(work)) incoherent = true
+    // Disponibilità o saldo con un importo del modello: mai (lo scrive l'app).
+    // Unica eccezione: quanto manca all'obiettivo, in una frase sull'obiettivo.
+    for (const [clause, { amounts, index }] of moneyByClause) {
+      const remainingClause = clauseAt(workForRemaining, index)
+      if (!(REMAINING.test(remainingClause) || PERMISSION.test(clause) || BALANCE.test(clause))) continue
+      const original = clauseAt(text, index).toLowerCase()
+      const aboutGoal = GOAL_WORD.test(original) || labels.some((label) => label && original.includes(label))
+      if (!(aboutGoal && amounts.every((amount) => allowed.goalGap.has(amount)))) incoherent = true
+    }
+  }
+
+  const malformed = ODD_NUMERAL.test(work) || INVISIBLE_NEAR_DIGIT.test(work) || ACCOUNTING_NEGATIVE.test(work) || tokens.some((token) => token.kind !== 'date' && Number.isNaN(token.value))
+  if (malformed) problems.push('malformed_number')
+  if (invented.length > 0) problems.push(`invented_numbers:${invented.join(',')}`)
+  if (reservedAmount) problems.push('reserved_amount')
+  if (moneyWhenOver) problems.push('money_when_over_budget')
+  if (incoherent) problems.push('incoherent_budget')
+  if (badDate) problems.push('invented_date')
+  problems.push(...numberWordProblems(text, labels))
+  return problems
 }
 
 // --- Riferimenti tra virgolette ---------------------------------------
@@ -328,14 +897,12 @@ export function validateSpendyResponse(raw, context, { history = [], previous = 
   if (countSentences(message) > MAX_SENTENCES) errors.push('too_many_sentences')
   if (/[*_`#]|^\s*[-•]/m.test(message)) errors.push('markdown')
 
-  const allowed = allowedNumbers(context)
-  // Sempre nella lingua della risposta (senza lingua: italiano, come il resto).
-  const numbers = extractNumbers(message, normalizeSpendyLocale(context?.locale))
-  // Un numero fuori dalla grammatica della lingua: scartato, senza
-  // riportarne le cifre.
-  if (numbers.some(Number.isNaN)) errors.push('malformed_number')
-  const invented = numbers.filter((n) => !Number.isNaN(n) && ![...allowed].some((a) => Math.abs(a - n) <= 1))
-  if (invented.length > 0) errors.push(`invented_numbers:${invented.join(',')}`)
+  // Numeri nella lingua della risposta (senza lingua: italiano), ognuno con
+  // il suo significato, confrontati esatti e con segno (Fase 2B.1: vedi
+  // numberProblems). Un numero fuori grammatica: malformed_number, senza cifre.
+  errors.push(...numberProblems(message, context))
+  // Solo la valuta dell'account, mai conversioni (senza riportare il testo).
+  errors.push(...currencyProblems(message, context?.currency, knownLabels(context)))
 
   const labels = knownLabels(context)
   if (quotedNames(message).some((name) => !labels.has(name))) errors.push('unknown_reference')
@@ -344,7 +911,12 @@ export function validateSpendyResponse(raw, context, { history = [], previous = 
   if (isFearOrOffensive(message)) errors.push('offensive_or_judgmental')
 
   const band = context?.budget?.band
-  if (band === 'exceeded' && (state === 'celebrating' || state === 'happy')) errors.push('incoherent_state')
+  // Disponibile zero o negativo: niente mascotte festosa o rassicurante, né nello
+  // stato né nel tono o nell'animazione (Fase 2B.5; prima solo band exceeded e
+  // solo lo stato). Restano liberi attentive, concerned, advisor, ironic.
+  const condition = budgetCondition(context)
+  if ((band === 'exceeded' || condition === 'over' || condition === 'exhausted')
+    && (state === 'celebrating' || state === 'happy' || tone === 'celebratory' || animation === 'celebrate')) errors.push('incoherent_state')
   if (contradictsCyclePhase(message, context?.budget?.cyclePhase)) errors.push('incoherent_cycle_phase')
 
   const said = [...history, ...(previous ? [previous] : [])].filter((line) => typeof line === 'string')
@@ -373,6 +945,10 @@ function parsePriority(value) {
 const MAX_LABEL = 60
 
 const num = (value) => (typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : undefined)
+// Gli importi tengono i centesimi (Fase 2B.1): "1.234,56" si confronta con
+// 1234.56, non con 1235. L'app oggi manda importi interi; se un giorno ne
+// manda con i decimali, il controllo resta esatto.
+const money = (value) => (typeof value === 'number' && Number.isFinite(value) ? Math.round(value * 100) / 100 : undefined)
 const str = (value, max = MAX_LABEL) => (typeof value === 'string' && value.trim() ? value.trim().slice(0, max) : undefined)
 const oneOf = (value, list) => (list.includes(value) ? value : undefined)
 const EVENT_ID = /^[a-z_]{3,40}$/
@@ -393,24 +969,24 @@ const EVENT_SPEC = {
   id: (v) => (typeof v === 'string' && EVENT_ID.test(v) ? v : undefined),
   importance: num,
   category: str,
-  amount: num,
+  amount: money,
   streakCycles: num,
-  expense: obj({ amount: num, category: str, usualAmount: num, categoryCycleCurrent: num, categoryCycleUsual: num }),
+  expense: obj({ amount: money, category: str, usualAmount: money, categoryCycleCurrent: money, categoryCycleUsual: money }),
   purchases: obj({ current: num, usual: num }),
-  singleExpense: obj({ amount: num, usualAmount: num, changePercent: num }),
-  smallExpenses: obj({ count: num, total: num }),
-  cycle: obj({ current: num, usual: num, difference: num, changePercent: num }),
+  singleExpense: obj({ amount: money, usualAmount: money, changePercent: num }),
+  smallExpenses: obj({ count: num, total: money }),
+  cycle: obj({ current: money, usual: money, difference: money, changePercent: num }),
 }
 
 export function sanitizeSpendyContext(input) {
   if (!input || typeof input !== 'object') return null
   const budget = pick(input.budget, {
-    monthly: num,
-    spent: num,
-    available: num,
+    monthly: money,
+    spent: money,
+    available: money,
     spentPercent: num,
     daysRemaining: num,
-    dailyAllowance: num,
+    dailyAllowance: money,
     cyclePhase: (v) => oneOf(v, CYCLE_PHASES),
     dayOfCycle: num,
     cycleDays: num,
@@ -422,15 +998,16 @@ export function sanitizeSpendyContext(input) {
   return {
     version: num(input.version) ?? 1,
     locale: normalizeSpendyLocale(input.locale),
+    currency: normalizeSpendyCurrency(input.currency),
     today: typeof input.today === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.today) ? input.today : undefined,
     budget,
-    spending: pick(input.spending, { today: num, usualCycle: num }) ?? {},
+    spending: pick(input.spending, { today: money, usualCycle: money }) ?? {},
     primaryEvent: primaryEvent?.id ? primaryEvent : null,
     otherEvents: (Array.isArray(input.otherEvents) ? input.otherEvents : [])
       .slice(0, 2)
       .map((event) => pick(event, { id: EVENT_SPEC.id, importance: num, category: str }))
       .filter((event) => event?.id),
-    goal: pick(input.goal, { label: str, percent: num, missing: num }) ?? null,
+    goal: pick(input.goal, { label: str, percent: num, missing: money }) ?? null,
     suggestedState: oneOf(input.suggestedState, AI_STATES) ?? null,
   }
 }
@@ -463,6 +1040,11 @@ STILE
 DATI
 - Usa SOLO i numeri che compaiono nel contesto, scritti come sono. Non fare calcoli, non inventare spese, saldi, percentuali o nomi.
 - Se un dato non c'è, non usarlo.
+- Le cifre del budget (budget.available, budget.dailyAllowance, budget.monthly, budget.spent) le scrive l'app sotto la tua frase: non scriverle tu, e non dire con un importo quanto resta, il saldo, quanto c'è sul conto o quanto si può spendere. Puoi usare gli importi dell'evento (spesa, categoria, media, differenza), la spesa di oggi, quanto manca all'obiettivo, le percentuali (con %) e i giorni (con la parola giorni).
+- importance, priority e version non sono dati da citare; le cifre dentro un nome restano nel nome.
+- Scrivi i numeri in cifre, mai in lettere, con i decimali solo se sono nel contesto.
+- budget.available negativo (band = exceeded) vuol dire budget superato: NON scrivere importi (né cifre di denaro, né importi a parole, né simboli di valuta) e non dire mai che restano soldi o che si può spendere. Di quanto è superato lo scrive l'app sotto la tua frase: tu aiuta a rallentare (giorni che restano, percentuale, prossime spese).
+- Niente orari, date diverse da quelle del ciclo o durate inventate: non sono dati che hai.
 
 TEMPO
 - Il periodo è il ciclo di budget impostato dall'utente, non il mese solare: parla di "ciclo", mai di "mese".
@@ -490,7 +1072,7 @@ export const STYLE_EXAMPLES = [
   'Il Giappone si avvicina. E questa volta non è merito dello shopping.',
   'Hai offerto la cena anche al cuoco? 😂',
   'Il forno di casa ha lavorato più del delivery, stavolta.',
-  'Restano 120 € per 9 giorni: si può fare, con un po’ di calma.',
+  'Mancano 9 giorni alla fine del ciclo: si può fare, con un po’ di calma.',
   'Le piccole spese non si notano una per una: si notano a fine ciclo.',
   'Hai speso meno del previsto. Mi sto emozionando.',
   'Oggi il portafoglio può dormire tranquillo.',
@@ -505,7 +1087,7 @@ export const STYLE_EXAMPLES_BY_LOCALE = {
     'Japan is getting closer. And this time it’s not thanks to shopping.',
     'Did you buy the chef dinner too? 😂',
     'The oven at home worked harder than delivery this time.',
-    '€120 left for 9 days: doable, with a bit of calm.',
+    '9 days to go in the cycle: doable, with a bit of calm.',
     'Small expenses don’t show one by one: they show at the end of the cycle.',
     'You spent less than expected. I’m getting emotional.',
     'Your wallet can sleep soundly today.',
@@ -515,7 +1097,7 @@ export const STYLE_EXAMPLES_BY_LOCALE = {
     'Japón está más cerca. Y esta vez no es gracias a las compras.',
     '¿También le pagaste la cena al cocinero? 😂',
     'El horno de casa ha trabajado más que el delivery esta vez.',
-    'Quedan 120 € para 9 días: se puede, con un poco de calma.',
+    'Quedan 9 días de ciclo: se puede, con un poco de calma.',
     'Los gastos pequeños no se notan uno a uno: se notan al final del ciclo.',
     'Has gastado menos de lo previsto. Me estoy emocionando.',
     'Hoy la cartera puede dormir tranquila.',
@@ -525,7 +1107,7 @@ export const STYLE_EXAMPLES_BY_LOCALE = {
     'Le Japon se rapproche. Et cette fois, ce n’est pas grâce au shopping.',
     'Vous avez aussi offert le dîner au chef\u00a0? 😂',
     'Le four de la maison a travaillé plus que la livraison, cette fois.',
-    'Il reste 120 € pour 9 jours\u00a0: c’est faisable, avec un peu de calme.',
+    'Encore 9 jours de cycle\u00a0: c’est faisable, avec un peu de calme.',
     'Les petites dépenses ne se voient pas une par une\u00a0: elles se voient en fin de cycle.',
     'Vous avez dépensé moins que prévu. Ça m’émeut.',
     'Aujourd’hui, le portefeuille peut dormir tranquille.',
@@ -550,6 +1132,27 @@ export function spendyLanguageInstructions(locale) {
   return lines.join('\n')
 }
 
+const CURRENCY_NAMES = { EUR: 'euro', USD: 'dollari statunitensi', GBP: 'sterline britanniche' }
+
+// La sezione VALUTA del prompt: la valuta dell'account, indipendente dalla
+// lingua. Gli importi del contesto sono già in questa valuta.
+export function spendyCurrencyInstructions(currency) {
+  const code = normalizeSpendyCurrency(currency)
+  const symbol = SPENDY_CURRENCIES[code]
+  const name = CURRENCY_NAMES[code]
+  return [
+    'VALUTA',
+    `- La valuta dell'utente è ${name} (${code}, simbolo ${symbol}): context.currency = "${code}". Tutti gli importi del contesto sono in ${name}, qualunque sia la lingua della risposta.`,
+    `- Per un importo usa solo il simbolo ${symbol}, nella posizione abituale della lingua della risposta: in inglese prima del numero (${symbol}150), in italiano, spagnolo e francese dopo (150 ${symbol}).`,
+    '- Non usare mai un\'altra valuta, non convertire importi e non citare tassi di cambio.',
+  ].join('\n')
+}
+
+// Personalità ed esempi scrivono gli importi in euro: per un'altra valuta si
+// riscrive solo il simbolo (nella stessa posizione: "€150" → "$150",
+// "150 €" → "150 £"), così il modello vede esempi nella valuta giusta.
+const withCurrencySymbol = (text, currency) => text.replaceAll('€', SPENDY_CURRENCIES[normalizeSpendyCurrency(currency)])
+
 // JSON Schema della risposta (per gli output strutturati del modello).
 export const SPENDY_RESPONSE_SCHEMA = {
   type: 'object',
@@ -568,9 +1171,10 @@ export const SPENDY_RESPONSE_SCHEMA = {
 
 export function buildSpendyPrompt(context, { previous = null, history = [], styleExamples } = {}) {
   const locale = normalizeSpendyLocale(context?.locale)
-  const examples = styleExamples ?? STYLE_EXAMPLES_BY_LOCALE[locale]
+  const currency = normalizeSpendyCurrency(context?.currency)
+  const examples = styleExamples ?? STYLE_EXAMPLES_BY_LOCALE[locale].map((example) => withCurrencySymbol(example, currency))
   return {
-    system: `${SPENDY_PERSONALITY}\n\n${spendyLanguageInstructions(locale)}`,
+    system: `${withCurrencySymbol(SPENDY_PERSONALITY, currency)}\n\n${spendyLanguageInstructions(locale)}\n\n${spendyCurrencyInstructions(currency)}`,
     input: {
       context,
       previous,

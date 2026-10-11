@@ -25,7 +25,7 @@ const PROTECTED_TOPICS = ['religione', 'etnia', 'razza', 'orientamento sessuale'
 // when it's 100% factually correct. Caught structurally (patterns), not
 // by trying to guess intent.
 const DESCRIPTIVE_PATTERNS = [
-  /\d+\s?€?\s*(?:->|→|a)\s*\d+\s?€/i, // "50 € a 200 €" / "50->200"
+  /\d+\s?[€$£]?\s*(?:->|→|a)\s*\d+\s?[€$£]/i, // "50 € a 200 €" / "50 $ a 200 $" / "50->200"
   /\d+\s?%/, // a bare percentage reads like a report, not a joke
   /le (tue )?spese.*(sono|è|risultano) (aumentat|diminuit|sal|sces)/i,
   /(hai speso|you spent|tu as dépensé|gastaste) (molto|troppo|poco|too much|trop|demasiado)/i,

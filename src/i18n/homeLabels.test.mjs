@@ -51,6 +51,7 @@ try {
   const { formatCycleLabel, getCycleRange, getPreviousCycleRange } = await server.ssrLoadModule('/src/utils/cycle.js')
   const { cycleLabelNames } = await server.ssrLoadModule('/src/i18n/cycleLabelNames.js')
   const { translate } = await server.ssrLoadModule('/src/i18n/translate.js')
+  const { formatCurrencyWhole } = await server.ssrLoadModule('/src/utils/format.js')
   const S = useAppStore.getState
   const container = dom.createContainer()
   const caught = []
@@ -92,7 +93,7 @@ try {
       check(`${lang}: stipendio dei cicli precedenti → "${translate(lang, 'budget.cycle.legacy.field', { cycle: e.legacy })}"`,
         shown.includes(translate(lang, 'budget.cycle.legacy.field', { cycle: e.legacy })) && shown.includes(translate(lang, 'budget.cycle.legacy.explainone', { cycles: e.legacy })))
       check(`   ${lang}: nuovo ciclo → "${e.current}", precedente "${e.previous}"`,
-        shown.includes(translate(lang, 'budget.cycle.fresh.current', { cycle: e.current })) && shown.includes(e.previous))
+        shown.includes(translate(lang, 'budget.cycle.fresh.current', { cycle: e.current, zero: formatCurrencyWhole(0, lang) })) && shown.includes(e.previous))
     }
     const october = getCycleRange('2026-10-20', 1)
     check('italiano identico a prima (stessa etichetta di formatCycleLabel senza nomi)', formatCycleLabel(october, 1, cycleLabelNames('it')) === formatCycleLabel(october, 1) && formatCycleLabel(october, 1) === 'Ottobre 2026')
@@ -118,7 +119,7 @@ try {
       const [cur, prev] = EXPECTED[lang]
       const shown = text(container)
       check(`${lang}: ciclo in corso "${cur}", precedente "${prev}"`, formatCycleLabel(current, 27, cycleLabelNames(lang)) === cur && formatCycleLabel(previous, 27, cycleLabelNames(lang)) === prev
-        && shown.includes(translate(lang, 'budget.cycle.fresh.current', { cycle: cur })) && shown.includes(prev))
+        && shown.includes(translate(lang, 'budget.cycle.fresh.current', { cycle: cur, zero: formatCurrencyWhole(0, lang) })) && shown.includes(prev))
     }
     check('italiano identico a prima', formatCycleLabel(current, 27) === '27 Set – 26 Ott')
     await act(() => root.render(null))

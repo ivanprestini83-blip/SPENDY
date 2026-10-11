@@ -3,6 +3,7 @@ import { useAppStore } from '../../store/useAppStore.js'
 import { getCycleRange, formatCycleLabel } from '../../utils/cycle.js'
 import { BackupCard } from '../settings/BackupCard.jsx'
 import { CurrentSalaryCard } from '../settings/CurrentSalaryCard.jsx'
+import { CurrencyCard } from '../settings/CurrencyCard.jsx'
 import { LanguageCard } from '../settings/LanguageCard.jsx'
 import { DeleteAccountCard } from '../settings/DeleteAccountCard.jsx'
 import { PrivacyCard } from '../settings/PrivacyCard.jsx'
@@ -86,6 +87,8 @@ export function SettingsScreen({ onClose }) {
         </div>
 
         <LanguageCard />
+
+        <CurrencyCard />
 
         <SyncCard />
 

@@ -55,6 +55,7 @@ import { getCycleTiming } from './cycle.js'
 import { translate } from '../i18n/translate.js'
 import { normalizeLanguage } from '../i18n/languages.js'
 import { formatCurrencyWhole } from './format.js'
+import { findCelebratedGoal } from './goalReached.js'
 
 export const SPENDY_STATES = {
   HAPPY: 'happy',
@@ -94,10 +95,6 @@ function cyclePhaseOf(financialData, behaviorContext) {
 }
 const CATEGORY_DROP_ADVISOR_AT = -15 // % decrease vs last month
 const CATEGORY_DROP_MIN_AMOUNT = 5 // €, ignore trivial drops
-
-function findReachedGoal(goals) {
-  return goals.find((goal) => goal.saved >= goal.target) ?? null
-}
 
 // Nearest-to-done open goal — where an "advisor" suggestion to redirect
 // savings should point. Same idea as affordability.js's closest-goal
@@ -287,13 +284,22 @@ export function getSpendyCoach(financialData, behaviorContext = null) {
     }
   }
 
-  // 1. Goal celebration — a real milestone, never replaced by anything
-  // else: the user must see it before any routine reaction.
-  const reachedGoal = findReachedGoal(goals)
-  if (reachedGoal) {
+  // 1. Goal celebration — a real milestone, shown before any routine reaction.
+  // Fase 2B.8: solo nella finestra del raggiungimento (il giorno stesso e quello
+  // dopo, goalReached.js): poi l'obiettivo non blocca più la cascata qui sotto.
+  // E la situazione del budget prevale sulla festa (al centesimo, come la card):
+  //   disponibile > 0  festa (celebrating), come prima;
+  //   disponibile = 0  obiettivo riconosciuto con una frase sobria che dice che
+  //                    il budget è esaurito (advisor, nessuna animazione festosa);
+  //   disponibile < 0  niente festa: passa avanti l'avviso di budget superato
+  //                    (livello 2).
+  const reachedGoal = findCelebratedGoal(goals, behaviorContext?.today)
+  const availableCents = typeof financialData?.available === 'number' ? Math.round(financialData.available * 100) : null
+  if (reachedGoal && !(availableCents !== null && availableCents < 0)) {
+    const exhausted = availableCents === 0
     return {
-      state: SPENDY_STATES.CELEBRATING,
-      message: translate(lang, 'coach.goalreached', { goal: reachedGoal.label }),
+      state: exhausted ? SPENDY_STATES.ADVISOR : SPENDY_STATES.CELEBRATING,
+      message: translate(lang, exhausted ? 'coach.goalreachedtight' : 'coach.goalreached', { goal: reachedGoal.label }),
       reason: 'goal_reached',
       priority: 1,
       insight: null,

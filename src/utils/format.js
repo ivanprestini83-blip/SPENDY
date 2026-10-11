@@ -5,31 +5,37 @@
 // dall'utente, mostrati con due decimali (175,50 € resta 175,50 €, mai
 // 176 €: il numero a schermo deve coincidere con quello salvato).
 //
-// La valuta è una sola, l'euro (ACTIVE_CURRENCY). La lingua decide solo
-// separatori e posizione del simbolo:
-//   it 1.794,00 €   en €1,794.00   es 1.794,00 €   fr 1 794,00 €
+// Lingua e valuta sono indipendenti. La valuta è quella dell'account (EUR,
+// USD, GBP: utils/currency.js); la lingua decide separatori e posizione del
+// simbolo, la valuta il simbolo:
+//   EUR  it 1.794,00 €   en €1,794.00   es 1.794,00 €   fr 1 794,00 €
+//   USD  it 1.794,00 $   en $1,794.00   es 1.794,00 $   fr 1 794,00 $
+//   GBP  it 1.794,00 £   en £1,794.00   es 1.794,00 £   fr 1 794,00 £
+// Nessuna conversione: 2000 resta 2000, cambia solo il simbolo.
 //
-// `language` è facoltativo: senza, vale la lingua corrente dell'app
-// (i18n/currentLanguage.js), così i chiamanti di prima continuano a
-// funzionare. Chi ha già una lingua sua (motori con `lang`, componenti con
-// useLanguage) la passa esplicitamente.
+// `language` e `currency` sono facoltativi: senza, valgono la lingua e la
+// valuta correnti dell'app (i18n/currentLanguage.js, currentCurrency), così
+// i chiamanti di prima continuano a funzionare. Chi ha già una lingua sua
+// (motori con `lang`, componenti con useLanguage) la passa esplicitamente.
 import { currentLanguage } from '../i18n/currentLanguage.js'
 import { languageInfo } from '../i18n/languages.js'
-
-export const ACTIVE_CURRENCY = 'EUR'
+import { currentCurrency, normalizeCurrency } from './currency.js'
 
 const formatters = new Map()
-function formatterFor(language, kind) {
+function formatterFor(language, kind, currency) {
   const locale = languageInfo(language).locale
-  const key = `${locale}|${kind}`
+  const code = normalizeCurrency(currency)
+  const key = `${locale}|${kind}|${kind === 'money' || kind === 'whole' ? code : ''}`
   if (!formatters.has(key)) {
-    const options = kind === 'money'
-      // narrowSymbol: "€", mai "EUR"; separatore delle migliaia sempre
-      // (anche 1.794,00, non solo da 10.000 come fa l'italiano di Intl).
-      ? { style: 'currency', currency: ACTIVE_CURRENCY, currencyDisplay: 'narrowSymbol', useGrouping: 'always', minimumFractionDigits: 2, maximumFractionDigits: 2 }
-      : kind === 'integer'
-        ? { useGrouping: 'always', maximumFractionDigits: 0 }
-        : { useGrouping: 'always', maximumFractionDigits: 1 }
+    // narrowSymbol: "€", "$", "£" (mai "EUR", "US$", "$US"); separatore delle
+    // migliaia sempre (anche 1.794,00, non solo da 10.000 come fa l'italiano).
+    const money = { style: 'currency', currency: code, currencyDisplay: 'narrowSymbol', useGrouping: 'always' }
+    const options = {
+      money: { ...money, minimumFractionDigits: 2, maximumFractionDigits: 2 },
+      whole: { ...money, minimumFractionDigits: 0, maximumFractionDigits: 0 },
+      integer: { useGrouping: 'always', maximumFractionDigits: 0 },
+      decimal1: { useGrouping: 'always', maximumFractionDigits: 1 },
+    }[kind]
     formatters.set(key, new Intl.NumberFormat(locale, options))
   }
   return formatters.get(key)
@@ -57,21 +63,21 @@ const render = (formatter, value) => formatter.formatToParts(value)
   .map((part) => (part.type === 'group' ? READABLE_GROUP[part.value] ?? part.value : plainSpaces(part.value)))
   .join('')
 
-export function formatCurrency(value, language = currentLanguage()) {
-  return render(formatterFor(language, 'money'), finiteOrZero(value))
+export function formatCurrency(value, language = currentLanguage(), currency = currentCurrency()) {
+  return render(formatterFor(language, 'money', currency), finiteOrZero(value))
 }
 
-// Il simbolo della valuta attiva, per i campi d'importo ("€").
-export function currencySymbol(language = currentLanguage()) {
-  return formatterFor(language, 'money').formatToParts(0).find((part) => part.type === 'currency')?.value ?? '€'
+// Il simbolo della valuta attiva, per i campi d'importo ("€", "$", "£").
+export function currencySymbol(language = currentLanguage(), currency = currentCurrency()) {
+  return formatterFor(language, 'money', currency).formatToParts(0).find((part) => part.type === 'currency')?.value ?? '€'
 }
 
 // Un importo nascosto ("nascondi gli importi"): le cifre diventano ••••, il
-// simbolo resta al suo posto per quella lingua ("•••• €", "€••••").
-export function maskedCurrency(language = currentLanguage()) {
-  const parts = formatterFor(language, 'money').formatToParts(0)
+// simbolo resta al suo posto per quella lingua ("•••• €", "$••••").
+export function maskedCurrency(language = currentLanguage(), currency = currentCurrency()) {
+  const parts = formatterFor(language, 'money', currency).formatToParts(0)
   const symbolFirst = parts.findIndex((part) => part.type === 'currency') < parts.findIndex((part) => part.type === 'integer')
-  const symbol = currencySymbol(language)
+  const symbol = currencySymbol(language, currency)
   return symbolFirst ? `${symbol}••••` : `•••• ${symbol}`
 }
 
@@ -91,16 +97,10 @@ export function formatSignedPercent(value) {
 }
 
 // Un importo intero, senza decimali, per le frasi che parlano di cifre
-// tonde (soglie, limiti, importi già arrotondati all'euro dai motori):
-//   it 1.794 €   en €1,794   es 1.794 €   fr 1 794 €
-// Arrotonda solo la scrittura, mai il valore. Aggiunta a parte: le funzioni
-// qui sopra restano come sono.
-const wholeFormatters = new Map()
-export function formatCurrencyWhole(value, language = currentLanguage()) {
-  const locale = languageInfo(language).locale
-  if (!wholeFormatters.has(locale)) {
-    wholeFormatters.set(locale, new Intl.NumberFormat(locale, { style: 'currency', currency: ACTIVE_CURRENCY, currencyDisplay: 'narrowSymbol', useGrouping: 'always', minimumFractionDigits: 0, maximumFractionDigits: 0 }))
-  }
+// tonde (soglie, limiti, importi già arrotondati all'unità dai motori):
+//   it 1.794 €   en $1,794   es 1.794 £   fr 1 794 €
+// Arrotonda solo la scrittura, mai il valore.
+export function formatCurrencyWhole(value, language = currentLanguage(), currency = currentCurrency()) {
   const rounded = Number.isFinite(value) ? Math.round(value) : 0
-  return render(wholeFormatters.get(locale), rounded === 0 ? 0 : rounded)
+  return render(formatterFor(language, 'whole', currency), rounded === 0 ? 0 : rounded)
 }

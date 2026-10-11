@@ -6,6 +6,18 @@ export default {
       current: 'Idioma actual: {language}',
       partial: 'La traducción de la app está en curso: algunas pantallas siguen por ahora en italiano.',
     },
+    currency: {
+      title: 'Moneda',
+      hint: 'La moneda de referencia de tu cuenta, para todos los importes. Es independiente del idioma.',
+      current: 'Moneda actual: {currency}',
+      names: { eur: 'Euro', usd: 'Dólar estadounidense', gbp: 'Libra esterlina' },
+      confirm: {
+        title: '¿Cambiar a {currency}?',
+        text: 'Los importes que ya has introducido no se convierten: los números siguen siendo los mismos y a partir de ahora se refieren a {currency}. El cambio vale para toda la cuenta.',
+        yes: 'Confirmar',
+        no: 'Cancelar',
+      },
+    },
   },
   home: {
     header: {
@@ -65,9 +77,9 @@ export default {
       fresh: {
         title: 'Ha empezado un nuevo ciclo',
         previous: 'El ciclo {cycle} queda guardado en Evolución: ingresos {income}, gastos {spent}.',
-        current: 'El nuevo ciclo ({cycle}) empieza desde 0\u00a0€: los ingresos y el disponible siguen en cero hasta que añadas el nuevo sueldo.',
+        current: 'El nuevo ciclo ({cycle}) empieza desde {zero}: los ingresos y el disponible siguen en cero hasta que añadas el nuevo sueldo.',
         addsalary: 'Añadir el nuevo sueldo',
-        startzero: 'Empezar el ciclo desde 0\u00a0€',
+        startzero: 'Empezar el ciclo desde {zero}',
       },
     },
   },
@@ -120,6 +132,7 @@ export default {
   coach: {
     waiting: '🦊 Estoy esperando... ¿a qué esperas tú? ¡Configura tus ingresos mensuales y empezamos!',
     goalreached: '🎉 ¡Objetivo "{goal}" conseguido! Esta vez invito yo... virtualmente 😂',
+    goalreachedtight: '🎯 ¡Objetivo "{goal}" conseguido, enhorabuena! Pero el presupuesto de este ciclo se ha agotado: lo celebramos sin gastar.',
     ontrack: '😎 ¡Bien! Por ahora vas por debajo del presupuesto en este ciclo.',
     drop: {
       goal: 'Has reducido tus gastos en {category} un {percent}%. Podrías pasar {amount} a "{goal}".',
@@ -152,6 +165,14 @@ export default {
       positivestreak: 'Varios ciclos seguidos por debajo del presupuesto.',
       negativestreak: 'Varios ciclos seguidos por encima del umbral de atención.',
     },
+  },
+  // Fase 2B.3: la frase di fatti sotto una risposta di Spendy AI, scritta dal
+  // codice e mai dal modello ({amount} = importo già formattato).
+  spendyai: {
+    overbudget: 'Presupuesto superado en {amount}.',
+    // Fase 2B.4: a budget sano le cifre del budget le scrive l'app, non il modello.
+    available: 'Disponible: {amount}.',
+    availabledaily: 'Disponible: {amount}, unos {daily} al día.',
   },
   mascot: {
     badge: {

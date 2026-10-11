@@ -23,7 +23,7 @@ import { MESSAGES, translate } from './translate.js'
 import { humorLibrary } from '../utils/humorLibrary.js'
 import * as reactionLibrary from '../data/spendyReactionLibrary.js'
 import { getSpendyCoach } from '../utils/spendyCoach.js'
-import { evaluateExpenseReaction } from '../utils/expenseReactionEngine.js'
+import { evaluateExpenseReaction, resolveReactionText } from '../utils/expenseReactionEngine.js'
 import { buildRadar, pickQuietMessage, RADAR_STATUS } from '../utils/radarEngine.js'
 import { evaluateAffordability } from '../utils/affordability.js'
 import {
@@ -60,7 +60,8 @@ const leftoverItalian = (text, lang, keys = NEW_KEYS) => {
 section('1. Dizionari: nessuna chiave mancante, parametri identici')
 // =====================================================================
 // 150 della Fase 4A + 6 testi alternativi dell'immagine di Spendy (mascot.alt.*).
-check(`chiavi nuove della Fase 4A: ${NEW_KEYS.length}`, NEW_KEYS.length === 156, NEW_KEYS.length)
+// Fase 2B.7: +1 (coach.goalreachedtight, obiettivo raggiunto con il budget finito).
+check(`chiavi nuove della Fase 4A: ${NEW_KEYS.length}`, NEW_KEYS.length === 157, NEW_KEYS.length)
 for (const lang of LANGS) {
   const missing = NEW_KEYS.filter((key) => typeof lookup(MESSAGES[lang], key) !== 'string' || !lookup(MESSAGES[lang], key).trim())
   check(`${lang}: tutte presenti e non vuote`, missing.length === 0, missing.join(', '))
@@ -82,7 +83,9 @@ for (const lang of LANGS) {
     for (const m of source.matchAll(/'((?:coach|mascot|radarcard|affordability|notifications|categories)\.[a-z.]+)'/g)) used.add(m[1])
     if (PREFIX[path]) for (const m of source.matchAll(/\bt\('([a-z.]+)'/g)) used.add(PREFIX[path] + m[1])
     if (PREFIX[path]) for (const m of source.matchAll(/\)\('([a-z.]+)'\)/g)) used.add(PREFIX[path] + m[1])
-    for (const m of source.matchAll(/\? '([a-z]+\.[a-z.]+)' : '([a-z]+\.[a-z.]+)'/g)) { used.add(PREFIX[path] + m[1]); used.add(PREFIX[path] + m[2]) }
+    // Una chiave già completa ("coach.goalreached") non va prefissata (Fase 2B.7).
+    const keyOf = (key) => (AREAS.includes(key.split('.')[0]) ? key : PREFIX[path] + key)
+    for (const m of source.matchAll(/\? '([a-z]+\.[a-z.]+)' : '([a-z]+\.[a-z.]+)'/g)) { used.add(keyOf(m[1])); used.add(keyOf(m[2])) }
   }
   for (const level of ['concerned', 'attentive']) for (const phase of ['early', 'middle', 'finaldays', 'lastday', 'neutral']) used.add(`coach.warning.${level}.${phase}`)
   for (const state of ['happy', 'attentive', 'concerned', 'ironic', 'advisor', 'celebrating']) used.add(`mascot.badge.${state}`)
@@ -191,7 +194,13 @@ section('4. Coach: le frasi fisse, stesse soglie')
 section('5. Reazioni alle spese: stessa scelta, nella lingua scelta')
 // =====================================================================
 {
-  const pool = (lang, group) => reactionLibrary.REACTION_LIBRARY[lang][group]
+  // Le frasi come le mostra l'app (valuta di default EUR): gli importi sono
+  // segnaposto risolti dal motore (Fase 3D).
+  const resolve = (lang) => (text) => resolveReactionText(text, lang, 'EUR')
+  const pool = (lang, group) => {
+    const entry = reactionLibrary.REACTION_LIBRARY[lang][group]
+    return Array.isArray(entry) ? entry.map(resolve(lang)) : resolve(lang)(entry)
+  }
   const react = (lang, { expenses, monthlyBudget = 2000, goals = [], available = 1000, rng, jokeHistory = [] }) => evaluateExpenseReaction({
     today: TODAY, expenses, monthlyBudget, cycleStartDay: 1, goals, financialData: { available }, jokeHistory, rng, lang,
   })
@@ -379,16 +388,36 @@ const text = (node) => (typeof node?.data === 'string' ? node.data : (node?.chil
 const cls = (node) => node.attributes?.get?.('class') ?? ''
 const DATA_FIELDS = ['monthlyBudget', 'cycleStartDay', 'expenses', 'incomes', 'customCategories', 'goals', 'emergencyFundSaved', 'spendyAIEnabled']
 const dataOf = (state) => JSON.stringify(Object.fromEntries(DATA_FIELDS.map((field) => [field, state[field]])))
+let realRandom = null // Math.random originale, mentre il test la fissa (sezione 10)
 
 try {
   const { useAppStore } = await server.ssrLoadModule('/src/store/useAppStore.js')
   const { default: App } = await server.ssrLoadModule('/src/App.jsx')
   const LIB = (await server.ssrLoadModule('/src/data/spendyReactionLibrary.js')).REACTION_LIBRARY
+  // Le frasi della libreria sono MODELLI ("{amount:100} {gender:superati|superate}…"):
+  // l'app le risolve per lingua e valuta prima di sceglierle. Il confronto si fa
+  // con le frasi risolte nello stesso modo (resolveReactionText, la funzione
+  // dell'app), non con i modelli grezzi: prima il test falliva ogni volta che la
+  // scelta casuale cadeva su una frase con segnaposto (instabile, 1–5 volte su 10).
+  const { resolveReactionText } = await server.ssrLoadModule('/src/utils/expenseReactionEngine.js')
+  const resolvedPool = (lang, pool) => pool.map((phrase) => resolveReactionText(phrase, lang, 'EUR'))
   const S = useAppStore.getState
   const caught = []
   const container = dom.createContainer()
   const root = createRoot(container, { onCaughtError: (e) => caught.push(e), onUncaughtError: (e) => caught.push(e), onRecoverableError: () => {} })
   const hero = () => text(nodes(container).find((n) => cls(n) === 'spendy-hero__message'))
+
+  // La casualità, fissata SOLO nel test e solo per questo scenario: il motore
+  // delle reazioni usa Math.random di default (rng in expenseReactionEngine.js;
+  // la Home non ne passa un altro, e in produzione resta casuale). Il valore
+  // scelto è fuori dalla frase rara (8%) e porta su una frase CON segnaposto del
+  // gruppo "oltre 100 €": così ogni esecuzione verifica anche la loro risoluzione.
+  // Ripristinato nel finally qui sotto.
+  const OVER100_RAW = (lang) => [...LIB[lang].SPESA_100, ...LIB[lang].SPESA_INUTILE]
+  const TEMPLATED_INDEX = OVER100_RAW('it').findIndex((phrase, i) => phrase.includes('{amount:') && (i + 0.5) / OVER100_RAW('it').length >= 0.08)
+  const FIXED_RANDOM = (TEMPLATED_INDEX + 0.5) / OVER100_RAW('it').length
+  realRandom = Math.random
+  Math.random = () => FIXED_RANDOM
 
   S().switchScope('u:utente-fase-4a')
   await act(() => root.render(h(App)))
@@ -400,15 +429,19 @@ try {
     S().addExpense({ amount: 150, categoryId: 'casa', description: 'affitto box', date: today })
   })
   // Nell'app la scelta è casuale: di solito il gruppo "oltre 100 €", a volte
-  // (8%) una frase rara. Si cerca dove sta la frase italiana mostrata.
-  const GROUPS = { over100: (lang) => [...LIB[lang].SPESA_100, ...LIB[lang].SPESA_INUTILE], rare: (lang) => LIB[lang].RARE_SPECIALI }
+  // (8%) una frase rara. Si cerca dove sta la frase italiana mostrata, tra le
+  // frasi RISOLTE (la ricerca resta: il test non presume quale sia uscita).
+  const GROUPS = { over100: (lang) => resolvedPool(lang, OVER100_RAW(lang)), rare: (lang) => resolvedPool(lang, LIB[lang].RARE_SPECIALI) }
   const itMessage = hero()
   const [group, index] = Object.entries(GROUPS).map(([name, pool]) => [name, pool('it').indexOf(itMessage)]).find(([, i]) => i >= 0) ?? [null, -1]
   check('Home: Spendy reagisce alla spesa di oggi (oltre 100 €) in italiano', index >= 0, itMessage)
+  check('   con la casualità fissata del test: la frase con segnaposto attesa, risolta ("100 €", accordo al maschile per l\'euro)',
+    group === 'over100' && index === TEMPLATED_INDEX && itMessage === resolveReactionText(OVER100_RAW('it')[TEMPLATED_INDEX], 'it', 'EUR') && itMessage.includes('100 €') && !/[{}]/.test(itMessage), itMessage)
   const before = dataOf(S())
   for (const lang of ['en', 'es', 'fr', 'it']) {
     await act(() => S().setLanguage(lang))
     check(`${lang}: la stessa reazione, tradotta, subito (senza reload)`, group !== null && hero() === GROUPS[group](lang)[index], hero())
+    check(`   ${lang}: nessun segnaposto non risolto`, !/[{}]/.test(hero()), hero())
   }
   // Spese: il nome della categoria predefinita segue la lingua; i dati no.
   await act(() => S().setLanguage('fr'))
@@ -429,7 +462,13 @@ try {
   // Spendy AI: preferenza attiva, app in inglese → finché non c'è una frase AI
   // (qui: ospite, nessuna chiamata) Spendy usa la sua frase locale in inglese.
   await act(() => { useAppStore.setState({ spendyAIEnabled: true }); S().setLanguage('en'); S().setActiveTab('home') })
-  check('AI attiva + inglese: senza frase AI Spendy usa la frase locale in inglese, la preferenza resta salvata', LIB.en.SPESA_100.concat(LIB.en.SPESA_INUTILE, LIB.en.BUDGET_SUPERATO, LIB.en.SPESA_ENORME_1000, LIB.en.SPESA_ENORME_500, LIB.en.RARE_SPECIALI).includes(hero()) && S().spendyAIEnabled === true, hero())
+  // Le frasi locali inglesi RISOLTE come le risolve l'app (prima: modelli grezzi
+  // con {amount:…}, e il controllo falliva quando usciva una di quelle).
+  const englishLocal = resolvedPool('en', LIB.en.SPESA_100.concat(LIB.en.SPESA_INUTILE, LIB.en.BUDGET_SUPERATO, LIB.en.SPESA_ENORME_1000, LIB.en.SPESA_ENORME_500, LIB.en.RARE_SPECIALI))
+  check('AI attiva + inglese: senza frase AI Spendy usa la frase locale in inglese, la preferenza resta salvata', englishLocal.includes(hero()) && !/[{}]/.test(hero()) && S().spendyAIEnabled === true, hero())
+  check('   la frase locale inglese non è una frase italiana (fallback nella lingua giusta)', !resolvedPool('it', [...LIB.it.SPESA_100, ...LIB.it.SPESA_INUTILE, ...LIB.it.BUDGET_SUPERATO, ...LIB.it.SPESA_ENORME_1000, ...LIB.it.SPESA_ENORME_500, ...LIB.it.RARE_SPECIALI]).includes(hero()), hero())
+  Math.random = realRandom
+  realRandom = null
   // Impostazioni → Spendy AI: la nota "parla solo italiano" della Fase 4A non c'è più.
   await act(() => S().openModal('settings'))
   check('Impostazioni (inglese, AI attiva): nessuna nota "solo italiano"', !text(container).includes('only speaks Italian') && translate('en', 'settings.ai.italianonly') === 'settings.ai.italianonly')
@@ -571,6 +610,7 @@ try {
   check('nessun errore di rendering', caught.length === 0, caught[0]?.message)
   await act(() => root.unmount())
 } finally {
+  if (realRandom) Math.random = realRandom
   await server.close()
 }
 

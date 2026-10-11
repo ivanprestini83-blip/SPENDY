@@ -6,6 +6,18 @@ export default {
       current: 'Current language: {language}',
       partial: 'The app is being translated: some screens are still in Italian for now.',
     },
+    currency: {
+      title: 'Currency',
+      hint: 'Your account’s reference currency, for every amount. It’s independent of the language.',
+      current: 'Current currency: {currency}',
+      names: { eur: 'Euro', usd: 'US dollar', gbp: 'British pound' },
+      confirm: {
+        title: 'Switch to {currency}?',
+        text: 'Amounts you’ve already entered won’t be converted: the numbers stay the same and will refer to {currency} from now on. This applies to your whole account.',
+        yes: 'Confirm',
+        no: 'Cancel',
+      },
+    },
   },
   home: {
     header: {
@@ -65,9 +77,9 @@ export default {
       fresh: {
         title: 'A new cycle has started',
         previous: 'The {cycle} cycle stays saved in Trends: income {income}, spending {spent}.',
-        current: 'The new cycle ({cycle}) starts from €0: income and available stay at zero until you add your new salary.',
+        current: 'The new cycle ({cycle}) starts from {zero}: income and available stay at zero until you add your new salary.',
         addsalary: 'Add your new salary',
-        startzero: 'Start the cycle from €0',
+        startzero: 'Start the cycle from {zero}',
       },
     },
   },
@@ -120,6 +132,7 @@ export default {
   coach: {
     waiting: '🦊 I’m waiting... what are you waiting for? Set your monthly income and we’re off!',
     goalreached: '🎉 Goal "{goal}" reached! This one’s on me... virtually 😂',
+    goalreachedtight: '🎯 Goal "{goal}" reached, well done! This cycle’s budget is used up, though: we celebrate for free.',
     ontrack: '😎 Nice! You’re under budget this cycle, for now.',
     drop: {
       goal: 'You cut your {category} spending by {percent}%. You could move {amount} to "{goal}".',
@@ -152,6 +165,14 @@ export default {
       positivestreak: 'Several cycles in a row under budget.',
       negativestreak: 'Several cycles in a row above the warning threshold.',
     },
+  },
+  // Fase 2B.3: la frase di fatti sotto una risposta di Spendy AI, scritta dal
+  // codice e mai dal modello ({amount} = importo già formattato).
+  spendyai: {
+    overbudget: 'Over budget by {amount}.',
+    // Fase 2B.4: a budget sano le cifre del budget le scrive l'app, non il modello.
+    available: 'Available: {amount}.',
+    availabledaily: 'Available: {amount}, about {daily} a day.',
   },
   mascot: {
     badge: {

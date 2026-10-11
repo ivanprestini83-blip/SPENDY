@@ -16,7 +16,7 @@
 import { getCategory } from '../data/categories.js'
 import { getCycleTiming } from '../utils/cycle.js'
 import { todaysExpenses } from '../utils/budgetCalculations.js'
-import { normalizeSpendyLocale } from '../../supabase/functions/_shared/spendyAIRules.js'
+import { normalizeSpendyCurrency, normalizeSpendyLocale } from '../../supabase/functions/_shared/spendyAIRules.js'
 import { SPENDY_EVENTS } from './spendyEvents.js'
 
 export const SPENDY_AI_CONTEXT_VERSION = 1
@@ -32,6 +32,11 @@ export function budgetBand({ available, spentPercent }) {
 }
 
 const round = (value) => (Number.isFinite(value) ? Math.round(value) : null)
+// Fase 2B.5: il disponibile tiene i centesimi, come lo mostra la BudgetCard
+// (493,60 € non diventa 494 €, e -0,40 € non diventa 0). È lo stesso dato
+// (financialData.available), non un secondo calcolo. Il modello non lo scrive
+// mai (cifra del budget riservata all'app): serve alla riga di fatti.
+const toCents = (value) => (Number.isFinite(value) ? Math.round(value * 100) / 100 : null)
 
 function categoryLabel(categoryId, insight) {
   if (insight?.category?.label) return insight.category.label
@@ -167,9 +172,11 @@ function fingerprintOf({ band, primary, others }) {
 // (un caffè in più non deve chiedere una frase nuova): servono solo a non
 // riproporre dalla cache una frase con numeri che nel frattempo sono cambiati.
 // C'è anche la lingua: una frase generata in un'altra lingua non si ripropone.
+// E la valuta: una frase scritta in euro non si ripropone a chi è passato ai dollari.
 function financialFactsOf(context) {
   return JSON.stringify({
     locale: context.locale,
+    currency: context.currency,
     budget: context.budget,
     spending: context.spending,
     primaryEvent: context.primaryEvent,
@@ -190,6 +197,7 @@ export function buildSpendyAIContext({
   cycleStartDay = 1,
   goals = [],
   locale,
+  currency,
 } = {}) {
   const monthly = financialData?.monthlyBudget ?? 0
   const available = financialData?.available ?? 0
@@ -203,7 +211,7 @@ export function buildSpendyAIContext({
   const budget = {
     monthly: round(monthly),
     spent: round(financialData?.spentThisMonth ?? 0),
-    available: round(available),
+    available: toCents(available),
     spentPercent,
     daysRemaining: timing.daysRemaining,
     cyclePhase: timing.phase,
@@ -225,6 +233,10 @@ export function buildSpendyAIContext({
     version: SPENDY_AI_CONTEXT_VERSION,
     // La lingua scelta nell'app: il server la ricontrolla (it/en/es/fr, altrimenti it).
     locale: normalizeSpendyLocale(locale),
+    // La valuta dell'account (EUR, USD, GBP; il server la ricontrolla, EUR se
+    // non valida). Gli importi qui sotto sono numeri in questa valuta: nessuna
+    // conversione, e indipendente dalla lingua.
+    currency: normalizeSpendyCurrency(currency),
     today,
     budget,
     spending,

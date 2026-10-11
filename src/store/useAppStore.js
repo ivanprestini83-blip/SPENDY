@@ -10,6 +10,8 @@ import { settingsToLocal } from '../sync/mappers.js'
 import { addToState, markAllReadInState, markReadInState, removeFromState, sanitizeNotificationState } from '../notifications/notificationState.js'
 import { STATE_BASE, createScopeManager, isUserScope, isValidScope, ownerOf, scopeFor } from './scope.js'
 import { isValidAmount, isValidBudget } from '../utils/amounts.js'
+import { goalReachedOn } from '../utils/goalReached.js'
+import { DEFAULT_CURRENCY, isCurrency, normalizeCurrency } from '../utils/currency.js'
 import { SALARY_CATEGORY_ID, isSalary } from '../utils/salary.js'
 import { DEFAULT_LANGUAGE, LEGACY_LANGUAGE, normalizeLanguage } from '../i18n/languages.js'
 import { deviceStorage, ensureLanguagePreference, readLanguagePreference, writeLanguagePreference } from '../i18n/languagePreference.js'
@@ -44,10 +46,15 @@ const tombstone = (row) => {
 // sempre la somma dei suoi versamenti. È ciò che rende impossibile
 // perdere un versamento fatto contemporaneamente da due dispositivi —
 // due righe si sommano, due incrementi si sovrascrivono.
+// Fase 2B.8: anche `reachedOn` (il giorno in cui il totale ha raggiunto il
+// target) è derivato dai versamenti, come `saved`: si ricalcola in ogni
+// percorso che passa di qui (creazione, versamento, dati scaricati dal cloud,
+// riapertura) e non viene mai inviato al server (goalToRemote non lo elenca).
 const recomputeGoals = (goals, goalContributions) =>
   goals.map((goal) => ({
     ...goal,
     saved: sumAmounts(goalContributions.filter((contribution) => contribution.goalId === goal.id)),
+    reachedOn: goalReachedOn(goal, goalContributions),
   }))
 
 // Le impostazioni viaggiano come riga unica (tabella profiles).
@@ -100,7 +107,7 @@ const MAX_REJECTED = 50
 // liste non divergano.
 export const emptyScopeState = () => ({
   monthlyBudget: 0,
-  currency: '€',
+  currency: DEFAULT_CURRENCY,
   cycleStartDay: null,
   amountHidden: false,
   spendyAIEnabled: false,
@@ -209,7 +216,9 @@ export const useAppStore = create(
       }),
 
       monthlyBudget: 0,
-      currency: '€',
+      // Codice ISO della valuta dell'account (utils/currency.js): EUR per tutti
+      // finché l'utente non ne sceglie un'altra in Impostazioni.
+      currency: DEFAULT_CURRENCY,
       // Which day-of-month the user's billing cycle starts on (1-31) —
       // null means "not set yet", which behaves exactly like calendar
       // months (cycle day 1) everywhere cycle.js is used. Auto-set the
@@ -277,6 +286,12 @@ export const useAppStore = create(
       // chiamata all'AI (vedi ai/useSpendyVoice.js).
       spendyAIEnabled: false,
       setSpendyAIEnabled: (enabled) => set((state) => withSettingsOp(state, { spendyAIEnabled: enabled === true })),
+
+      // La valuta di riferimento dell'account (EUR, USD, GBP), scelta in
+      // Impostazioni dopo una conferma. Viaggia con le impostazioni come il
+      // budget. Cambia SOLO l'etichetta: nessun importo viene convertito o
+      // toccato. Un codice non supportato, o la valuta già attiva, non fa nulla.
+      setCurrency: (code) => set((state) => (!isCurrency(code) || code === state.currency ? {} : withSettingsOp(state, { currency: code }))),
 
       // Le versioni di Termini e Privacy che il SERVER ha confermato per
       // questo account (legal/legalGate.js currentLegalVersionKey). Solo una
@@ -786,6 +801,11 @@ export const useAppStore = create(
         // lingua, o con un valore non valido: italiano (utenti esistenti).
         const device = readLanguagePreference(deviceStorage())
         state.language = device ? device.language : normalizeLanguage(state.language, LEGACY_LANGUAGE)
+
+        // Contenitori salvati con il simbolo ('€', le versioni precedenti) o
+        // senza valuta: il codice ISO, EUR se non si riconosce. Solo la
+        // preferenza: nessun importo cambia.
+        state.currency = normalizeCurrency(state.currency)
 
         // Contenitori salvati prima delle notifiche, o con dati non validi.
         Object.assign(state, sanitizeNotificationState(state.notifications, state.notificationKeys))

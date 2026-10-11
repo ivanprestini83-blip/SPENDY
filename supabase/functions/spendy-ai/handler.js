@@ -206,6 +206,13 @@ export function parseModelJson(text) {
   }
 }
 
+// Risposta del modello scartata: all'app arriva solo questo, sempre uguale
+// (Fase 2B.1). Prima il 422 riportava gli errori del controllo, compresi i
+// numeri inventati ("invented_numbers:1234"): restano SOLO nei log, ridotti
+// al codice (logErrorCodes). L'app tratta ogni 422 come 'invalid' e mostra
+// la frase locale.
+export const INVALID_RESPONSE = Object.freeze({ error: 'invalid', message: 'response_rejected' })
+
 // Nei log solo il codice di ogni errore del controllo, mai ciò che lo segue:
 // "invented_numbers:9999" → "invented_numbers", "repeated_structure:open:…"
 // → "repeated_structure" (né importi né parole della risposta del modello).
@@ -404,12 +411,12 @@ export function createSpendyAIHandler({
     const parsed = parseModelJson(result.text)
     if (!parsed) {
       log({ outcome: 'invalid', event: eventId, errors: ['not_json'], stopReason: result.stopReason, model: result.model ?? config.model, ...usageLog })
-      return json(422, { error: 'invalid', details: ['not_json'] })
+      return json(422, INVALID_RESPONSE)
     }
     const checked = validateSpendyResponse(parsed, context, { history, previous })
     if (!checked.valid) {
       log({ outcome: 'invalid', event: eventId, errors: logErrorCodes(checked.errors), model: result.model ?? config.model, ...usageLog })
-      return json(422, { error: 'invalid', details: checked.errors })
+      return json(422, INVALID_RESPONSE)
     }
 
     log({

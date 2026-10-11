@@ -39,7 +39,7 @@ const EMERGENCY_FUND_TARGET_MONTHS = 6
 // mutates, this component re-renders, buildFinancialData/getSpendyCoach
 // just recompute from the latest numbers.
 export function HomePage() {
-  const { t, language } = useLanguage()
+  const { t, language, currency } = useLanguage()
   const today = useAppStore((state) => state.today)
   // L'ultimo stipendio inserito: solo per l'obiettivo del fondo emergenza
   // (logica invariata, monthlyBudget × mesi).
@@ -100,8 +100,10 @@ export function HomePage() {
       financialData: buildFinancialData({ today, monthlyBudget, expenses, incomes, goals, cycleStartDay }),
       rng: () => 0,
       lang: language,
+      currency,
     }),
-    [expenses, goals, today, monthlyBudget, cycleStartDay, incomes, jokeHistory, language],
+    // `currency`: le schede scrivono importi; cambiandola si riscrivono subito.
+    [expenses, goals, today, monthlyBudget, cycleStartDay, incomes, jokeHistory, language, currency],
   )
 
   // Remember a behavior-engine joke once it's actually shown, so the same

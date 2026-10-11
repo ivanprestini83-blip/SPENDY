@@ -10,16 +10,22 @@
 //
 // Nuove frasi vanno aggiunte qui manualmente in futuro — mai generate
 // automaticamente.
+//
+// Importi: mai scritti a mano, perché la valuta è una scelta dell'account
+// (EUR, USD, GBP). `{amount:100}` è 100 nella lingua e nella valuta della
+// frase ("100 €", "$100", "100 £"); `{gender:spariti|sparite}` sceglie la
+// parola che si accorda al nome della valuta (le sterline sono femminili in
+// italiano, spagnolo e francese). Li risolve expenseReactionEngine.js.
 
 // 🛍️ 1. SPESA >100 € — SORPRESA IMMEDIATA
 export const SPESA_100 = [
-  'Ops. Sono spariti più di 100 €. Li hai visti?',
-  'Oltre 100 €? Così, senza nemmeno avvisarmi?',
+  'Ops. Sono {gender:spariti|sparite} più di {amount:100}. {gender:Li hai visti|Le hai viste}?',
+  'Oltre {amount:100}? Così, senza nemmeno avvisarmi?',
   'Aspetta… quanto hai appena speso?!',
-  '100 € superati. Il tuo conto ha appena deglutito.',
+  '{amount:100} {gender:superati|superate}. Il tuo conto ha appena deglutito.',
   'E niente, oggi il conto corrente non festeggia.',
   'Questa non è più una piccola spesa. È una dichiarazione.',
-  'Più di 100 €? Abbiamo perso il senso della misura?',
+  'Più di {amount:100}? Abbiamo perso il senso della misura?',
   'Io avrei almeno chiesto il permesso al portafoglio.',
   'Interessante… avevamo proprio deciso di spendere così tanto?',
   'Questa cifra merita almeno una spiegazione.',
@@ -74,17 +80,17 @@ export const BUDGET_SUPERATO = [
 
 // 🔥 5. SPESA ENORME — €500–999
 export const SPESA_ENORME_500 = [
-  '500 €?! Aspetta, mi devo sedere.',
+  '{amount:500}?! Aspetta, mi devo sedere.',
   'Questa non è una spesa. È un evento.',
   'Il conto corrente ha appena chiesto una pausa.',
-  '500 € evaporati. Almeno salutali.',
+  '{amount:500} {gender:evaporati|evaporate}. Almeno {gender:salutali|salutale}.',
   'Ok. Questa la voglio proprio capire.',
   'Per questa cifra pretendo almeno una bella storia.',
 ]
 
 // 🔥 5. SPESA ENORME — €1.000+
 export const SPESA_ENORME_1000 = [
-  '1.000 €?! Io sono una volpe, non un investigatore.',
+  '{amount:1000}?! Io sono una volpe, non un investigatore.',
   'FERMO. Qui dobbiamo parlarne.',
   'Mille euro?! Il tuo conto ha appena visto la luce.',
   'Questa spesa ha bisogno di una conferenza stampa.',
@@ -194,13 +200,13 @@ const EN_GOAL_DAMAGED = [
 
 const EN = {
   SPESA_100: [
-    'Oops. Over €100 just vanished. Did you see them go?',
-    'Over €100? Just like that, without even warning me?',
+    'Oops. Over {amount:100} just vanished. Did you see them go?',
+    'Over {amount:100}? Just like that, without even warning me?',
     'Wait… how much did you just spend?!',
-    '€100 and counting. Your account just gulped.',
+    '{amount:100} and counting. Your account just gulped.',
     'Well, your bank account isn’t celebrating today.',
     'This isn’t a small purchase anymore. It’s a statement.',
-    'More than €100? Have we lost all sense of proportion?',
+    'More than {amount:100}? Have we lost all sense of proportion?',
     'I’d have at least asked your wallet for permission.',
     'Interesting… did we really decide to spend that much?',
     'This amount deserves at least an explanation.',
@@ -245,15 +251,15 @@ const EN = {
     'The budget’s gone. The spending, on the other hand, seems to be doing great.',
   ],
   SPESA_ENORME_500: [
-    '€500?! Hang on, I need to sit down.',
+    '{amount:500}?! Hang on, I need to sit down.',
     'This isn’t a purchase. It’s an event.',
     'Your bank account just asked for a break.',
-    '€500 evaporated. At least wave goodbye.',
+    '{amount:500} evaporated. At least wave goodbye.',
     'Okay. This one I really want to understand.',
     'For that amount, I expect at least a good story.',
   ],
   SPESA_ENORME_1000: [
-    '€1,000?! I’m a fox, not a detective.',
+    '{amount:1000}?! I’m a fox, not a detective.',
     'STOP. We need to talk about this.',
     'A thousand euros?! Your account just saw its life flash before its eyes.',
     'This purchase needs a press conference.',
@@ -324,13 +330,13 @@ const ES_GOAL_DAMAGED = [
 
 const ES = {
   SPESA_100: [
-    'Ups. Han desaparecido más de 100 €. ¿Los has visto?',
-    '¿Más de 100 €? ¿Así, sin avisarme siquiera?',
+    'Ups. Han desaparecido más de {amount:100}. ¿{gender:Los|Las} has visto?',
+    '¿Más de {amount:100}? ¿Así, sin avisarme siquiera?',
     'Espera… ¡¿cuánto acabas de gastar?!',
-    '100 € superados. Tu cuenta acaba de tragar saliva.',
+    '{amount:100} {gender:superados|superadas}. Tu cuenta acaba de tragar saliva.',
     'Pues nada, hoy la cuenta corriente no está de fiesta.',
     'Esto ya no es un gasto pequeño. Es una declaración de intenciones.',
-    '¿Más de 100 €? ¿Hemos perdido el sentido de la medida?',
+    '¿Más de {amount:100}? ¿Hemos perdido el sentido de la medida?',
     'Yo al menos le habría pedido permiso a la cartera.',
     'Interesante… ¿de verdad habíamos decidido gastar tanto?',
     'Esta cifra merece al menos una explicación.',
@@ -375,15 +381,15 @@ const ES = {
     'El presupuesto se ha acabado. Los gastos, en cambio, están estupendamente.',
   ],
   SPESA_ENORME_500: [
-    '¡¿500 €?! Espera, que me tengo que sentar.',
+    '¡¿{amount:500}?! Espera, que me tengo que sentar.',
     'Esto no es un gasto. Es un acontecimiento.',
     'La cuenta corriente acaba de pedir un descanso.',
-    '500 € evaporados. Al menos diles adiós.',
+    '{amount:500} {gender:evaporados|evaporadas}. Al menos diles adiós.',
     'Vale. Este sí que lo quiero entender.',
     'Por esta cifra exijo al menos una buena historia.',
   ],
   SPESA_ENORME_1000: [
-    '¡¿1.000 €?! Soy una raposa, no una detective.',
+    '¡¿{amount:1000}?! Soy una raposa, no una detective.',
     'ALTO. Aquí tenemos que hablar.',
     '¡¿Mil euros?! Tu cuenta acaba de ver la luz al final del túnel.',
     'Este gasto necesita una rueda de prensa.',
@@ -454,13 +460,13 @@ const FR_GOAL_DAMAGED = [
 
 const FR = {
   SPESA_100: [
-    'Oups. Plus de 100 € viennent de disparaître. Vous les avez vus ?',
-    'Plus de 100 € ? Comme ça, sans même me prévenir ?',
+    'Oups. Plus de {amount:100} viennent de disparaître. Vous les avez {gender:vus|vues} ?',
+    'Plus de {amount:100} ? Comme ça, sans même me prévenir ?',
     'Attendez… vous venez de dépenser combien ?!',
-    '100 € dépassés. Votre compte vient d’avaler de travers.',
+    '{amount:100} {gender:dépassés|dépassées}. Votre compte vient d’avaler de travers.',
     'Bon, aujourd’hui le compte courant ne fait pas la fête.',
     'Ce n’est plus une petite dépense. C’est une déclaration.',
-    'Plus de 100 € ? On a perdu le sens de la mesure ?',
+    'Plus de {amount:100} ? On a perdu le sens de la mesure ?',
     'Moi, j’aurais au moins demandé la permission au portefeuille.',
     'Intéressant… on avait vraiment décidé de dépenser autant ?',
     'Ce montant mérite au moins une explication.',
@@ -505,15 +511,15 @@ const FR = {
     'Le budget est épuisé. Les dépenses, elles, ont l’air de très bien se porter.',
   ],
   SPESA_ENORME_500: [
-    '500 € ?! Attendez, il faut que je m’assoie.',
+    '{amount:500} ?! Attendez, il faut que je m’assoie.',
     'Ce n’est pas une dépense. C’est un événement.',
     'Le compte courant vient de demander une pause.',
-    '500 € envolés. Faites-leur au moins un signe de la main.',
+    '{amount:500} {gender:envolés|envolées}. Faites-leur au moins un signe de la main.',
     'D’accord. Celle-là, je veux vraiment la comprendre.',
     'Pour ce montant, j’exige au moins une belle histoire.',
   ],
   SPESA_ENORME_1000: [
-    '1 000 € ?! Je suis une renarde, pas une détective.',
+    '{amount:1000} ?! Je suis une renarde, pas une détective.',
     'STOP. Là, il faut qu’on en parle.',
     'Mille euros ?! Votre compte vient de voir sa vie défiler.',
     'Cette dépense mérite une conférence de presse.',

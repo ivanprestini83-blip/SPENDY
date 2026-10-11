@@ -16,6 +16,7 @@
 // BehaviorEngine in un passaggio separato).
 import { BEHAVIOR_TYPES } from '../utils/behaviorEngine.js'
 import { computeImportance } from '../utils/importantEventSelector.js'
+import { findCelebratedGoal } from '../utils/goalReached.js'
 
 export const SPENDY_EVENTS = {
   GOAL_REACHED: 'goal_reached',
@@ -130,7 +131,9 @@ function eventFromCoach(coach, { expenses, today, goals, financialData }) {
   const event = { id: mapping.id, importance: mapping.importance, source: 'coach', categoryId: null }
 
   if (coach.reason === 'goal_reached') {
-    event.goal = goals.find((goal) => goal.target > 0 && goal.saved >= goal.target) ?? null
+    // Fase 2B.8: lo stesso obiettivo del coach (il più recente nella finestra
+    // del raggiungimento); fuori finestra nessun evento di festa.
+    event.goal = findCelebratedGoal(goals.filter((goal) => goal.target > 0), today)
     return event.goal ? event : null
   }
   if (['budget_exceeded', 'budget_high', 'budget_rising'].includes(coach.reason)) return event

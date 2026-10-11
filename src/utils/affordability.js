@@ -6,10 +6,11 @@ import { formatCurrencyWhole } from './format.js'
 // never an external model. See AffordabilityScreen for the disclaimer
 // shown alongside this result. `lang` only picks the words (missing or
 // unknown → Italian): levels and thresholds are the same in every language.
-export function evaluateAffordability({ amount, availableBudget, goals, lang = 'it' }) {
+export function evaluateAffordability({ amount, availableBudget, goals, lang = 'it', currency }) {
   const t = (key, params) => translate(lang, `affordability.${key}`, params)
-  // Gli stessi importi arrotondati all'euro, scritti nel formato della lingua.
-  const money = (value) => formatCurrencyWhole(Math.round(value), lang)
+  // Gli stessi importi arrotondati all'unità, scritti nella lingua e nella
+  // valuta dell'account (`currency` assente: quella corrente).
+  const money = (value) => formatCurrencyWhole(Math.round(value), lang, currency)
 
   if (!Number.isFinite(amount) || amount <= 0) {
     return {

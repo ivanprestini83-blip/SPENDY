@@ -25,6 +25,7 @@
 // Home: 'offline' | 'timeout' | 'error' | 'rate_limited' | 'invalid' |
 // 'hallucinate'. 'normal' è l'AI che funziona.
 import { humorLibrary } from '../../utils/humorLibrary.js'
+import { currencyInfo } from '../../utils/currency.js'
 import { similarity } from '../../utils/jokeEvaluator.js'
 import {
   SPESA_100, BUONA_SCELTA, RISPARMIO, SPESA_RIPETUTA, AUMENTO_ANOMALO,
@@ -48,7 +49,10 @@ const MAX_LENGTH = 220
 
 const LIB = humorLibrary.it
 const euro = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0 })
-const eur = (value) => `${euro.format(value)} €`
+// Il simbolo della valuta del contesto (context.currency, EUR se manca):
+// impostato a ogni generate(), come le frasi italiane del mock.
+let mockCurrencySymbol = '€'
+const eur = (value) => `${euro.format(value)} ${mockCurrencySymbol}`
 const lower = (label) => (label ? label.toLowerCase() : 'questa categoria')
 const signed = (value) => `${value > 0 ? '+' : ''}${value}%`
 
@@ -79,17 +83,15 @@ function categoryPools(label, direction, generic = []) {
 }
 
 // La coda sul budget rispetta la fase del ciclo (budget.cyclePhase): nell'ultimo
-// giorno non si parla di giorni che restano. I giorni non vengono contati a
-// voce: la quota giornaliera (che include oggi) dice già quanto si può spendere.
+// giorno non si parla di giorni che restano. Fase 2B.4: nessuna cifra del budget
+// (disponibile, quota giornaliera, budget, speso): le scrive l'app sotto la frase.
 function budgetTail(budget) {
   const lastDay = budget.cyclePhase === 'last_day'
   if (budget.band === 'exceeded') return lastDay ? 'Oggi il ciclo si chiude: domani si riparte da zero.' : 'Da qui a fine ciclo conviene andarci piano.'
-  if (lastDay) return `Oggi è l’ultimo giorno del ciclo: restano ${eur(budget.available)}.`
-  if (budget.band === 'ok') return `Il budget regge: restano ${eur(budget.available)}.`
-  if (budget.dailyAllowance != null) {
-    return `Restano ${eur(budget.available)} fino a fine ciclo, circa ${eur(budget.dailyAllowance)} al giorno.`
-  }
-  return `Restano ${eur(budget.available)} fino a fine ciclo.`
+  if (lastDay) return 'Oggi è l’ultimo giorno del ciclo: chiudiamolo bene.'
+  if (budget.band === 'ok') return 'Il budget regge.'
+  if (budget.dailyAllowance != null) return 'Da qui a fine ciclo conviene dosare le spese giorno per giorno.'
+  return 'Da qui a fine ciclo conviene dosare le spese.'
 }
 
 // --- Angoli ------------------------------------------------------------
@@ -134,7 +136,7 @@ function categoryUpAngles(ctx, { trend = false } = {}) {
       {
         id: 'relaxed',
         ...mood,
-        help: `${eur(cycle.difference)} in più del solito su ${cat}, e il budget regge: restano ${eur(ctx.budget.available)}.`,
+        help: `${eur(cycle.difference)} in più del solito su ${cat}, e il budget regge.`,
         quipPools: categoryPools(category, 'high', [AUMENTO_ANOMALO]),
       },
       {
@@ -150,7 +152,7 @@ function categoryUpAngles(ctx, { trend = false } = {}) {
       angles.push({
         id: 'daily',
         ...mood,
-        help: `Con ${cat} a ${eur(cycle.current)} invece dei soliti ${eur(cycle.usual)}, restano circa ${eur(ctx.budget.dailyAllowance)} al giorno fino a fine ciclo.`,
+        help: `Con ${cat} a ${eur(cycle.current)} invece dei soliti ${eur(cycle.usual)}, da qui a fine ciclo conviene dosare.`,
       })
     }
     angles.push({
@@ -224,15 +226,15 @@ function unusualPurchaseAngles(ctx) {
       help: `${Cat}: ${eur(amount)} in questo ciclo. Se resta una tantum nessun problema, se diventa un'abitudine la teniamo d'occhio insieme.`,
     },
   ]
-  // Quanto pesa sul ciclo: due numeri del contesto, e un giudizio a parole
-  // (nessuna percentuale calcolata qui).
+  // Quanto pesa sul ciclo: un giudizio a parole, calcolato sul totale speso ma
+  // senza scriverlo (Fase 2B.4: è una cifra del budget, la scrive l'app).
   if (ctx.budget.spent > 0 && amount <= ctx.budget.spent) {
     const weight = amount / ctx.budget.spent < 0.1 ? 'una voce piccola, niente che sposti il ciclo' : 'una voce che nel ciclo si fa sentire'
     angles.push({
       id: 'weight',
       state: 'attentive',
       tone: 'friendly',
-      help: `Dei ${eur(ctx.budget.spent)} spesi in questo ciclo, ${eur(amount)} sono andati in ${cat}: ${weight}.`,
+      help: `${eur(amount)} in ${cat} in questo ciclo: ${weight}.`,
     })
   }
   if (calmBudget(ctx)) {
@@ -240,13 +242,13 @@ function unusualPurchaseAngles(ctx) {
       id: 'planned',
       state: 'happy',
       tone: 'friendly',
-      help: `Se i ${eur(amount)} in ${cat} erano in programma, tutto regolare: il budget ha ancora ${eur(ctx.budget.available)} di margine.`,
+      help: `Se i ${eur(amount)} in ${cat} erano in programma, tutto regolare: il budget ha ancora margine.`,
     })
     angles.push({
       id: 'calm',
       state: 'ironic',
       tone: 'playful',
-      help: `${eur(amount)} in ${cat}, e il budget non fa una piega: restano ${eur(ctx.budget.available)}.`,
+      help: `${eur(amount)} in ${cat}, e il budget non fa una piega.`,
     })
   }
   if (tightBudget(ctx) && ctx.budget.dailyAllowance != null) {
@@ -254,7 +256,7 @@ function unusualPurchaseAngles(ctx) {
       id: 'tight',
       state: 'attentive',
       tone: 'helpful',
-      help: `${eur(amount)} in ${cat} proprio ora che il budget è stretto: restano circa ${eur(ctx.budget.dailyAllowance)} al giorno.`,
+      help: `${eur(amount)} in ${cat} proprio ora che il budget è stretto: meglio andarci piano per qualche giorno.`,
     })
   }
   return angles
@@ -271,13 +273,13 @@ const COMPOSERS = {
   },
 
   [E.BUDGET_EXCEEDED]: (ctx) => {
-    const over = eur(Math.abs(ctx.budget.available))
     const days = ctx.budget.daysRemaining
     const mood = { state: 'concerned', tone: 'concerned' }
-    // niente battuta: prima si aiuta
+    // niente battuta: prima si aiuta. Fase 2B.3: nessun importo — di quanto il
+    // budget è superato lo scrive l'app sotto la frase (budgetFactLine).
     const helps = [
-      `Siamo oltre il budget di ${over}${days > 0 ? `, con ${days} giorni ancora davanti` : ''}.`,
-      days > 0 ? `Il budget è finito con ${days} giorni di anticipo: siamo sopra di ${over}.` : `Il ciclo chiude sopra il budget di ${over}.`,
+      `Siamo oltre il budget${days > 0 ? `, con ${days} giorni ancora davanti` : ''}.`,
+      days > 0 ? `Il budget è finito con ${days} giorni di anticipo.` : 'Il ciclo chiude sopra il budget.',
     ]
     const closers = [
       'Nessun dramma: da qui conta ogni spesa piccola.',
@@ -302,7 +304,7 @@ const COMPOSERS = {
       angles.push({
         id: 'daily',
         ...mood,
-        help: `Restano ${eur(ctx.budget.available)} fino a fine ciclo: circa ${eur(ctx.budget.dailyAllowance)} al giorno.`,
+        help: `Il ${ctx.budget.spentPercent}% del budget è andato: da qui a fine ciclo conviene dosare giorno per giorno.`,
         quipPools: high ? [] : [LIB.types.budget_rising],
       })
     }
@@ -310,7 +312,7 @@ const COMPOSERS = {
       angles.push({
         id: 'weight',
         ...mood,
-        help: `Siamo al ${ctx.budget.spentPercent}% del budget: da qui ogni spesa pesa un po' di più. Restano ${eur(ctx.budget.available)}.`,
+        help: `Siamo al ${ctx.budget.spentPercent}% del budget: da qui ogni spesa pesa un po' di più.`,
       })
     }
     return angles
@@ -376,7 +378,7 @@ const COMPOSERS = {
   [E.SAVINGS_ABOVE_USUAL]: (ctx) => {
     const usual = ctx.spending.usualCycle
     const help = usual != null && usual > ctx.budget.spent
-      ? `Questo ciclo sei a ${eur(ctx.budget.spent)}, di solito un ciclo intero ti costa circa ${eur(usual)}.`
+      ? `Questo ciclo stai spendendo meno del solito: di solito un ciclo intero ti costa circa ${eur(usual)}.`
       : 'Questo ciclo stai spendendo meno del solito.'
     if (ctx.goal) {
       return [{ id: 'goal', state: 'advisor', tone: 'helpful', help: `${help} Un pezzetto potrebbe andare su "${ctx.goal.label}".` }]
@@ -585,6 +587,7 @@ export function createMockProvider({ mode = 'normal', latencyMs = 450 } = {}) {
       if (mode === 'rate_limited') throw providerError('rate_limited', 'Mock: limite API raggiunto')
       if (mode === 'invalid') return { message: 42, state: 'furious', shouldShow: 'yes' }
 
+      mockCurrencySymbol = currencyInfo(context?.currency).symbol
       const response = composeMockResponse(context, history, previous)
       if (mode === 'hallucinate' && response.shouldShow) {
         // Il tipico errore di un modello: numeri e nomi che nei dati non ci sono.

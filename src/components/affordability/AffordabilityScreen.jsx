@@ -14,7 +14,7 @@ const LEVEL_EMOJI = { green: '🟢', yellow: '🟡', red: '🔴' }
 // room. No AI involved: evaluateAffordability only ever looks at numbers
 // already in the store.
 export function AffordabilityScreen({ onClose }) {
-  const { language } = useLanguage()
+  const { language, currency } = useLanguage()
   const today = useAppStore((state) => state.today)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
@@ -26,14 +26,14 @@ export function AffordabilityScreen({ onClose }) {
 
   const [amount, setAmount] = useState('')
   const [item, setItem] = useState('')
-  const [result, setResult] = useState(null)
+  // L'importo chiesto (numero), non la risposta già scritta: il verdetto si
+  // ricalcola a ogni disegno, così segue subito lingua e valuta.
+  const [asked, setAsked] = useState(null)
 
   const availableBudget = monthlyBudget - totalForMonth(expenses, today, cycleStartDay)
 
-  const handleAsk = () => {
-    const amountValue = parseFloat(amount.replace(',', '.'))
-    setResult(evaluateAffordability({ amount: amountValue, availableBudget, goals, lang: language }))
-  }
+  const handleAsk = () => setAsked(parseFloat(amount.replace(',', '.')))
+  const result = asked === null ? null : evaluateAffordability({ amount: asked, availableBudget, goals, lang: language, currency })
 
   return (
     <div className="affordability-screen">
@@ -48,7 +48,7 @@ export function AffordabilityScreen({ onClose }) {
         <label className="affordability-screen__field">
           <span>Quanto vuoi spendere?</span>
           <div className="affordability-screen__amount-input">
-            <span>{currencySymbol()}</span>
+            <span>{currencySymbol(language, currency)}</span>
             <input
               type="number"
               inputMode="decimal"
@@ -56,7 +56,7 @@ export function AffordabilityScreen({ onClose }) {
               value={amount}
               onChange={(event) => {
                 setAmount(event.target.value)
-                setResult(null)
+                setAsked(null)
               }}
             />
           </div>

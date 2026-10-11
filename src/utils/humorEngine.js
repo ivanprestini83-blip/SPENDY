@@ -72,7 +72,7 @@ function resolveTemplates(insight, lang) {
 //
 // La stragrande maggioranza delle frasi in libreria non contiene
 // segnaposto ed e' del tutto indifferente a questa funzione.
-export function buildInsightVars(insight, lang) {
+export function buildInsightVars(insight, lang, currency) {
   const facts = insight.facts ?? {}
   const vars = {}
 
@@ -83,10 +83,10 @@ export function buildInsightVars(insight, lang) {
   if (typeof facts.days === 'number') vars.days = String(facts.days)
 
   const amount = facts.total ?? facts.saved ?? (typeof insight.current === 'number' ? insight.current : null)
-  if (typeof amount === 'number' && Number.isFinite(amount)) vars.amount = formatCurrency(amount, lang)
+  if (typeof amount === 'number' && Number.isFinite(amount)) vars.amount = formatCurrency(amount, lang, currency)
 
   const remaining = facts.missing ?? facts.remaining
-  if (typeof remaining === 'number' && Number.isFinite(remaining)) vars.remaining = formatCurrency(remaining, lang)
+  if (typeof remaining === 'number' && Number.isFinite(remaining)) vars.remaining = formatCurrency(remaining, lang, currency)
 
   const percent = facts.percent ?? (typeof insight.changePercent === 'number' ? Math.abs(insight.changePercent) : null)
   if (typeof percent === 'number' && Number.isFinite(percent)) vars.percentage = `${Math.round(percent)}%`
@@ -120,10 +120,11 @@ export function interpolate(template, vars) {
 // gia' interpolato: JokeEvaluator giudica "questa sembra un referto?" sul
 // template (dove i numeri non ci sono ancora) e tutto il resto sul testo
 // finale, che e' quello che l'utente leggera'.
-export function generateJokeCandidates(insight, lang = 'it') {
+export function generateJokeCandidates(insight, lang = 'it', currency) {
   const { templates, source } = resolveTemplates(insight, lang)
-  // Gli importi nella lingua della battuta (separatori e posizione del simbolo).
-  const vars = buildInsightVars(insight, lang)
+  // Gli importi nella lingua della battuta e nella valuta dell'account
+  // (`currency` assente: quella corrente).
+  const vars = buildInsightVars(insight, lang, currency)
 
   return templates
     .map((template, index) => {

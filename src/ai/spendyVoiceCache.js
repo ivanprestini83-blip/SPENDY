@@ -16,7 +16,9 @@ import { GUEST, isRetiredScope, voiceKey } from '../store/scope.js'
 
 export const VOICE_CACHE_KEY = 'spendy-ai-voice'
 export const voiceCacheKey = voiceKey
-export const VOICE_CACHE_VERSION = 1
+// 2 (Fase 2B.3): le frasi salvate prima sono state validate con regole più
+// deboli sugli importi (e senza la regola del budget sforato): si scartano.
+export const VOICE_CACHE_VERSION = 2
 export const VOICE_HISTORY_LIMIT = 30
 
 export function emptyVoiceCache() {

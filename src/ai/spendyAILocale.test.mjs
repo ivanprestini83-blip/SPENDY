@@ -14,6 +14,11 @@
 //   - Fase 2B: gli importi della risposta si leggono con la grammatica della
 //     sua lingua (1.794 / €1,794 / 1 794): niente importi inventati che
 //     passano perché letti come numeri piccoli ("€1,234" → 1).
+//   - Fase 2B.1: ogni numero del contesto autorizza la risposta solo con il
+//     suo significato (importo, %, giorni, conteggio, data di oggi), valori
+//     esatti e con segno, nessuna tolleranza ±1, numeri in lettere scartati.
+//     Le aspettative che codificavano il vecchio comportamento sono state
+//     aggiornate qui sotto, ognuna con il perché.
 
 import { check, section, report } from '../sync/testkit.mjs'
 import { createSpendyAIHandler, readConfig, logErrorCodes } from '../../supabase/functions/spendy-ai/handler.js'
@@ -21,7 +26,7 @@ import { AI_DAILY_LIMIT } from '../../supabase/functions/spendy-ai/quota.js'
 import {
   SPENDY_LOCALES, DEFAULT_SPENDY_LOCALE, normalizeSpendyLocale, sanitizeSpendyContext, buildSpendyPrompt,
   STYLE_EXAMPLES, STYLE_EXAMPLES_BY_LOCALE, SPENDY_PERSONALITY, validateSpendyResponse, passesToneRules, contradictsCyclePhase,
-  extractNumbers, allowedNumbers,
+  extractNumbers, allowedNumbers, authorizedNumbers, numberProblems,
 } from '../../supabase/functions/_shared/spendyAIRules.js'
 import { validateAIResponse } from './spendyAIGuard.js'
 import { createSpendyAI } from './spendyAI.js'
@@ -281,21 +286,35 @@ const MILLION_GOAL = { label: 'Casa', percent: 12, missing: 1000000 }
 const amountVerdict = (locale, message, options) => validateSpendyResponse(answer(message), amountsContext(locale, options))
 const errorsOf = (locale, message, options) => amountVerdict(locale, message, options).errors ?? []
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+// Il vecchio insieme UNICO di numeri consentiti di amountsContext (prima della
+// Fase 2B.1: ogni numero del contesto, data compresa, con tolleranza ±1). Serve
+// solo alle prove "prima" qui sotto, che mostrano i bypass chiusi.
+const LEGACY_POOL = [1, 9, 10, 21, 30, 40, 60, 99, 179, 250, 894, 900, 1206, 1794, 2026, 3000]
+const legacyAllowed = (n) => LEGACY_POOL.some((a) => Math.abs(a - n) <= 1)
 
 section('Fase 2B — il contesto dei test: numeri consentiti noti')
 {
   const pool = [...allowedNumbers(amountsContext('en'))].sort((a, b) => a - b)
-  check('consentiti: 1 9 10 21 30 40 60 99 179 250 894 900 1206 1794 2026 3000', same(pool, [1, 9, 10, 21, 30, 40, 60, 99, 179, 250, 894, 900, 1206, 1794, 2026, 3000]), pool.join(' '))
+  // Fase 2B.1: solo gli IMPORTI autorizzano importi. Percentuali (40, 99), giorni
+  // (9, 21, 30), importanza (60), version (1) e data (2026, 10) non valgono più come euro.
+  // Fase 2B.4: e le cifre del budget (179 quota, 1206 speso, 1794 disponibile, 3000
+  // budget) le scrive solo l'app: al modello restano gli importi dell'evento.
+  check('importi che il modello può scrivere: 250 894 900 1794 (1794 è anche la categoria)', same(pool, [250, 894, 900, 1794]), pool.join(' '))
+  check('   cifre del budget riservate all\'app: 179 1206 1794 3000', same([...authorizedNumbers(amountsContext('en')).reserved].sort((a, b) => a - b), [17900, 120600, 179400, 300000]))
+  const typed = authorizedNumbers(amountsContext('en'))
+  // Fase 2B.3: tra i giorni anche 10 (i 9 che restano compreso oggi) e 1 (il primo giorno del ciclo).
+  check('   percentuali 40 e 99, giorni 1 9 10 21 30, nessun conteggio; importanza, version e data esclusi',
+    same([...typed.percent].sort((a, b) => a - b), [40, 99]) && same([...typed.days].sort((a, b) => a - b), [1, 9, 10, 21, 30]) && typed.count.size === 0 && same(typed.today, { year: 2026, month: 10, day: 10 }))
   check('   con l\'obiettivo: anche 12 e 1.000.000', allowedNumbers(amountsContext('en', { goal: MILLION_GOAL })).has(1000000) && !allowedNumbers(amountsContext('en')).has(1000000))
 }
 
 section('Fase 2B — formati corretti nelle quattro lingue')
 {
   const CORRECT = {
-    it: [['Restano 1.794 €, oggi 250 €.', [1794, 250]], ['Restano 1.794,50 € di 3.000 €.', [1795, 3000]], ['Restano 1794 € in tutto.', [1794]], ['Oggi 249,5 € di shopping.', [250]]],
-    es: [['Quedan 1.794 €, hoy 250 €.', [1794, 250]], ['Quedan 1.794,50 € de 3.000 €.', [1795, 3000]], ['Quedan 1794 € en total.', [1794]], ['Hoy 249,5 € en compras.', [250]]],
-    en: [['Still €1,794 left, €250 today.', [1794, 250]], ['Still €1,794.50 left out of €3,000.', [1795, 3000]], ['Still €1794 left overall.', [1794]], ['Today €249.5 on shopping.', [250]]],
-    fr: [['Il reste 1 794 €, 250 € aujourd’hui.', [1794, 250]], [`Il reste 1${NB}794,50 € sur 3${NN}000 €.`, [1795, 3000]], [`Il reste 1${NN}794 € au total.`, [1794]], ['Il reste 1794 € au total.', [1794]], ['Aujourd’hui 249,5 € de shopping.', [250]]],
+    it: [['Shopping a 1.794 €, oggi 250 €.', [1794, 250]], ['Shopping a 1.794,00 €, di solito 900 €.', [1794, 900]], ['Shopping a 1794 € in tutto.', [1794]], ['Oggi 250,00 € di shopping.', [250]]],
+    es: [['Compras: 1.794 €, hoy 250 €.', [1794, 250]], ['Compras: 1.794,00 €, lo habitual 900 €.', [1794, 900]], ['Compras: 1794 € en total.', [1794]], ['Hoy 250,00 € en compras.', [250]]],
+    en: [['Shopping at €1,794, €250 today.', [1794, 250]], ['Shopping at €1,794.00, usually €900.', [1794, 900]], ['Shopping at €1794 overall.', [1794]], ['Today €250.00 on shopping.', [250]]],
+    fr: [['Shopping à 1 794 €, 250 € aujourd’hui.', [1794, 250]], [`Shopping à 1${NB}794,00 €, d’habitude 900 €.`, [1794, 900]], [`Shopping à 1${NN}794 € au total.`, [1794]], ['Shopping à 1794 € au total.', [1794]], ['Aujourd’hui 250,00 € de shopping.', [250]]],
   }
   for (const [locale, cases] of Object.entries(CORRECT)) {
     for (const [message, expected] of cases) {
@@ -303,6 +322,18 @@ section('Fase 2B — formati corretti nelle quattro lingue')
       check(`${locale}: "${message}" → ${expected.join(', ')}, accettata`, same(read, expected) && amountVerdict(locale, message).valid, `${read.join(', ')} ${errorsOf(locale, message).join(',')}`)
     }
   }
+  // Fase 2B.1: i decimali si leggono ESATTI (prima "1.794,50" diventava 1795 e
+  // "249,5" diventava 250, e passavano). ",00" è lo stesso valore, con certezza.
+  const DECIMALS = { it: 'Shopping a 1.794,50 €.', es: 'Compras: 1.794,50 €.', en: 'Shopping at €1,794.50.', fr: `Shopping à 1${NB}794,50 €.` }
+  for (const [locale, message] of Object.entries(DECIMALS)) {
+    check(`${locale}: "${message}" → 1794.5 esatto, rifiutato (nel contesto c'è 1794)`, same(extractNumbers(message, locale), [1794.5]) && errorsOf(locale, message).includes('invented_numbers:1794.5'), errorsOf(locale, message).join(','))
+  }
+  // Fase 2B.4: i centesimi su un importo dell'EVENTO (il disponibile è riservato all'app).
+  const withCents = (locale) => ({ ...amountsContext(locale), primaryEvent: { ...amountsContext(locale).primaryEvent, cycle: { ...amountsContext(locale).primaryEvent.cycle, current: 1794.5 } } })
+  check('   con 1794,50 davvero nel contesto: accettato, e 1794,51 no (centesimi conservati)', SPENDY_LOCALES.every((locale) => validateSpendyResponse(answer(DECIMALS[locale]), withCents(locale)).valid)
+    && validateSpendyResponse(answer('Shopping a 1.794,51 €.'), withCents('it')).errors.includes('invented_numbers:1794.51'))
+  // Fase 2B.4: le frasi sono sull'evento (shopping), non "restano X": il
+  // disponibile e le altre cifre del budget le scrive solo l'app.
   const million = { it: 'Mancano 1.000.000 € per "Casa".', es: 'Faltan 1.000.000 € para "Casa".', en: 'Still €1,000,000 to go for "Casa".', fr: `Il manque 1${NN}000${NN}000 € pour «Casa».` }
   for (const [locale, message] of Object.entries(million)) {
     check(`${locale}: oltre il milione ("${message}") → 1000000, accettata solo se è nel contesto`,
@@ -316,11 +347,13 @@ section('Fase 2B — importi inventati in formato inglese: bloccati')
   for (const [message, value] of [['You spent €1,234 on shopping.', 1234], ['You spent €9,999 on shopping.', 9999], ['You spent €40,000 on shopping.', 40000], ['You have €1,000,000 left.', 1000000]]) {
     const errors = errorsOf('en', message)
     check(`en: "${message}" → ${value}, rifiutata (invented_numbers:${value})`, same(extractNumbers(message, 'en'), [value]) && errors.includes(`invented_numbers:${value}`), errors.join(','))
-    check(`   prima: letta come ${extractNumbers(message).join(', ')} (numeri consentiti) — il bypass che la Fase 2B chiude`, extractNumbers(message).every((n) => [...allowedNumbers(amountsContext('en'))].some((a) => Math.abs(a - n) <= 1)))
+    check(`   prima: letta come ${extractNumbers(message).join(', ')} (numeri consentiti) — il bypass che la Fase 2B chiude`, extractNumbers(message).every((n) => legacyAllowed(n)))
   }
-  check('en: lo stesso importo vero passa (€1,794), uno vicino inventato no (€1,834)', amountVerdict('en', 'Still €1,794 left.').valid && errorsOf('en', 'Still €1,834 left.').includes('invented_numbers:1834'))
+  check('en: lo stesso importo vero passa (€1,794), uno vicino inventato no (€1,834)', amountVerdict('en', 'Shopping at €1,794.').valid && errorsOf('en', 'Shopping at €1,834.').includes('invented_numbers:1834'))
   check('it: "1.234 €" inventato resta rifiutato (come prima)', errorsOf('it', 'Hai 1.234 € da parte.').includes('invented_numbers:1234'))
-  check('tolleranza invariata: ±1 dall\'importo vero (1.795 € e 1.793 € sì, 1.796 € no)', amountVerdict('it', 'Restano 1.795 €.').valid && amountVerdict('it', 'Restano 1.793 €.').valid && !amountVerdict('it', 'Restano 1.796 €.').valid)
+  // Fase 2B.1: la tolleranza ±1 è stata tolta (prima 1.795 € e 1.793 € passavano).
+  check('nessuna tolleranza: solo 1.794 € (1.793 € e 1.795 € rifiutati)', amountVerdict('it', 'Shopping a 1.794 €.').valid
+    && errorsOf('it', 'Shopping a 1.795 €.').includes('invented_numbers:1795') && errorsOf('it', 'Shopping a 1.793 €.').includes('invented_numbers:1793') && legacyAllowed(1795) && legacyAllowed(1793))
 }
 
 section('Fase 2B — formati della lingua sbagliata: rifiutati, mai reinterpretati')
@@ -337,7 +370,7 @@ section('Fase 2B — formati della lingua sbagliata: rifiutati, mai reinterpreta
     check(`${locale}: "${message}" → malformed_number, nessun importo letto al suo posto`, errors.includes('malformed_number') && extractNumbers(message, locale).some(Number.isNaN), errors.join(','))
   }
   check('l\'errore non riporta le cifre (i log del server ricevono solo "malformed_number")', errorsOf('en', 'Still €1.794 left.').every((error) => !/\d/.test(error)))
-  check('"€9 250" in inglese: 9 e 250 sono consentiti, ma il testo non si legge come due numeri', allowedNumbers(amountsContext('en')).has(9) && allowedNumbers(amountsContext('en')).has(250) && !amountVerdict('en', 'Still €9 250 left.').valid)
+  check('"€9 250" in inglese: 9 e 250 sono consentiti, ma il testo non si legge come due numeri', authorizedNumbers(amountsContext('en')).days.has(9) && allowedNumbers(amountsContext('en')).has(250) && !amountVerdict('en', 'Still €9 250 left.').valid)
   check('"1,794" in italiano: né 1,794 → 2 né 1794', !amountVerdict('it', 'Restano 1,794 €.').valid)
 }
 
@@ -352,9 +385,9 @@ section('Fase 2B — cifre Unicode non ASCII: mai ignorate')
 
 section('Fase 2B — più importi nella stessa frase')
 {
-  check('en: "€250 today, €1,794 left, 9 days to go" → 250, 1794, 9: accettata', same(extractNumbers('€250 today, €1,794 left, 9 days to go.', 'en'), [250, 1794, 9]) && amountVerdict('en', '€250 today, €1,794 left, 9 days to go.').valid)
+  check('en: "€250 today, €1,794 on shopping, 9 days to go" → 250, 1794, 9: accettata', same(extractNumbers('€250 today, €1,794 on shopping, 9 days to go.', 'en'), [250, 1794, 9]) && amountVerdict('en', '€250 today, €1,794 on shopping, 9 days to go.').valid)
   check('en: un solo importo inventato tra quelli veri basta a rifiutare', same(errorsOf('en', '€250 today, €2,500 left.').filter((e) => e.startsWith('invented')), ['invented_numbers:2500']))
-  check('fr: "250 € aujourd’hui, 1 794 € restants" → 250, 1794', same(extractNumbers(`250 € aujourd’hui, 1${NN}794 € restants.`, 'fr'), [250, 1794]) && amountVerdict('fr', `250 € aujourd’hui, 1${NN}794 € restants.`).valid)
+  check('fr: "250 € aujourd’hui, 1 794 € en shopping" → 250, 1794', same(extractNumbers(`250 € aujourd’hui, 1${NN}794 € en shopping.`, 'fr'), [250, 1794]) && amountVerdict('fr', `250 € aujourd’hui, 1${NN}794 € en shopping.`).valid)
   check('it: "9, 250" con lo spazio dopo la virgola restano due numeri', same(extractNumbers('Giorni 9, 250 € oggi.', 'it'), [9, 250]))
   check('en: un numero ben scritto e uno fuori grammatica → rifiutata', errorsOf('en', '€250 today, €1.794 left.').includes('malformed_number'))
 }
@@ -366,7 +399,7 @@ section('Fase 2B — date, giorni e percentuali: come prima')
     check(`${locale}: stessi numeri della lettura di prima (date con - e /, giorni, %, ore)`, UNCHANGED.every((text) => same(extractNumbers(text, locale).filter((n) => !Number.isNaN(n)), extractNumbers(text)) && !extractNumbers(text, locale).some(Number.isNaN)))
   }
   check('date e giorni nel contesto: accettate in ogni lingua ("2026-10-10", "9 days", "40%")', SPENDY_LOCALES.every((locale) => amountVerdict(locale, 'On 2026-10-10: 9 days, 40%.').valid))
-  check('it: "12,5%" resta 13 (rifiutato: non è nel contesto), come prima', errorsOf('it', 'Il 12,5% in più.').includes('invented_numbers:13'))
+  check('it: "12,5%" si legge 12,5 esatto (prima 13): rifiutato, non è nel contesto', errorsOf('it', 'Il 12,5% in più.').includes('invented_numbers:12.5'))
   check('cambio voluto: una data con i punti ("10.10.2026") non è più letta come 10 e 2026 → rifiutata', errorsOf('it', 'Il 10.10.2026 restano 250 €.').includes('malformed_number'))
 }
 
@@ -374,17 +407,18 @@ section('Fase 2B — extractNumbers(text) senza lingua: identico a prima')
 {
   const LEGACY = [['1.179', [1179]], ['1.179,50', [1180]], ['66', [66]], ['12,5', [13]], ['Vacanze 2027', [2027]], ['2026-10-10', [2026, 10, 10]], ['€1,794', [2]], ['1 794 €', [1, 794]], ['Restano １７９４ €.', []]]
   check('lettura all\'italiana di sempre (anche "€1,794" → 2: serve solo ai testi del contesto)', LEGACY.every(([text, expected]) => same(extractNumbers(text), expected)), LEGACY.map(([text]) => extractNumbers(text).join('/')).join(' | '))
-  check('allowedNumbers invariato: numeri dentro i nomi e la data ("Vacanze 2027", "2026-10-10")', ['2027', '2026', '10'].every((n) => allowedNumbers({ today: '2026-10-10', goal: { label: 'Vacanze 2027' } }).has(Number(n))))
-  check('una lingua sconosciuta vale l\'italiano (come per il resto di Spendy AI)', same(extractNumbers('1.794,50 €', 'de'), [1795]) && extractNumbers('€1,794', 'de').some(Number.isNaN))
-  check('contesto senza lingua: si legge in italiano (prima la validazione era sempre all\'italiana)', validateSpendyResponse(answer('Restano 1.794 €.'), { ...amountsContext('it'), locale: undefined }).valid
+  // Fase 2B.1 (V2): prima le cifre dei nomi e della data erano importi consentiti ("2026 €" passava).
+  check('le cifre dei nomi e della data NON sono più importi consentiti ("Vacanze 2027", "2026-10-10")', allowedNumbers({ today: '2026-10-10', goal: { label: 'Vacanze 2027' } }).size === 0)
+  check('una lingua sconosciuta vale l\'italiano (come per il resto di Spendy AI)', same(extractNumbers('1.794,50 €', 'de'), [1794.5]) && extractNumbers('€1,794', 'de').some(Number.isNaN))
+  check('contesto senza lingua: si legge in italiano (prima la validazione era sempre all\'italiana)', validateSpendyResponse(answer('Shopping a 1.794 €.'), { ...amountsContext('it'), locale: undefined }).valid
     && validateSpendyResponse(answer('Still €1,234 left.'), { ...amountsContext('it'), locale: undefined }).errors.includes('malformed_number'))
 }
 
 section('Fase 2B — stessi testi, stesso contesto: stesso verdetto su server, guard e client')
 {
   const SAMPLES = [
-    ['en', 'Still €1,794 left, €250 today.'], ['en', 'You spent €9,999 on shopping.'], ['en', 'Still €1.794 left.'], ['en', 'Still ١٧٩٤ € left.'],
-    ['it', 'Restano 1.794,50 €.'], ['it', 'Hai speso 1,234 € oggi.'], ['es', 'Quedan 1.794 €.'], ['fr', `Il reste 1${NN}794 €.`], ['fr', 'Il reste 1.794 €.'],
+    ['en', 'Shopping at €1,794, €250 today.'], ['en', 'You spent €9,999 on shopping.'], ['en', 'Still €1.794 left.'], ['en', 'Still ١٧٩٤ € left.'],
+    ['it', 'Shopping a 1.794,50 €.'], ['it', 'Hai speso 1,234 € oggi.'], ['es', 'Compras: 1.794 €.'], ['fr', `Shopping à 1${NN}794 €.`], ['it', 'Ti restano 1.794 €.'], ['fr', 'Il reste 1.794 €.'],
   ]
   const outcomes = []
   for (const [locale, message] of SAMPLES) {
@@ -396,14 +430,17 @@ section('Fase 2B — stessi testi, stesso contesto: stesso verdetto su server, g
       aiPreference: async () => true, config: readConfig((name) => ENV[name]),
       verifyUser: async () => ({ id: 'utente-b', emailConfirmed: true }),
       callModel: async () => ({ text: JSON.stringify(answer(message)), stopReason: 'end_turn', model: 'm' }),
-      quota: memoryQuota(), now: () => DAY1, log: () => {},
+      quota: memoryQuota(), now: () => DAY1, log: (entry) => serverLogs.push(entry),
     })
+    const serverLogs = []
     const res = await handler(post({ context }))
     const server = { status: res.status, body: await res.json() }
     const serverValid = server.status === 200
-    const serverErrors = server.body?.details ?? []
+    // Fase 2B.1: il 422 non porta più gli errori all'app; il server li scrive
+    // nei log, ridotti al codice (logErrorCodes).
+    const serverErrors = serverLogs.find((entry) => entry.outcome === 'invalid')?.errors ?? []
     const agree = direct.valid === guard.valid && guard.valid === client.ok && client.ok === serverValid
-      && same(direct.errors ?? [], guard.errors ?? []) && same(guard.errors ?? [], client.details ?? []) && same(client.details ?? [], serverErrors)
+      && same(direct.errors ?? [], guard.errors ?? []) && same(guard.errors ?? [], client.details ?? []) && same(logErrorCodes(client.details ?? []), serverErrors)
     outcomes.push(direct.valid)
     check(`${locale}: "${message}" → ${direct.valid ? 'accettata' : `rifiutata (${direct.errors.join(',')})`} ovunque`, agree, JSON.stringify({ direct: direct.errors, guard: guard.errors, client: client.details, server: serverErrors }))
   }
@@ -436,10 +473,11 @@ section('Fase 2B — moltiplicatori e abbreviazioni: rifiutati in ogni lingua')
     check(`${locale}: "${message}" → rifiutata (malformed_number), mai letta come numero piccolo`, errors.includes('malformed_number') && extractNumbers(message, locale).every(Number.isNaN), errors.join(','))
   }
   check('   prima della correzione: letti come 40 / 1 / 10 / 2 (numeri consentiti) → accettati: il bypass chiuso qui era preesistente',
-    ['You spent €40k on shopping.', 'You spent €1.2k on shopping.', 'You spent €9.9k on shopping.', 'Has gastado 2 mil € hoy.'].every((text) => extractNumbers(text).every((n) => [...allowedNumbers(amountsContext('en'))].some((a) => Math.abs(a - n) <= 1))))
-  check('rifiutati anche quando il valore vero sarebbe nel contesto ("€1.794k" no, "€1,794" sì): l\'abbreviazione non si confronta', !amountVerdict('en', 'Still €1.794k left.').valid && amountVerdict('en', 'Still €1,794 left.').valid)
-  check('NON coperti: i numeri scritti in lettere ("two thousand euros", "duemila euro") non contengono cifre — serve un controllo separato',
-    amountVerdict('en', 'You spent two thousand euros.').valid && amountVerdict('it', 'Hai speso duemila euro.').valid)
+    ['You spent €40k on shopping.', 'You spent €1.2k on shopping.', 'You spent €9.9k on shopping.', 'Has gastado 2 mil € hoy.'].every((text) => extractNumbers(text).every((n) => legacyAllowed(n))))
+  check('rifiutati anche quando il valore vero sarebbe nel contesto ("€1.794k" no, "€1,794" sì): l\'abbreviazione non si confronta', !amountVerdict('en', 'Shopping at €1.794k.').valid && amountVerdict('en', 'Shopping at €1,794.').valid)
+  // Fase 2B.1 (V3): prima non coperti (passavano).
+  check('ora coperti: i numeri scritti in lettere ("two thousand euros", "duemila euro") → number_in_words',
+    errorsOf('en', 'You spent two thousand euros.').includes('number_in_words') && errorsOf('it', 'Hai speso duemila euro.').includes('number_in_words'))
 }
 
 section('Fase 2B — le stesse lettere e parole quando non sono moltiplicatori: accettate')
@@ -450,8 +488,12 @@ section('Fase 2B — le stesse lettere e parole quando non sono moltiplicatori: 
     ['fr', '9 mois, 250 €.', [9, 250]], ['en', '40 minutes for €250.', [40, 250]], ['it', 'Restano 250 €. Mila ringrazia.', [250]], ['fr', '250 €. Mille mercis.', [250]],
   ]
   for (const [locale, message, expected] of NOT_MULTIPLIERS) {
-    check(`${locale}: "${message}" → ${expected.join(', ')}, accettata`, same(extractNumbers(message, locale), expected) && amountVerdict(locale, message).valid, errorsOf(locale, message).join(','))
+    // Fase 2B.1: lette come prima e MAI moltiplicatori (nessun malformed_number). Ma "9 km", "2 kg", "40 minutes"
+    // non sono dati del contesto: prima passavano perché 9, 2, 40 coincidevano (±1) con giorni o percentuali.
+    check(`${locale}: "${message}" → ${expected.join(', ')}, nessun moltiplicatore`, same(extractNumbers(message, locale), expected) && !errorsOf(locale, message).includes('malformed_number'), errorsOf(locale, message).join(','))
   }
+  check('con i numeri del contesto e il loro significato: accettate ("9 giorni / days / días / jours" e 250 €)',
+    amountVerdict('it', 'Restano 9 giorni: 250 €.').valid && amountVerdict('en', '9 days left, €250.').valid && amountVerdict('es', 'Quedan 9 días y 250 €.').valid && amountVerdict('fr', 'Il reste 9 jours et 250 €.').valid)
   check('scelta prudente, documentata: "4K", "40 mila persone", "1 grand café" contano come moltiplicatori (rifiutate)',
     !amountVerdict('en', 'A 4K screen for €250.').valid && !amountVerdict('it', '40 mila persone, 250 €.').valid && !amountVerdict('fr', '1 grand café, 250 €.').valid)
 }
@@ -468,17 +510,19 @@ section('Fase 2B — formati legittimi che ora vengono respinti (cambio voluto, 
     check(`${locale}: "${message}" (${why}) → rifiutata con malformed_number → frase locale`, errorsOf(locale, message).includes('malformed_number'))
   }
   check('   prima della Fase 2B queste frasi passavano (date e orari letti come 10 / 21, numeri adiacenti come due numeri)',
-    ['Il 10.10.2026 restano 250 €.', 'Alle 21.30 restano 250 €.', 'Giorno 9 250 € spesi.'].every((text) => extractNumbers(text).every((n) => [...allowedNumbers(amountsContext('it'))].some((a) => Math.abs(a - n) <= 1))))
+    ['Il 10.10.2026 restano 250 €.', 'Alle 21.30 restano 250 €.', 'Giorno 9 250 € spesi.'].every((text) => extractNumbers(text).every((n) => legacyAllowed(n))))
   check('fr: "9 250 €" si legge 9250 (migliaia francesi), non 9 e 250 → rifiutata come importo inventato', errorsOf('fr', 'Il reste 9 250 €.').includes('invented_numbers:9250'))
-  check('le date con / e - e gli orari con : restano come prima', SPENDY_LOCALES.every((locale) => amountVerdict(locale, 'On 2026-10-10 (10/10/2026) at 21:30: 250 €.').valid))
+  check('le date di oggi con / e - restano accettate', SPENDY_LOCALES.every((locale) => amountVerdict(locale, 'On 2026-10-10 (10/10/2026): 250 €.').valid))
+  // Fase 2B.1: prima "21:30" passava perché 21 e 30 erano giorno e durata del ciclo.
+  check('   un orario ("21:30") non è un dato del contesto → rifiutato', SPENDY_LOCALES.every((locale) => errorsOf(locale, 'On 2026-10-10 at 21:30: 250 €.').includes('invented_numbers:21,30')))
 }
 
-section('PREESISTENTE (non Fase 2B) — un solo insieme di numeri consentiti per importi, giorni e percentuali')
+section('Fase 2B.1 — chiuso: un solo insieme di numeri consentiti per importi, giorni e percentuali')
 {
-  // Il guard sa quali numeri sono nel contesto, non COSA rappresentano.
-  check('"Hai speso 9 €": 9 sono i giorni rimasti, ma la frase passa', amountVerdict('it', 'Hai speso 9 € oggi.').valid)
-  check('"You spent €40": 40 è la percentuale spesa, ma la frase passa', amountVerdict('en', 'You spent €40 today.').valid)
-  check('"Only 1,794 days left": 1794 è un importo, ma la frase passa', amountVerdict('en', 'Only 1,794 days left.').valid)
+  // Prima il guard sapeva quali numeri c'erano nel contesto, non COSA rappresentavano (le tre frasi passavano).
+  check('"Hai speso 9 €": 9 sono i giorni rimasti → rifiutata', errorsOf('it', 'Hai speso 9 € oggi.').includes('invented_numbers:9'))
+  check('"You spent €40": 40 è la percentuale spesa → rifiutata', errorsOf('en', 'You spent €40 today.').includes('invented_numbers:40'))
+  check('"Only 1,794 days left": 1794 è un importo, non dei giorni → rifiutata', errorsOf('en', 'Only 1,794 days left.').includes('invented_numbers:1794'))
   check('   comportamento uguale prima della Fase 2B per "9 €" e "€40" (stessa lettura)', same(extractNumbers('Hai speso 9 € oggi.'), [9]) && same(extractNumbers('You spent €40 today.'), [40]))
   check('   "1,794 days": prima passava per caso (letto 2), ora perché 1794 è nel contesto', same(extractNumbers('Only 1,794 days left.'), [2]) && same(extractNumbers('Only 1,794 days left.', 'en'), [1794]))
 }
@@ -526,21 +570,25 @@ section('Log del server: mai importi né parole della risposta del modello')
   const entry = invented.logs.find((e) => e.outcome === 'invalid')
   check('importi inventati: nel log solo "invented_numbers", senza valori', same(entry?.errors, ['invented_numbers']), JSON.stringify(entry?.errors))
   check('   nessuna cifra dell\'importo inventato nel log (né 9999 / 9,999 né 4321)', !/9,?999|4,?321/.test(invented.logText))
-  check('   la risposta 422 all\'app resta com\'è (dettagli per il client, che non li registra)', invented.status === 422 && invented.body.details.includes('invented_numbers:9999,4321'))
+  // Fase 2B.1 (V6): prima il 422 riportava "invented_numbers:9999,4321" all'app.
+  check('   la risposta 422 all\'app è generica: nessun dettaglio, nessuna cifra', invented.status === 422 && same(invented.body, { error: 'invalid', message: 'response_rejected' }))
   const repeated = await run('Shopping galore: €250 today.', { previous: 'Shopping galore: €1,794 left.' })
   const repeatedErrors = repeated.logs.find((e) => e.outcome === 'invalid')?.errors ?? []
   check('struttura ripetuta: nel log "repeated_structure", senza le parole della risposta ("shopping galore")', repeatedErrors.includes('repeated_structure') && !/galore/i.test(repeated.logText), JSON.stringify(repeatedErrors))
   const malformed = await run('Still €1.794 left.')
   check('formato non valido: "malformed_number", senza cifre', same(malformed.logs.find((e) => e.outcome === 'invalid')?.errors, ['malformed_number']) && !/1\.?794/.test(malformed.logText))
   check('logErrorCodes: solo i codici, senza doppioni', same(logErrorCodes(['invented_numbers:1,2', 'repeated_structure:open:shopping galore', 'markdown', 'invented_numbers:3']), ['invented_numbers', 'repeated_structure', 'markdown']))
-  const ok = await run('Still €1,794 left.')
-  check('risposta valida: nel log nessun importo né testo', ok.status === 200 && !/1,?794|Still/.test(ok.logText))
+  const ok = await run('Shopping at €1,794.')
+  check('risposta valida: nel log nessun importo né testo', ok.status === 200 && !/1,?794|Shopping/.test(ok.logText))
 }
 
 section('Fase 2B — prompt: esempi inglesi con il simbolo davanti')
-check('en: "€150 of shopping today", "€120 left for 9 days"', STYLE_EXAMPLES_BY_LOCALE.en[0].startsWith('€150 of shopping today') && STYLE_EXAMPLES_BY_LOCALE.en[4].startsWith('€120 left for 9 days'))
+// Fase 2B.4: l'esempio "€120 left for 9 days" insegnava una frase ora vietata (il
+// disponibile lo scrive l'app): l'esempio parla dei giorni, senza importo.
+check('en: "€150 of shopping today", "9 days to go in the cycle"', STYLE_EXAMPLES_BY_LOCALE.en[0].startsWith('€150 of shopping today') && STYLE_EXAMPLES_BY_LOCALE.en[4].startsWith('9 days to go in the cycle'))
 check('   nessun esempio inglese con "€" dopo il numero', STYLE_EXAMPLES_BY_LOCALE.en.every((example) => !/\d\s?€/.test(example)))
-check('italiano, spagnolo e francese invariati ("150 €", "120 €")', ['it', 'es', 'fr'].every((locale) => STYLE_EXAMPLES_BY_LOCALE[locale][0].startsWith('150 €') && STYLE_EXAMPLES_BY_LOCALE[locale].some((example) => example.includes('120 €'))))
+check('italiano, spagnolo e francese: "150 €" davanti; nessun esempio dice con un importo quanto resta', ['it', 'es', 'fr'].every((locale) => STYLE_EXAMPLES_BY_LOCALE[locale][0].startsWith('150 €') && !STYLE_EXAMPLES_BY_LOCALE[locale].some((example) => example.includes('120 €'))))
+check('   ogni esempio di stile passa il guard come risposta (contesto con 150 € di spesa oggi)', SPENDY_LOCALES.every((locale) => STYLE_EXAMPLES_BY_LOCALE[locale].every((example) => numberProblems(example, { ...amountsContext(locale), spending: { today: 150 } }).length === 0)))
 check('gli esempi passano il proprio guard di lingua (numeri ben scritti)', SPENDY_LOCALES.every((locale) => STYLE_EXAMPLES_BY_LOCALE[locale].every((example) => !extractNumbers(example, locale).some(Number.isNaN))))
 
 report('Spendy AI multilingua — Fase 4B-3')

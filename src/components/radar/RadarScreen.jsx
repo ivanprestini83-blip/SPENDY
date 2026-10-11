@@ -14,7 +14,7 @@ import './RadarScreen.css'
 // proporre — vive nei moduli puri, dove i test la raggiungono senza
 // bisogno di un browser.
 export function RadarScreen({ onClose }) {
-  const { language, t } = useLanguage()
+  const { language, currency, t } = useLanguage()
   const today = useAppStore((state) => state.today)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
@@ -35,7 +35,7 @@ export function RadarScreen({ onClose }) {
 
   const financialData = buildFinancialData({ today, monthlyBudget, expenses, incomes, goals, cycleStartDay })
   const radar = buildRadar({
-    expenses, goals, today, monthlyBudget, cycleStartDay, financialData, jokeHistory, lang: language,
+    expenses, goals, today, monthlyBudget, cycleStartDay, financialData, jokeHistory, lang: language, currency,
   })
 
   const runAction = (card) => {

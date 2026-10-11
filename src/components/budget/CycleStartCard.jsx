@@ -1,5 +1,5 @@
 import { useAppStore } from '../../store/useAppStore.js'
-import { formatCurrency, maskedCurrency } from '../../utils/format.js'
+import { formatCurrency, formatCurrencyWhole, maskedCurrency } from '../../utils/format.js'
 import { totalForPeriod } from '../../utils/budgetCalculations.js'
 import { formatCycleLabel, getCycleRange, getPreviousCycleRange } from '../../utils/cycle.js'
 import { parseAmountInput, isValidAmount } from '../../utils/amounts.js'
@@ -105,7 +105,7 @@ export function CycleStartCard() {
             {t('budget.cycle.fresh.previous', { cycle: formatCycleLabel(previous, cycleStartDay, names), income: money(previousIncome), spent: money(previousSpent) })}
           </p>
           <p className="cycle-start__text">
-            {t('budget.cycle.fresh.current', { cycle: formatCycleLabel(current, cycleStartDay, names) })}
+            {t('budget.cycle.fresh.current', { cycle: formatCycleLabel(current, cycleStartDay, names), zero: formatCurrencyWhole(0, language) })}
           </p>
           <div className="cycle-start__actions">
             <button
@@ -119,7 +119,7 @@ export function CycleStartCard() {
               {t('budget.cycle.fresh.addsalary')}
             </button>
             <button type="button" className="cycle-start__link" onClick={() => useAppStore.getState().confirmCycleStart(current.start)}>
-              {t('budget.cycle.fresh.startzero')}
+              {t('budget.cycle.fresh.startzero', { zero: formatCurrencyWhole(0, language) })}
             </button>
           </div>
         </div>

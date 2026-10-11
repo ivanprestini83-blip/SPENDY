@@ -30,6 +30,7 @@ import {
   extractNumbers,
   allowedNumbers,
   validateSpendyResponse,
+  isOverBudget,
 } from '../../supabase/functions/_shared/spendyAIRules.js'
 
 export {
@@ -44,6 +45,7 @@ export {
   passesToneRules,
   extractNumbers,
   allowedNumbers,
+  isOverBudget,
 }
 
 // I vocabolari condivisi devono essere esattamente quelli dell'app: un

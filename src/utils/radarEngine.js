@@ -158,7 +158,7 @@ const percentText = (value) => `${value > 0 ? '+' : ''}${round(value)}%`
 
 const textIn = (ctx) => (key, params) => translate(ctx?.lang, `radarcard.${key}`, params)
 // Gli importi nella stessa lingua dei testi (separatori e posizione del simbolo).
-const moneyIn = (ctx) => (value) => formatCurrency(value, normalizeLanguage(ctx?.lang))
+const moneyIn = (ctx) => (value) => formatCurrency(value, normalizeLanguage(ctx?.lang), ctx?.currency)
 
 // Il nome della categoria in minuscolo, come nelle frasi di sempre.
 const categoryName = (insight, t) => insight.category?.label?.toLowerCase() ?? t('thiscategory')
@@ -222,7 +222,7 @@ function narrateSmallExpenses(insight, ctx) {
   const t = textIn(ctx)
   const money = moneyIn(ctx)
   // "sotto i 15 €": la soglia è quella del motore (BEHAVIOR_ENGINE_CONFIG), scritta nella lingua.
-  const smallLimit = formatCurrencyWhole(BEHAVIOR_ENGINE_CONFIG.smallExpenseMaxAmount, normalizeLanguage(ctx?.lang))
+  const smallLimit = formatCurrencyWhole(BEHAVIOR_ENGINE_CONFIG.smallExpenseMaxAmount, normalizeLanguage(ctx?.lang), ctx?.currency)
   const { count, total, average, categoryLabel } = insight.facts
   return {
     title: t('title.small'),
@@ -414,10 +414,10 @@ function enrichBudgetInsight(insight, financialData, monthlyBudget) {
   return { ...insight, facts: { ...(insight.facts ?? {}), budget, spent, remaining, percent } }
 }
 
-function buildMessage(insight, { lang, jokeHistory, rng }) {
+function buildMessage(insight, { lang, currency, jokeHistory, rng }) {
   const key = getInsightTopicKey(insight)
   const history = jokeHistory.filter((entry) => entry.key === key)
-  const candidates = generateJokeCandidates(insight, lang)
+  const candidates = generateJokeCandidates(insight, lang, currency)
   const best = pickBestJoke(candidates, insight, history, rng)
   return { key, message: best?.text ?? null, score: best?.score ?? null }
 }
@@ -480,6 +480,8 @@ export function buildRadar({
   financialData = null,
   jokeHistory = [],
   lang = 'it',
+  // La valuta dell'account (assente: quella corrente, utils/currency.js).
+  currency,
   limit = RADAR_CARD_LIMIT,
   rng = Math.random,
   config = BEHAVIOR_ENGINE_CONFIG,
@@ -487,7 +489,7 @@ export function buildRadar({
   if (!today) return { status: RADAR_STATUS.LEARNING, cards: [], cyclesSeen: 0, cyclesNeeded: config.minimumHistoricalSamples }
 
   const cyclesSeen = countCyclesWithData(expenses, today, cycleStartDay, config)
-  const ctx = { lang, jokeHistory, rng, cycleEndLabel: null }
+  const ctx = { lang, currency, jokeHistory, rng, cycleEndLabel: null }
 
   const hasHistory = cyclesSeen >= config.minimumHistoricalSamples
   const insights = rankInsightsByImportance(

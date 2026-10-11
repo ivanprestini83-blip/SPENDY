@@ -18,13 +18,14 @@ export function prepareSpendyVoice({
   cycleStartDay = 1,
   goals = [],
   locale,
+  currency,
 }) {
   // Gli stessi insight che getSpendyCoach e il Radar ottengono: nessuna
   // analisi nuova, solo una seconda lettura dello stesso risultato.
   const insights = analyzeBehavior({ expenses, today, monthlyBudget, financialData, cycleStartDay, goals })
   const events = detectSpendyEvents({ coach, insights, expenses, today, goals, financialData })
   const { context, meta } = buildSpendyAIContext({
-    events, coach, financialData, expenses, today, cycleStartDay, goals, locale,
+    events, coach, financialData, expenses, today, cycleStartDay, goals, locale, currency,
   })
   return { events, context, meta }
 }

@@ -20,8 +20,10 @@
 //   7. limite giornaliero di chiamate       → locale
 //   8. ultima chiamata troppo recente       → locale (salvo eventi urgenti)
 //   9. altrimenti                           → AI
-import { defaultToneFor, defaultAnimationFor } from './spendyAIGuard.js'
+import { defaultToneFor, defaultAnimationFor, isOverBudget } from './spendyAIGuard.js'
 import { recordAICall, recordAIFailure, recordAIVoice } from './spendyVoiceCache.js'
+import { translate } from '../i18n/translate.js'
+import { formatCurrency, formatCurrencyWhole, maskedCurrency } from '../utils/format.js'
 
 export const VOICE_LIMITS = {
   minImportance: 40, // stessa scala 0-100 di importantEventSelector
@@ -133,11 +135,50 @@ export function voiceFromCoach(coach) {
   }
 }
 
-export function voiceFromAI(response) {
+// La frase di fatti sotto una risposta di Spendy AI. Le cifre del budget non
+// le scrive mai il modello (il guard lo impone): le dice l'app, dal contesto da
+// cui è partita la richiesta, nella lingua e nella valuta dell'account. Il
+// testo del modello non entra mai qui.
+//   budget sforato (2B.3)  "Budget superato di 120,40 €."
+//   budget sano    (2B.4)  "Disponibile: 493,60 €, circa 18 € al giorno."
+// Fase 2B.5:
+//   - il disponibile con i centesimi e lo stesso formato della BudgetCard
+//     (formatCurrency): 493,60 € non diventa 494 €; uno sforamento di 0,40 €
+//     resta uno sforamento; la quota giornaliera, già intera, resta intera;
+//   - nell'ultimo giorno del ciclo niente quota giornaliera (sarebbe tutto il
+//     disponibile: "494 €, circa 494 € al giorno");
+//   - `hideAmounts` (la preferenza "nascondi gli importi" della BudgetCard): gli
+//     importi diventano "•••• €" come nella card, la frase resta.
+//   - Fase 2B.7: l'importo (anche mascherato) non va a capo tra la cifra e il
+//     simbolo ("0,40 / €."): solo nella riga di fatti gli spazi DENTRO l'importo
+//     diventano non separabili. formatCurrency, e il resto dell'app, restano
+//     com'erano; gli spazi tra le parole della frase restano normali.
+const unbreakable = (amount) => amount.replace(/ /g, '\u00a0')
+
+export function budgetFactLine(context, { hideAmounts = false } = {}) {
+  const available = context?.budget?.available
+  if (typeof available !== 'number' || !Number.isFinite(available)) return null
+  const masked = () => unbreakable(maskedCurrency(context.locale, context.currency))
+  const money = (value) => (hideAmounts ? masked() : unbreakable(formatCurrency(value, context.locale, context.currency)))
+  const whole = (value) => (hideAmounts ? masked() : unbreakable(formatCurrencyWhole(value, context.locale, context.currency)))
+  if (isOverBudget(context)) {
+    return available < 0 ? translate(context.locale, 'spendyai.overbudget', { amount: money(Math.abs(available)) }) : null
+  }
+  const daily = context.budget.dailyAllowance
+  const lastDay = context.budget.cyclePhase === 'last_day' || context.budget.daysRemaining === 0
+  return typeof daily === 'number' && daily > 0 && !lastDay
+    ? translate(context.locale, 'spendyai.availabledaily', { amount: money(available), daily: whole(daily) })
+    : translate(context.locale, 'spendyai.available', { amount: money(available) })
+}
+
+// `context`: lo stesso con cui la frase è stata generata (in cache si riusa
+// solo se i dati sono identici: vedi decideSpendyVoice, regola 2).
+// `hideAmounts`: la preferenza "nascondi gli importi" (store.amountHidden).
+export function voiceFromAI(response, context = null, { hideAmounts = false } = {}) {
   return {
     source: 'ai',
     message: response.message,
-    secondaryText: null,
+    secondaryText: budgetFactLine(context, { hideAmounts }),
     state: response.state,
     tone: response.tone,
     layout: response.layout,
@@ -145,7 +186,7 @@ export function voiceFromAI(response) {
   }
 }
 
-export function resolveSpendyVoice({ decision: choice, coach, cache }) {
-  if (choice.action === 'cache' && cache.current?.voice) return voiceFromAI(cache.current.voice)
+export function resolveSpendyVoice({ decision: choice, coach, cache, context = null, hideAmounts = false }) {
+  if (choice.action === 'cache' && cache.current?.voice) return voiceFromAI(cache.current.voice, context, { hideAmounts })
   return voiceFromCoach(coach)
 }

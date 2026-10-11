@@ -129,7 +129,9 @@ section('Controllo delle frasi dell\'AI: niente contraddizioni con la fase')
   check('"restano N giorni" nell\'ultimo giorno: rifiutata', contradictsCyclePhase('Restano 240 € per 1 giorni.', 'last_day'))
   check('"ultimi giorni" a inizio ciclo: rifiutata', contradictsCyclePhase('Ultimi giorni del ciclo, tieni duro.', 'first_half'))
   check('"appena iniziato" nella seconda metà: rifiutata', contradictsCyclePhase('Il ciclo è appena iniziato.', 'second_half'))
-  check('una frase coerente nell\'ultimo giorno passa', validateSpendyResponse({ ...base, message: 'Ultimo giorno del ciclo: restano 240 €. Domani si riparte.' }, ctx('last_day')).valid === true)
+  // Fase 2B.4: il disponibile (240 €) è una cifra del budget, la scrive l'app sotto la
+  // frase; la coerenza con la fase si prova con un dato che il modello può dire (76%).
+  check('una frase coerente nell\'ultimo giorno passa', validateSpendyResponse({ ...base, message: 'Ultimo giorno del ciclo: sei al 76% del budget. Domani si riparte.' }, ctx('last_day')).valid === true)
   check('senza fase nel contesto: nessun rifiuto per il tempo (contesti di prima)', contradictsCyclePhase(bug, undefined) === false)
 }
 
