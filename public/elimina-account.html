@@ -88,13 +88,25 @@
           Nell'app, l'eliminazione rimuove anche, dal dispositivo da cui la richiedi, i dati locali di quell'account, la
           memoria delle frasi di Spendy, le copie di sicurezza automatiche dell'account e la sessione di accesso.
         </p>
+        <p>
+          Sugli <strong>altri dispositivi</strong> dove l'account era aperto con l'app aggiornata, SPENDY verifica con il servizio
+          di autenticazione se l'account esiste ancora: all'apertura, quando l'app torna attiva e periodicamente mentre è aperta.
+          Quando l'eliminazione è confermata, i dati locali di quell'account vengono rimossi anche da lì. Se la verifica non dà
+          una risposta certa (per esempio senza connessione o per un errore temporaneo) non viene cancellato niente; se su quel
+          dispositivo la sessione risulta terminata, i dati dell'account vengono soltanto nascosti.
+        </p>
+        <p>
+          Le modifiche fatte su un dispositivo e mai sincronizzate non vengono cancellate automaticamente: restano nascoste e
+          non vengono più inviate, finché non scegli di scaricarne una copia o di rimuoverle in Impostazioni → Dati di account
+          eliminati.
+        </p>
       </section>
 
       <section>
         <h2>Cosa può rimanere</h2>
         <p>L'eliminazione dall'app non può raggiungere:</p>
         <ul>
-          <li>la copia locale dell'account su <strong>altri dispositivi</strong> dove lo avevi usato: lì l'account non potrà più accedere né sincronizzarsi, e i dati restano finché non li rimuovi disinstallando l'app o cancellando i dati del sito;</li>
+          <li>la copia locale dell'account su altri dispositivi dove l'eliminazione non può essere verificata (per esempio perché il dispositivo non viene più aperto, resta senza connessione o usa una versione non aggiornata dell'app): lì l'account non potrà più accedere né sincronizzarsi, e i dati restano finché non li rimuovi da quel dispositivo;</li>
           <li>i dati di una versione precedente di SPENDY salvati sul dispositivo nel vecchio formato locale;</li>
           <li>i dati usati senza account (modalità ospite) e il loro archivio, conservato sul dispositivo quando sono stati associati all'account al primo accesso;</li>
           <li>i file di backup JSON che hai già esportato;</li>
@@ -114,7 +126,7 @@
           Titolare del trattamento: Ivan Prestini, Via Paolo VI 1, 25020 Gambara (BS), Italia<br />
           Email: <a href="mailto:privacy@getspendy.info">privacy@getspendy.info</a>
         </p>
-        <p class="note">Versione 2026-10-06 · 6 ottobre 2026</p>
+        <p class="note">Versione 2026-10-12 · 12 ottobre 2026</p>
       </section>
     </main>
   </body>

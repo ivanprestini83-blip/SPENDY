@@ -8,7 +8,7 @@ import { SETTINGS_KEY, ackOps as ackOutboxOps, enqueueOp, hasPending, pendingIds
 import { mergeRemoteRows } from '../sync/syncEngine.js'
 import { settingsToLocal } from '../sync/mappers.js'
 import { addToState, markAllReadInState, markReadInState, removeFromState, sanitizeNotificationState } from '../notifications/notificationState.js'
-import { STATE_BASE, createScopeManager, isUserScope, isValidScope, ownerOf, scopeFor } from './scope.js'
+import { STATE_BASE, createScopeManager, isUserScope, isValidScope, ownerOf, retiredReason, scopeFor } from './scope.js'
 import { isValidAmount, isValidBudget } from '../utils/amounts.js'
 import { goalReachedOn } from '../utils/goalReached.js'
 import { DEFAULT_CURRENCY, isCurrency, normalizeCurrency } from '../utils/currency.js'
@@ -171,6 +171,36 @@ export const useAppStore = create(
         const scope = scopeFor(userId)
         const backupPrefix = `${AUTO_BACKUP_PREFIX}${scope.replace(/[^A-Za-z0-9_-]+/g, '-')}-`
         return scopes.forgetScope(scope, [backupPrefix])
+      },
+      // Le modifiche di un account mai arrivate sul server (coda + rifiutate):
+      // dallo stato in memoria se è l'ambito attivo, altrimenti dal suo
+      // contenitore. → numero, oppure null se non leggibile.
+      // Per l'ambito attivo vale il massimo tra memoria e contenitore: un'altra
+      // scheda può aver salvato modifiche che questa non ha in memoria.
+      unsyncedWritesFor: (userId) => {
+        if (typeof userId !== 'string' || !userId) return null
+        const scope = scopeFor(userId)
+        const stored = scopes.unsyncedWrites(scope)
+        if (get().scopeId !== scope) return stored
+        const inMemory = (get().sync?.outbox?.length ?? 0) + (get().sync?.rejected?.length ?? 0)
+        return stored === null ? null : Math.max(stored, inMemory)
+      },
+      // Invalidazione degli ambiti per tutte le schede (store/scope.js,
+      // RETIRED_SCOPES_KEY): da qui in poi nessuna scrittura in quell'ambito.
+      retireAccountScope: (userId, reason) => (typeof userId === 'string' && userId ? scopes.retire(scopeFor(userId), reason) : false),
+      reinstateAccountScope: (userId) => (typeof userId === 'string' && userId ? scopes.reinstate(scopeFor(userId)) : false),
+      retiredReasonFor: (userId) => (typeof userId === 'string' && userId ? retiredReason(scopeFor(userId)) : null),
+      deletedAccountsWithData: () => scopes.deletedAccountsWithData(),
+      accountContainerState: (userId) => (typeof userId === 'string' && userId ? scopes.containerState(scopeFor(userId)) : null),
+      hasAccountContainer: (userId) => (typeof userId === 'string' && userId ? scopes.hasContainer(scopeFor(userId)) : false),
+      markAccountCleared: (userId) => (typeof userId === 'string' && userId ? scopes.markCleared(scopeFor(userId)) : false),
+      // Salva lo stato in memoria dell'ambito attivo nel suo contenitore
+      // invalidato e rimosso (vedi scope.js preserve): stessa forma che
+      // scriverebbe zustand/persist.
+      preserveRetiredContainer: (userId) => {
+        if (typeof userId !== 'string' || !userId || get().scopeId !== scopeFor(userId)) return false
+        const { partialize, version } = api.persist.getOptions()
+        return scopes.preserve(scopeFor(userId), JSON.stringify({ state: partialize(get()), version }))
       },
 
       switchScope: (scope) => {

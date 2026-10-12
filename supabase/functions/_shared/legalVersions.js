@@ -4,5 +4,5 @@
 // versione qui: chi ha accettato quella precedente dovrà riaccettare.
 export const LEGAL_VERSIONS = Object.freeze({
   terms: '2026-10-06',
-  privacy: '2026-10-06',
+  privacy: '2026-10-12',
 })

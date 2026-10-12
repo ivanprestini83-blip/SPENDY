@@ -52,7 +52,114 @@ const retiredScopes = new Set()
 export const retireScope = (scope) => {
   if (isUserScope(scope)) retiredScopes.add(scope)
 }
-export const isRetiredScope = (scope) => retiredScopes.has(scope)
+
+// Ambiti INVALIDATI su questo dispositivo, per tutte le schede e anche dopo un
+// riavvio (sync/sessionGate.js). Il solo elenco in memoria non basta: una
+// seconda scheda aperta sullo stesso account non lo vede, e riscriverebbe il
+// contenitore appena rimosso. Questo elenco sta nello storage condiviso e si
+// controlla PRIMA di ogni scrittura persistente legata a un ambito (adattatore
+// di zustand qui sotto, memoria di Spendy AI): una scrittura tardiva — di una
+// risposta di sync, di Spendy AI, di un'altra scheda — viene semplicemente
+// scartata. Mai il guest.
+//   'deleted'  account eliminato, PROVATO da Supabase Auth: definitivo.
+//   'removed'  contenitore rimosso su richiesta esplicita, senza prova che
+//              l'account non esista più: torna valido se quell'account rientra
+//              con una sessione vera (reinstate).
+// L'elenco NON contiene l'id dell'account: solo un'impronta dell'ambito
+// calcolata con un sale casuale di questo dispositivo, il motivo e la data.
+// Basta a riconoscere l'ambito prima di una scrittura; dopo la rimozione dei
+// dati, nel localStorage non resta niente che nomini l'account.
+export const RETIRED_SCOPES_KEY = 'spendy-retired-scopes'
+export const RETIRED_SALT_KEY = 'spendy-retired-salt'
+export const RETIRED_DELETED = 'deleted'
+export const RETIRED_REMOVED = 'removed'
+
+const sharedStorage = () => {
+  try {
+    return globalThis.localStorage ?? null
+  } catch {
+    return null
+  }
+}
+
+// cyrb53: hash sincrono, non crittografico, sufficiente a distinguere gli
+// ambiti (due semi → 106 bit). Serve sincrono: si calcola a ogni scrittura.
+function cyrb53(text, seed) {
+  let h1 = 0xdeadbeef ^ seed
+  let h2 = 0x41c6ce57 ^ seed
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text.charCodeAt(i)
+    h1 = Math.imul(h1 ^ ch, 2654435761)
+    h2 = Math.imul(h2 ^ ch, 1597334677)
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, '0')
+}
+
+function readSalt(storage) {
+  try {
+    const salt = storage?.getItem(RETIRED_SALT_KEY)
+    return typeof salt === 'string' && salt.length >= 16 ? salt : null
+  } catch {
+    return null
+  }
+}
+
+// Il sale del dispositivo, creato alla prima invalidazione. → stringa o null
+export function ensureRetiredSalt(storage = sharedStorage()) {
+  const existing = readSalt(storage)
+  if (existing || !storage) return existing
+  let salt = ''
+  try {
+    const bytes = new Uint8Array(16)
+    globalThis.crypto.getRandomValues(bytes)
+    salt = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+  } catch {
+    salt = `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}`
+  }
+  try {
+    storage.setItem(RETIRED_SALT_KEY, salt)
+    return storage.getItem(RETIRED_SALT_KEY) === salt ? salt : null
+  } catch {
+    return null
+  }
+}
+
+// L'impronta di un ambito su questo dispositivo (null senza sale).
+export function scopeFingerprint(scope, storage = sharedStorage()) {
+  const salt = readSalt(storage)
+  if (!salt || !isUserScope(scope)) return null
+  const text = `${salt}|${scope}`
+  return `${cyrb53(text, 1)}${cyrb53(text, 2)}`
+}
+
+// → [{ fp, reason, at }] (solo voci valide)
+export function readRetiredScopes(storage = sharedStorage()) {
+  try {
+    const list = JSON.parse(storage?.getItem(RETIRED_SCOPES_KEY) ?? '[]')
+    return Array.isArray(list)
+      ? list.filter((entry) => entry && typeof entry.fp === 'string' && (entry.reason === RETIRED_DELETED || entry.reason === RETIRED_REMOVED))
+      : []
+  } catch {
+    return []
+  }
+}
+
+// La voce di un ambito invalidato ({ fp, reason, at, cleared? }), oppure null.
+export function retiredEntry(scope, storage = sharedStorage()) {
+  const fp = scopeFingerprint(scope, storage)
+  if (!fp) return null
+  return readRetiredScopes(storage).find((entry) => entry.fp === fp) ?? null
+}
+
+// Il motivo per cui un ambito è invalidato, oppure null.
+export function retiredReason(scope, storage = sharedStorage()) {
+  return retiredEntry(scope, storage)?.reason ?? null
+}
+
+export const isRetiredScope = (scope, storage = sharedStorage()) =>
+  isUserScope(scope) && (retiredScopes.has(scope) || retiredReason(scope, storage) !== null)
 
 const LISTS = ['expenses', 'incomes', 'goals', 'goalContributions', 'emergencyFundContributions', 'customCategories']
 
@@ -201,6 +308,8 @@ export function createScopeManager({ getStorage, now = () => new Date() }) {
   //     perché dopo il logout non deve mostrare i dati di quell'account;
   //   - se qualcosa non riesce, si annulla tutto: niente claim, niente perdita.
   function enterUserScope(userId) {
+    // Un ambito invalidato non si ricrea, nemmeno adottando i dati guest.
+    if (blocked(scopeFor(userId))) return { adopted: false, reason: 'retired' }
     if (read(GUEST_CLAIM_KEY) !== null) return { adopted: false, reason: 'already-claimed' }
     if (legacyMode) return { adopted: false, reason: 'legacy-mode' }
 
@@ -244,6 +353,11 @@ export function createScopeManager({ getStorage, now = () => new Date() }) {
 
   // ------------------------------------------- archivio per zustand/persist
 
+  // Invalidato (vedi RETIRED_SCOPES_KEY): letto dallo storage condiviso a OGNI
+  // scrittura, così vale subito anche per le altre schede e per le scritture
+  // già partite (una risposta di sync o di Spendy AI che arriva dopo).
+  const blocked = (scope) => isRetiredScope(scope, storage)
+
   const adapter = {
     getItem(name) {
       const key = keyFor(name, active)
@@ -254,17 +368,17 @@ export function createScopeManager({ getStorage, now = () => new Date() }) {
       } catch {
         // JSON corrotto: si conserva una copia PRIMA che il prossimo salvataggio
         // lo sovrascriva, e l'ambito riparte vuoto.
-        rawWrite(`${key}:corrupt:${stamp()}`, raw)
+        if (!blocked(active)) rawWrite(`${key}:corrupt:${stamp()}`, raw)
         return null
       }
       return raw
     },
     setItem(name, value) {
-      if (writesFrozen) return
+      if (writesFrozen || blocked(active)) return
       rawWrite(keyFor(name, active), value)
     },
     removeItem(name) {
-      if (writesFrozen) return
+      if (writesFrozen || blocked(active)) return
       remove(keyFor(name, active))
     },
   }
@@ -310,10 +424,118 @@ export function createScopeManager({ getStorage, now = () => new Date() }) {
     return doomed
   }
 
+  // Quante modifiche di un account non sono mai arrivate sul server (coda di
+  // invio + operazioni rifiutate), lette dal suo contenitore. Serve a non
+  // perderle in silenzio quando il contenitore si dovrebbe cancellare.
+  // → numero (0 se il contenitore non c'è), null se illeggibile.
+  function unsyncedWrites(scope) {
+    if (!isUserScope(scope)) return null
+    const raw = read(stateKey(scope))
+    if (raw === null) return 0
+    try {
+      const sync = JSON.parse(raw)?.state?.sync ?? {}
+      const count = (list) => (Array.isArray(list) ? list.length : 0)
+      return count(sync.outbox) + count(sync.rejected)
+    } catch {
+      return null
+    }
+  }
+
+  // Invalida un ambito per tutte le schede (vedi RETIRED_SCOPES_KEY). Un
+  // 'deleted' non viene mai declassato a 'removed'. → true se registrato
+  function retire(scope, reason, at = now().toISOString()) {
+    if (!isUserScope(scope) || (reason !== RETIRED_DELETED && reason !== RETIRED_REMOVED)) return false
+    retireScope(scope)
+    if (!ensureRetiredSalt(storage)) return false
+    const fp = scopeFingerprint(scope, storage)
+    const list = readRetiredScopes(storage)
+    const current = list.find((entry) => entry.fp === fp)
+    if (current?.reason === RETIRED_DELETED || current?.reason === reason) return true
+    const next = [...list.filter((entry) => entry.fp !== fp), { fp, reason, at }]
+    return write(RETIRED_SCOPES_KEY, JSON.stringify(next))
+  }
+
+  // Una sessione VERA di quell'account dimostra che esiste: un ambito rimosso
+  // a mano torna utilizzabile. Mai un 'deleted' (provato da Auth).
+  function reinstate(scope) {
+    const fp = scopeFingerprint(scope, storage)
+    const list = readRetiredScopes(storage)
+    const current = fp ? list.find((entry) => entry.fp === fp) : null
+    if (current?.reason !== RETIRED_REMOVED) return false
+    retiredScopes.delete(scope)
+    const next = list.filter((entry) => entry.fp !== fp)
+    return next.length > 0 ? write(RETIRED_SCOPES_KEY, JSON.stringify(next)) : (remove(RETIRED_SCOPES_KEY), true)
+  }
+
+  // L'utente ha scelto ESPLICITAMENTE di rimuovere i dati di quell'ambito:
+  // nessuna scheda li ricreerà più, nemmeno per salvare modifiche (preserve).
+  function markCleared(scope) {
+    const fp = scopeFingerprint(scope, storage)
+    const list = readRetiredScopes(storage)
+    if (!fp || !list.some((entry) => entry.fp === fp)) return false
+    return write(RETIRED_SCOPES_KEY, JSON.stringify(list.map((entry) => (entry.fp === fp ? { ...entry, cleared: true } : entry))))
+  }
+
+  // L'unica scrittura ammessa in un ambito invalidato. Una scheda scopre che il
+  // suo account è stato eliminato e che il contenitore è stato rimosso (da
+  // un'altra scheda, che non vedeva le sue modifiche), ma ha in memoria
+  // modifiche mai sincronizzate: le salva, una volta, perché non vadano perse
+  // in silenzio. Solo se il contenitore NON c'è, solo per un account eliminato
+  // e mai dopo una rimozione scelta dall'utente. Il contenitore resta bloccato
+  // per tutte le altre scritture e compare in Impostazioni. → true se salvato
+  function preserve(scope, raw) {
+    if (!isUserScope(scope) || typeof raw !== 'string' || read(stateKey(scope)) !== null) return false
+    const entry = retiredEntry(scope, storage)
+    if (entry?.reason !== RETIRED_DELETED || entry.cleared) return false
+    return write(stateKey(scope), raw)
+  }
+
+  // Gli account eliminati (provato) il cui contenitore è ancora sul
+  // dispositivo, perché conteneva modifiche mai sincronizzate o perché non si
+  // è potuto leggerlo: restano finché l'utente non sceglie (Impostazioni).
+  function deletedAccountsWithData() {
+    const deleted = new Map(readRetiredScopes(storage).filter((entry) => entry.reason === RETIRED_DELETED).map((entry) => [entry.fp, entry]))
+    if (deleted.size === 0 || !storage) return []
+    let keys = []
+    try {
+      keys = typeof storage.length === 'number' && typeof storage.key === 'function'
+        ? Array.from({ length: storage.length }, (_, index) => storage.key(index)).filter(Boolean)
+        : Object.keys(storage)
+    } catch {
+      keys = []
+    }
+    const prefix = `${STATE_BASE}:`
+    return keys
+      .filter((key) => key.startsWith(prefix) && isUserScope(key.slice(prefix.length)))
+      .map((key) => key.slice(prefix.length))
+      .map((scope) => ({ scope, entry: deleted.get(scopeFingerprint(scope, storage)) }))
+      .filter(({ entry }) => entry)
+      .map(({ scope, entry }) => ({ userId: ownerOf(scope), scope, at: entry.at ?? null, unsynced: unsyncedWrites(scope) }))
+  }
+
+  // Lo stato salvato di un ambito, per scaricarne una copia. → oggetto o null
+  function containerState(scope) {
+    if (!isUserScope(scope)) return null
+    try {
+      const state = JSON.parse(read(stateKey(scope)) ?? 'null')?.state
+      return state && typeof state === 'object' ? state : null
+    } catch {
+      return null
+    }
+  }
+
   return {
     storage: adapter,
     migration,
     forgetScope,
+    unsyncedWrites,
+    retire,
+    reinstate,
+    markCleared,
+    preserve,
+    deletedAccountsWithData,
+    containerState,
+    hasContainer: (scope) => isUserScope(scope) && read(stateKey(scope)) !== null,
     getActive: () => active,
     setActive(scope) {
       active = scope

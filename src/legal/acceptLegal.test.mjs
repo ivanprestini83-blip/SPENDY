@@ -45,13 +45,13 @@ section('Una sola versione corrente, per app e server')
 // =====================================================================
 {
   check('legal.js usa le versioni del modulo condiviso', LEGAL_DOCUMENTS.terms.version === LEGAL_VERSIONS.terms && LEGAL_DOCUMENTS.privacy.version === LEGAL_VERSIONS.privacy)
-  check('   versione corrente 2026-10-06', LEGAL_VERSIONS.terms === '2026-10-06' && LEGAL_VERSIONS.privacy === '2026-10-06')
+  check('   versioni correnti: Termini 2026-10-06, Privacy 2026-10-12', LEGAL_VERSIONS.terms === '2026-10-06' && LEGAL_VERSIONS.privacy === '2026-10-12')
   check('   immutabili', Object.isFrozen(LEGAL_VERSIONS))
   const index = readFileSync(join(ROOT, 'supabase/functions/accept-legal/index.ts'), 'utf8')
   check('la funzione deployata usa le stesse versioni (_shared/legalVersions.js)', /currentVersions: LEGAL_VERSIONS/.test(index) && /from '\.\.\/_shared\/legalVersions\.js'/.test(index))
   check('   e lo stesso verificatore dell\'utente di spendy-ai', /createSupabaseUserVerifier/.test(index) && /from '\.\.\/spendy-ai\/auth\.js'/.test(index))
-  check('nessuna versione scritta a mano nell\'app o nella funzione', !/2026-10-06/.test(readFileSync(join(ROOT, 'src/legal/legal.js'), 'utf8'))
-    && !/2026-10-06/.test(readFileSync(join(ROOT, 'supabase/functions/accept-legal/handler.js'), 'utf8')))
+  check('nessuna versione scritta a mano nell\'app o nella funzione', !/2026-10-(06|12)/.test(readFileSync(join(ROOT, 'src/legal/legal.js'), 'utf8'))
+    && !/2026-10-(06|12)/.test(readFileSync(join(ROOT, 'supabase/functions/accept-legal/handler.js'), 'utf8')))
 }
 
 // =====================================================================

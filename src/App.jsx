@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { useAppStore } from './store/useAppStore.js'
 import { startTodayWatcher } from './store/todayWatcher.js'
 import { startDocumentLanguage } from './i18n/documentLanguage.js'
@@ -23,6 +23,8 @@ import { startNotificationWatcher } from './notifications/notificationWatcher.js
 import { unreadCount } from './notifications/notificationState.js'
 import { PasswordRecoveryScreen } from './components/settings/PasswordRecoveryScreen.jsx'
 import { LegalGateScreen } from './components/legal/LegalGateScreen.jsx'
+import { SessionGateScreen } from './components/settings/SessionGateScreen.jsx'
+import { SESSION_DELETED, SESSION_ENDED, getSessionGateState, subscribeSessionGate } from './sync/sessionGate.js'
 import { LanguageWelcomeScreen } from './components/language/LanguageWelcomeScreen.jsx'
 import { useNeedsLanguageWelcome } from './components/language/useNeedsLanguageWelcome.js'
 import { HomePage } from './pages/HomePage.jsx'
@@ -60,6 +62,13 @@ function App() {
   const scopeId = useAppStore((state) => state.scopeId)
   // Un numero (primitivo): il badge si aggiorna solo quando cambia davvero.
   const unread = useAppStore((state) => unreadCount(state.notifications))
+  // Sessione dell'account finita senza un logout da qui (sync/sessionGate.js):
+  // la sua schermata NON viene disegnata, così nessun dato resta visibile.
+  const sessionGate = useSyncExternalStore(subscribeSessionGate, getSessionGateState, getSessionGateState)
+  // Anche con "Account eliminato" finché l'ambito è ancora quello dell'account
+  // (pulizia in corso, o un passaggio non riuscito): niente dei suoi dati a schermo.
+  const accountHidden = sessionGate?.status === SESSION_ENDED
+    || (sessionGate?.status === SESSION_DELETED && Boolean(sessionGate.userId) && scopeId === `u:${sessionGate.userId}`)
   // Primo avvio su questo dispositivo: prima di tutto la lingua.
   const needsLanguageWelcome = useNeedsLanguageWelcome()
 
@@ -96,6 +105,7 @@ function App() {
 
   return (
     <>
+    {!accountHidden && (
     <div className="app-shell" key={scopeId}>
       <div className="app-shell__header">
         <Header onOpenSettings={() => openModal('settings')} onOpenNotifications={() => openModal('notifications')} unreadCount={unread} />
@@ -138,8 +148,10 @@ function App() {
       {modal === 'settings' && <SettingsScreen onClose={closeModal} />}
       {modal === 'notifications' && <NotificationsScreen onClose={closeModal} />}
     </div>
+    )}
     {/* Fuori dalla schermata a chiave: sopravvivono al cambio di ambito. */}
     <LegalGateScreen />
+    <SessionGateScreen />
     <PasswordRecoveryScreen />
     {needsLanguageWelcome && <LanguageWelcomeScreen />}
     </>

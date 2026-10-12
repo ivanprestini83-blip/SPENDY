@@ -1,0 +1,19 @@
+/* Schermata "sessione terminata / account eliminato" (SessionGateScreen.jsx).
+   Riusa .recovery-screen; qui solo lo scorrimento (accesso + scelte possono
+   superare l'altezza di un telefono) e la spaziatura tra le card. */
+.session-gate {
+  overflow-y: auto;
+}
+
+.session-gate__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: auto 0;
+}
+
+.session-gate__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

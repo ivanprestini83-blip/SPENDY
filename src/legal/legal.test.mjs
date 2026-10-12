@@ -262,17 +262,20 @@ section('12–13. Pagine pubbliche e link')
     const html = readText(path)
     check(`${name}: presente, con titolo e viewport`, /<title>[^<]+<\/title>/.test(html) && /name="viewport"/.test(html))
     check(`   nessun segnaposto rimasto, nessun testo nascosto`, !html.includes('DA COMPLETARE') && !html.includes('class="todo"') && !/display:\s*none/.test(html))
-    check(`   versione ${LEGAL_DOCUMENTS.privacy.version} indicata`, html.includes(LEGAL_DOCUMENTS.privacy.version))
+    // I Termini hanno la loro versione; Privacy e pagina di eliminazione quella della Privacy.
+    const pageVersion = name === 'terms' ? LEGAL_DOCUMENTS.terms.version : LEGAL_DOCUMENTS.privacy.version
+    check(`   versione ${pageVersion} indicata`, html.includes(pageVersion))
     check(`   collega le altre pagine`, Object.values(pages).filter((p) => p !== path).every((p) => html.includes(`href="/${p.slice('public/'.length)}"`)))
   }
   const privacy = readText(pages.privacy)
   const terms = readText(pages.terms)
   check('privacy: versione tecnica uguale a quella registrata', privacy.includes(LEGAL_DOCUMENTS.privacy.version))
   check('termini: versione tecnica uguale a quella registrata', terms.includes(LEGAL_DOCUMENTS.terms.version))
-  for (const [name, html] of [['privacy', privacy], ['termini', terms]]) {
-    check(`${name}: Versione e Ultimo aggiornamento compilati`, html.includes(`<p>Versione: ${LEGAL_DOCUMENTS.privacy.version}</p>`) && html.includes('<p>Ultimo aggiornamento: 6 ottobre 2026</p>'))
+  for (const [name, html, version, updated] of [['privacy', privacy, LEGAL_DOCUMENTS.privacy.version, '12 ottobre 2026'], ['termini', terms, LEGAL_DOCUMENTS.terms.version, '6 ottobre 2026']]) {
+    check(`${name}: Versione e Ultimo aggiornamento compilati`, html.includes(`<p>Versione: ${version}</p>`) && html.includes(`<p>Ultimo aggiornamento: ${updated}</p>`) && html.includes(`Versione ${version} · in vigore dal ${updated}`))
   }
-  check('privacy e termini: stessa versione registrata alla registrazione', LEGAL_DOCUMENTS.privacy.version === '2026-10-06' && LEGAL_DOCUMENTS.terms.version === '2026-10-06')
+  check('versioni registrate alla registrazione: Privacy 2026-10-12, Termini invariati 2026-10-06', LEGAL_DOCUMENTS.privacy.version === '2026-10-12' && LEGAL_DOCUMENTS.terms.version === '2026-10-06')
+  check('privacy: il punto 15 dice cosa succede quando la versione cambia', /al primo\s+accesso successivo/.test(privacy) && /la\s+sincronizzazione resta ferma/.test(privacy))
   check('termini: niente consulenza finanziaria, anche per le frasi AI', /non costituiscono consulenza finanziaria/.test(terms) && /Spendy AI/.test(terms))
   check('SyncCard.jsx: le caselle vengono da LegalConsentFields, nessun indirizzo scritto a mano',
     readText('src/components/settings/SyncCard.jsx').includes('<LegalConsentFields') && !/href="\/(privacy|termini)/.test(readText('src/components/settings/SyncCard.jsx')))

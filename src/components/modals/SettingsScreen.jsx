@@ -6,6 +6,7 @@ import { CurrentSalaryCard } from '../settings/CurrentSalaryCard.jsx'
 import { CurrencyCard } from '../settings/CurrencyCard.jsx'
 import { LanguageCard } from '../settings/LanguageCard.jsx'
 import { DeleteAccountCard } from '../settings/DeleteAccountCard.jsx'
+import { DeletedAccountsCard } from '../settings/DeletedAccountsCard.jsx'
 import { PrivacyCard } from '../settings/PrivacyCard.jsx'
 import { SpendyAICard } from '../settings/SpendyAICard.jsx'
 import { SyncCard } from '../settings/SyncCard.jsx'
@@ -99,6 +100,8 @@ export function SettingsScreen({ onClose }) {
         <BackupCard />
 
         <DeleteAccountCard />
+
+        <DeletedAccountsCard />
       </div>
     </div>
   )
