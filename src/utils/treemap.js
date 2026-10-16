@@ -87,13 +87,24 @@ export function squarifiedTreemap(items, width, height) {
 }
 
 // L'altezza della treemap per una certa larghezza: è la protagonista della
-// pagina, e più categorie ha più spazio prende. Mai sotto i 260 px né
-// sopra 1,6 volte la larghezza.
+// pagina, e più categorie ha più spazio prende. Mai sotto i 280 px né
+// sopra 1,75 volte la larghezza.
 export function treemapHeight(width, count) {
   if (!(width > 0)) return 0
-  const ratio = count <= 3 ? 0.75 : count <= 6 ? 1 : count <= 10 ? 1.25 : count <= 14 ? 1.45 : 1.6
-  return Math.round(Math.max(260, width * ratio))
+  const ratio = count <= 3 ? 0.8 : count <= 6 ? 1.05 : count <= 10 ? 1.35 : count <= 14 ? 1.55 : 1.75
+  return Math.round(Math.max(280, width * ratio))
 }
+
+// Quanto "pesa" un importo nella mappa. Con le aree proporzionali agli
+// importi puri, una categoria grande schiaccia le piccole fino a renderle
+// illeggibili; Ivan ha chiesto di ridimensionare le grandi per vedere
+// molte più caselle. L'area è quindi proporzionale a importo^0,35: l'ordine
+// non cambia mai (chi spende di più ha sempre la tessera più grande), ma le
+// differenze sono compresse. I numeri scritti nelle tessere restano quelli
+// veri. Con 0,35 tutte le categorie dei casi di prova (fino a 18, anche
+// molto sbilanciate) restano visibili da 320 px in su.
+export const AREA_EXPONENT = 0.35
+export const areaWeight = (amount) => (Number.isFinite(amount) && amount > 0 ? amount ** AREA_EXPONENT : 0)
 
 // Quanto contenuto ci sta in una tessera di queste dimensioni (px), sapendo
 // quanti caratteri hanno l'importo e la percentuale. Importo e percentuale
@@ -133,25 +144,31 @@ export function tileDensity(width, height, amountChars = 9, shareChars = 3) {
 // categorie e, finché una tessera non riesce a mostrare i suoi numeri, la
 // categoria più piccola passa nel gruppo e si ridispone tutto.
 //
-//   items  → [{ id, value, ... }] (qualsiasi ordine)
+//   items  → [{ id, value, ... }] (qualsiasi ordine; value = importo)
 //   fits   → (rect) => true se in quella tessera ci stanno i suoi numeri
-//            (rect ha anche `grouped` per la tessera "Altre")
-// Restituisce { rects, grouped }: le tessere da disegnare (l'eventuale
-// "Altre" ha id OTHERS_ID e `grouped` con le categorie raccolte) e le
-// categorie raccolte, dalla più grande alla più piccola.
+//            (rect.amount è l'importo; rect ha anche `grouped` per "Altre")
+//   weight → quanto pesa un importo nella mappa (default: l'importo stesso;
+//            la pagina usa areaWeight qui sopra)
+// Restituisce { rects, grouped }: le tessere da disegnare, con `amount`
+// (l'importo vero) e `value` (il peso usato per l'area); l'eventuale
+// "Altre" ha id OTHERS_ID e `grouped` con le categorie raccolte, dalla più
+// grande alla più piccola. Il peso di "Altre" è quello della SOMMA dei suoi
+// importi, come se fosse una categoria sola.
 export const OTHERS_ID = '__others__'
 
-export function groupSmallTiles(items, width, height, fits) {
+export function groupSmallTiles(items, width, height, fits, weight = (amount) => amount) {
   const valid = (Array.isArray(items) ? items : [])
     .filter((item) => item && Number.isFinite(item.value) && item.value > 0)
     .sort((a, b) => b.value - a.value)
   let visible = valid
   let grouped = []
+  const weighted = (item) => ({ ...item, amount: item.value, value: weight(item.value) })
   for (;;) {
+    const othersAmount = grouped.reduce((sum, item) => sum + item.value, 0)
     const others = grouped.length > 0
-      ? [{ id: OTHERS_ID, value: grouped.reduce((sum, item) => sum + item.value, 0), grouped }]
+      ? [{ id: OTHERS_ID, amount: othersAmount, value: weight(othersAmount), grouped }]
       : []
-    const rects = squarifiedTreemap([...visible, ...others], width, height)
+    const rects = squarifiedTreemap([...visible.map(weighted), ...others], width, height)
     const allFit = rects.every((rect) => fits(rect))
     // Una sola categoria rimasta (o nessuna): non c'è niente da raccogliere.
     if (allFit || visible.length <= 1) return { rects, grouped }

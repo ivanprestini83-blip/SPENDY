@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { formatCurrency, formatSignedPercent } from '../../utils/format.js'
 import { getCategoryColor } from '../../data/categoryColors.js'
-import { groupSmallTiles, treemapHeight, tileDensity, OTHERS_ID } from '../../utils/treemap.js'
+import { groupSmallTiles, treemapHeight, tileDensity, areaWeight, OTHERS_ID } from '../../utils/treemap.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import './CategoryTreemap.css'
 
@@ -11,9 +11,11 @@ const FALLBACK_WIDTH = 340
 // Il colore della tessera "Altre": un lilla neutro, non quello di una categoria.
 const OTHERS_COLOR = '#a78bfa'
 
-// La mappa delle spese per categoria: una treemap vera, in cui l'AREA di
-// ogni tessera è proporzionale all'importo della categoria sul totale del
-// periodo (utils/treemap.js, layout "squarified"). Le tessere sono
+// La mappa delle spese per categoria: una treemap vera (utils/treemap.js,
+// layout "squarified"), in cui chi spende di più ha sempre la tessera più
+// grande. L'area segue l'importo "compresso" (areaWeight, importo^0,35):
+// le categorie grandi non schiacciano le piccole, che restano leggibili.
+// I numeri scritti sono sempre quelli veri. Le tessere sono
 // attaccate, come nelle mappe finanziarie; i colori sono quelli fissi della
 // categoria (gli stessi della ciambella), resi pastello: identificano, non
 // giudicano.
@@ -49,12 +51,13 @@ export function CategoryTreemap({ rows, total, onOpenDetail = () => {} }) {
 
   const shareOf = (value) => (total > 0 ? Math.round((value / total) * 100) : 0)
   const height = treemapHeight(width, rows.length)
-  const fits = (rect) => tileDensity(rect.width, rect.height, formatCurrency(rect.value).length, `${shareOf(rect.value)}%`.length) !== null
+  const fits = (rect) => tileDensity(rect.width, rect.height, formatCurrency(rect.amount).length, `${shareOf(rect.amount)}%`.length) !== null
   const { rects, grouped } = groupSmallTiles(
     rows.map((row) => ({ id: row.categoryId, value: row.current, row })),
     width,
     height,
     fits,
+    areaWeight,
   )
 
   const selectedRow = rows.find((row) => row.categoryId === selectedId) ?? null
@@ -69,8 +72,8 @@ export function CategoryTreemap({ rows, total, onOpenDetail = () => {} }) {
           const isOthers = rect.id === OTHERS_ID
           const label = isOthers ? t('analytics.treemap.others', { count: grouped.length }) : rect.row.category.label
           const emoji = isOthers ? '•••' : rect.row.category.emoji
-          const amountText = formatCurrency(rect.value)
-          const share = shareOf(rect.value)
+          const amountText = formatCurrency(rect.amount)
+          const share = shareOf(rect.amount)
           // Se per arrotondamento una tessera non ci sta più (resize), resta
           // comunque nel formato più piccolo: importo e percentuale sempre.
           const density = tileDensity(rect.width, rect.height, amountText.length, `${share}%`.length) ?? 'stack'

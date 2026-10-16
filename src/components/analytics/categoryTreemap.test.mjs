@@ -18,7 +18,7 @@ import react from '@vitejs/plugin-react'
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { check, section, report } from '../../sync/testkit.mjs'
-import { squarifiedTreemap, treemapHeight, tileDensity, groupSmallTiles, OTHERS_ID } from '../../utils/treemap.js'
+import { squarifiedTreemap, treemapHeight, tileDensity, groupSmallTiles, areaWeight, AREA_EXPONENT, OTHERS_ID } from '../../utils/treemap.js'
 import { MESSAGES } from '../../i18n/translate.js'
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
@@ -69,7 +69,16 @@ verify('due categorie uguali', [{ id: 'a', value: 10 }, { id: 'b', value: 10 }],
   check('nessun elemento, o dimensioni non valide → nessuna tessera', squarifiedTreemap([], 200, 200).length === 0 && squarifiedTreemap(SAMPLE, 0, 200).length === 0 && squarifiedTreemap(SAMPLE, 200, Number.NaN).length === 0 && squarifiedTreemap(null, 200, 200).length === 0)
   check('non modifica l\'elenco ricevuto (ordine compreso)', (() => { const input = [{ id: 'p', value: 1 }, { id: 'g', value: 9 }]; squarifiedTreemap(input, 100, 100); return input[0].id === 'p' })())
 }
-check('altezza: più categorie, più spazio; mai sotto 260 px né sopra 1,6 × larghezza', treemapHeight(340, 2) === 260 && treemapHeight(340, 8) > treemapHeight(340, 4) && treemapHeight(340, 30) === Math.round(340 * 1.6) && treemapHeight(0, 5) === 0)
+check('altezza: più categorie, più spazio; mai sotto 280 px né sopra 1,75 × larghezza', treemapHeight(340, 2) === 280 && treemapHeight(340, 8) > treemapHeight(340, 4) && treemapHeight(340, 30) === Math.round(340 * 1.75) && treemapHeight(0, 5) === 0)
+{
+  // Peso nella mappa: importo^0,35 (le grandi non schiacciano le piccole).
+  check('peso compresso: stesso ordine degli importi, differenze ridotte', AREA_EXPONENT === 0.35 && areaWeight(400) > areaWeight(100) && areaWeight(400) / areaWeight(10) < 400 / 10 && Math.abs(areaWeight(400) / areaWeight(10) - 40 ** 0.35) < 1e-9)
+  check('   peso zero per importi nulli, negativi o non numerici', areaWeight(0) === 0 && areaWeight(-5) === 0 && areaWeight(Number.NaN) === 0)
+  const values = [320, 12]
+  const { rects } = groupSmallTiles(values.map((value, i) => ({ id: `w${i}`, value })), 300, 300, () => true, areaWeight)
+  check('   con il peso, le tessere portano l\'importo vero (amount) e il peso usato per l\'area (value)', rects[0].amount === 320 && rects[1].amount === 12 && Math.abs(rects[0].value - areaWeight(320)) < 1e-9)
+  check('   la piccola ottiene molta più area che in proporzione pura', (rects[1].width * rects[1].height) / (300 * 300) > (12 / 332) * 3)
+}
 {
   // Raggruppamento: le categorie troppo piccole per i loro numeri vanno in "Altre".
   const items = [320, 260, 213.35, 149.99, 129.3, 95, 89.99, 72, 62.5, 58.4, 48, 44.9, 39, 35, 31.5, 23.9, 12, 7.7].map((value, i) => ({ id: `g${i}`, value }))
@@ -150,7 +159,9 @@ try {
   check('   ogni tessera posizionata (left/top/width/height)', tiles.every((tile) => ['left', 'top', 'width', 'height'].every((k) => k in styleOf(tile))))
   const areas = tiles.map((tile) => { const s = styleOf(tile); return s.width * s.height })
   check('   tessere attaccate: insieme riempiono esattamente la mappa (nessuno spazio fra loro)', Math.abs(areas.reduce((x, y) => x + y, 0) - 340 * treemapHeight(340, 8)) < 1)
-  check('   le aree seguono gli importi (più spesa → tessera più grande)', areas.every((a, i) => i === 0 || a <= areas[i - 1] + 1) && Math.abs(areas[0] / areas.reduce((x, y) => x + y, 0) - 417 / total) < 0.01)
+  check('   le aree seguono l\'ordine degli importi (più spesa → tessera più grande)', areas.every((a, i) => i === 0 || a <= areas[i - 1] + 1))
+  check('   area proporzionale al peso compresso (importo^0,35)', Math.abs(areas[0] / areas.reduce((x, y) => x + y, 0) - areaWeight(417) / rows.reduce((x, r) => x + areaWeight(r.current), 0)) < 0.01)
+  check('   esempio con 8 categorie: tutte visibili, nessuna raccolta in "Altre"', !othersInfo && tiles.length === 8)
   check('   dimensioni diverse fra le tessere (una vera treemap)', new Set(areas.map(Math.round)).size === tiles.length)
   check('   colore su ogni tessera (fisso della categoria; lilla per "Altre")', tiles.every((tile) => /--tile-color:#[0-9a-f]{6}/i.test(tile)))
   check('   etichetta completa per gli screen reader: nome, importo, percentuale', tiles[0].includes(`aria-label="Bolletta luce, ${formatCurrency(417)}, 28%"`))
@@ -174,13 +185,19 @@ try {
     const manyTiles = tilesOf(manyHtml)
     const maxBottom = Math.max(...manyTiles.map((tile) => { const s = styleOf(tile); return s.top + s.height }))
     const maxRight = Math.max(...manyTiles.map((tile) => { const s = styleOf(tile); return s.left + s.width }))
-    const othersTile = manyTiles.find((tile) => tile.includes('category-treemap__tile--others'))
-    const shown = manyTiles.filter((tile) => !tile.includes('--others')).length
+    check('18 categorie: tutte visibili (nessuna in "Altre"), dentro la mappa, nessun overflow', manyTiles.length === 18 && !manyHtml.includes('--others') && maxRight <= 340.01 && maxBottom <= treemapHeight(340, 18) + 0.01)
+    check('   ognuna con importo e percentuale', manyTiles.every((tile) => /category-treemap__amount">[^<]+</.test(tile) && /category-treemap__share">\d+%</.test(tile)))
+  }
+  {
+    // Caso estremo: 40 categorie su 340 px. Le più piccole vanno in "Altre".
+    const extreme = Array.from({ length: 40 }, (_, i) => ({ categoryId: `x-${i}`, category: { label: `Voce ${i + 1}`, emoji: '🏷️' }, current: Math.round(5000 / (i + 1)) / 10, previous: 0, changePercent: 0, changeAmount: 0 }))
+    const xTiles = tilesOf(render(extreme))
+    const othersTile = xTiles.find((tile) => tile.includes('category-treemap__tile--others'))
+    const shown = xTiles.filter((tile) => !tile.includes('--others')).length
     const groupedCount = Number(othersTile?.match(/aria-label="Altre (\d+),/)?.[1])
-    check('18 categorie: dentro la mappa, nessun overflow', maxRight <= 340.01 && maxBottom <= treemapHeight(340, 18) + 0.01)
-    check('   le più piccole sono raccolte in "Altre N", nessuna persa', Boolean(othersTile) && shown + groupedCount === 18, `${shown} + ${groupedCount}`)
+    check('40 categorie: le più piccole raccolte in "Altre N", nessuna persa', Boolean(othersTile) && shown + groupedCount === 40, `${shown} + ${groupedCount}`)
     check('   anche "Altre" mostra importo e percentuale', /category-treemap__amount">[^<]+</.test(othersTile) && /category-treemap__share">\d+%</.test(othersTile))
-    check('   tutte le tessere sono pulsanti con etichetta completa', manyTiles.every((tile) => /aria-label="(Categoria \d+|Altre \d+), [^"]+, \d+%"/.test(tile)))
+    check('   tutte le tessere sono pulsanti con etichetta completa', xTiles.every((tile) => /aria-label="(Voce \d+|Altre \d+), [^"]+, \d+%"/.test(tile)))
   }
   {
     const one = render([rows[0]])
