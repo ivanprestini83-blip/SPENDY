@@ -43,7 +43,7 @@ export function ExpenseSummaryCards({ today, month, monthlyBudget, onOpenExpense
 
 function TodayIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
       <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H17a1 1 0 0 1 1 1v2" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
       <rect x="3.5" y="8" width="17" height="11" rx="2.5" stroke="currentColor" strokeWidth="1.9" />
       <circle cx="16.25" cy="13.5" r="1.35" fill="currentColor" />
@@ -53,7 +53,7 @@ function TodayIcon() {
 
 function CycleIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
       <rect x="3.75" y="5.5" width="16.5" height="14.5" rx="3" stroke="currentColor" strokeWidth="1.9" />
       <path d="M3.75 10h16.5M8.5 3.5v4M15.5 3.5v4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
       <path d="M8 14.5h3" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />

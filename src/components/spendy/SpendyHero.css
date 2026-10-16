@@ -111,7 +111,7 @@
     'mascot'
     'speech'
     'cta';
-  row-gap: 12px;
+  row-gap: 8px;
 }
 
 /* --- Mascot --- */
@@ -127,11 +127,11 @@
   animation: spendy-hero-bob 6s ease-in-out 900ms infinite;
 }
 
-/* Bigger than its column on purpose: 40% wider, 10% of it stepping out
+/* Bigger than its column on purpose: 22% wider, 10% of it stepping out
    toward the screen edge (never further than the 18px gutter, so no part
    of her gets cut) and 30% tucked behind the speech bubble. */
 .spendy-hero__img {
-  width: 140%;
+  width: 122%;
   max-width: none;
   height: auto;
   aspect-ratio: 1;
@@ -162,8 +162,8 @@
 
 .spendy-hero--center .spendy-hero__mascot {
   justify-self: center;
-  width: min(62%, 240px);
-  margin-bottom: -30px;
+  width: min(36%, 140px);
+  margin-bottom: -22px;
 }
 
 .spendy-hero--center .spendy-hero__img {
@@ -182,7 +182,7 @@
 .spendy-hero__speech {
   grid-area: speech;
   position: relative;
-  padding: 14px 16px 15px;
+  padding: 12px 16px 13px;
   border-radius: 24px;
   background: var(--color-surface);
   box-shadow:

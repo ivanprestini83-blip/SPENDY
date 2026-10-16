@@ -14,11 +14,14 @@
   --flow-to: #fb923c;
   --flow-soft: rgba(248, 113, 113, 0.14);
 
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  /* Icona accanto al titolo, poi importo e dettagli a tutta larghezza:
+     più basso di una colonna con l'icona sopra. */
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
   min-width: 0;
-  padding: 2px 14px 4px 6px;
+  padding: 0 14px 2px 6px;
   text-align: left;
   border-radius: var(--radius-sm);
   transition: transform 0.15s var(--ease-standard);
@@ -33,7 +36,7 @@
   --flow-to: #fbbf24;
   --flow-soft: rgba(245, 158, 11, 0.16);
 
-  padding: 2px 6px 4px 18px;
+  padding: 0 6px 2px 18px;
   border-left: 1px solid rgba(23, 32, 51, 0.08);
 }
 
@@ -41,9 +44,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  margin-bottom: 10px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: linear-gradient(140deg, var(--flow-from), var(--flow-to));
   box-shadow: 0 8px 16px -8px var(--flow-from);
@@ -56,9 +58,16 @@
   color: var(--color-text-secondary);
 }
 
+.expense-summary__amount,
+.expense-summary__meta,
+.expense-summary__bar,
+.expense-summary__line {
+  grid-column: 1 / -1;
+}
+
 .expense-summary__amount {
-  margin-top: 2px;
-  font-size: 24px;
+  margin-top: 6px;
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.6px;
   font-variant-numeric: tabular-nums;
@@ -79,7 +88,7 @@
   width: 100%;
   max-width: 140px;
   height: 4px;
-  margin-top: 9px;
+  margin-top: 7px;
   border-radius: var(--radius-pill);
   background: var(--flow-soft);
   overflow: hidden;
@@ -97,7 +106,7 @@
   display: block;
   width: 48px;
   height: 4px;
-  margin-top: 9px;
+  margin-top: 7px;
   border-radius: var(--radius-pill);
   background: linear-gradient(90deg, var(--flow-from), var(--flow-to));
 }

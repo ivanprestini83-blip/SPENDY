@@ -119,7 +119,8 @@ try {
   {
     const html = render(400, 600)
     check('l\'arco è accessibile: progressbar 0–100 col valore della quota spesa (60%)', /<svg class="budget-card__arc"[^>]*role="progressbar"[^>]*aria-valuemin="0"[^>]*aria-valuemax="100"[^>]*aria-valuenow="60"/.test(html))
-    check('   l\'importo disponibile sta dentro l\'arco, con la quota spesa sotto', /budget-card__center[\s\S]*budget-card__amount[^>]*>€?\s?400,00/.test(html) && html.includes('<strong>60%</strong> speso'))
+    check('   importo disponibile accanto all\'arco, quota spesa dentro l\'arco', /budget-card__main[\s\S]*budget-card__amount[^>]*>400,00\s?€<\/p><div class="budget-card__gauge">/.test(html) && /budget-card__gauge[\s\S]*<strong>60%<\/strong> speso/.test(html))
+    check('   periodo sotto l\'etichetta "Disponibile"', /budget-card__heading"><p class="budget-card__label">[^<]+<\/p><p class="budget-card__period">7 ott – 6 nov<\/p>/.test(html))
     {
       const over = render(-120.5, 1120.5)
       check('   sforato: arco pieno (valore 100, mai oltre)', /aria-valuenow="100"/.test(over))
