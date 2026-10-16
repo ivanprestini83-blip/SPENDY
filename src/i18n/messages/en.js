@@ -127,6 +127,7 @@ export default {
       usual: 'vs. usual',
       learning: '🔍 I’m still learning your habits ({seen}/{needed} cycles).',
       quiet: 'Nothing unusual to report right now.',
+      goals: 'Your goals',
     },
   },
   coach: {

@@ -1,5 +1,8 @@
 import { RADAR_STATUS } from '../../utils/radarEngine.js'
+import { BEHAVIOR_TYPES } from '../../utils/behaviorEngine.js'
 import { formatSignedPercent } from '../../utils/format.js'
+import { goalsProgress } from '../../utils/goalProgress.js'
+import { goalIcon } from '../../utils/goalIcon.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import './RadarPreview.css'
 
@@ -23,9 +26,23 @@ function tileTitle(card) {
 // Home teaser of Radar Spendy. Renders whatever buildRadar() returned —
 // the same cards, same order, same tones as RadarScreen — just the top
 // few, compressed to one figure each. Nothing is computed here.
-export function RadarPreview({ radar, onOpen = () => {} }) {
+//
+// Gli obiettivi invece li mostra TUTTI, dallo store (`goals`): la scheda
+// "obiettivo" del Radar ne racconta uno solo (il più vicino al traguardo,
+// scelto dal BehaviorEngine), quindi qui la sua tessera lascia il posto
+// alla lista completa. RadarScreen e il motore restano come sono.
+export function RadarPreview({ radar, goals = [], onOpen = () => {}, onOpenGoals = onOpen }) {
   const { t } = useLanguage()
-  const cards = radar.status === RADAR_STATUS.ACTIVE ? radar.cards.slice(0, PREVIEW_LIMIT) : []
+  const goalRows = goalsProgress(goals)
+  const tileCards = goalRows.length > 0 ? radar.cards.filter((card) => card.type !== BEHAVIOR_TYPES.GOAL_PROGRESS) : radar.cards
+  const cards = radar.status === RADAR_STATUS.ACTIVE ? tileCards.slice(0, PREVIEW_LIMIT) : []
+  const goalTitle = tileTitle({ title: goalRows.length > 1 ? t('home.nav.goals') : t('radarcard.title.goal') })
+  // Senza tessere il messaggio segue lo storico, non lo stato del Radar: se
+  // l'unica scheda era quella dell'obiettivo (che non richiede storico), il
+  // Radar è ACTIVE ma ancora in apprendimento, e "niente da segnalare"
+  // sarebbe falso.
+  const stillLearning = radar.status === RADAR_STATUS.LEARNING
+    || (radar.status === RADAR_STATUS.ACTIVE && radar.cyclesSeen < radar.cyclesNeeded)
 
   return (
     <section className="radar-preview">
@@ -65,10 +82,49 @@ export function RadarPreview({ radar, onOpen = () => {} }) {
         </div>
       ) : (
         <button type="button" className="radar-preview__empty" onClick={onOpen}>
-          {radar.status === RADAR_STATUS.LEARNING
+          {stillLearning
             ? t('radar.preview.learning', { seen: radar.cyclesSeen, needed: radar.cyclesNeeded })
             : `✅ ${radar.quietMessage ?? t('radar.preview.quiet')}`}
         </button>
+      )}
+
+      {/* UNA sola tessera, quella dell'obiettivo del Radar, ma con dentro
+          tutti gli obiettivi affiancati: percentuale e sotto il nome. Ne
+          stanno tre; dal quarto in poi la fila scorre dentro la tessera. */}
+      {goalRows.length > 0 && (
+        <div
+          role="button"
+          tabIndex={0}
+          className="radar-preview__tile radar-preview__tile--goal radar-preview__goals-tile"
+          onClick={onOpenGoals}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              onOpenGoals()
+            }
+          }}
+        >
+          <span className="radar-preview__tile-badge" aria-hidden="true">🎯</span>
+          <span className="radar-preview__tile-title">{goalTitle}</span>
+          <span
+            className={`radar-preview__goal-list radar-preview__goal-list--${goalRows.length > 3 ? 'many' : goalRows.length}`}
+            role="list"
+            aria-label={t('radar.preview.goals')}
+          >
+            {goalRows.map((goal, index) => (
+              <span
+                key={goal.id ?? index}
+                role="listitem"
+                className={`radar-preview__goal-item${goal.completed ? ' radar-preview__goal-item--done' : ''}`}
+              >
+                {/* Dal nome dell'obiettivo ("Casa" → 🏠), se non ne ha già una sua. */}
+                <span className="radar-preview__goal-icon" aria-hidden="true">{goalIcon(goal)}</span>
+                <span className="radar-preview__tile-value">{goal.percent}%</span>
+                <span className="radar-preview__tile-label radar-preview__goal-name">{goal.label}</span>
+              </span>
+            ))}
+          </span>
+        </div>
       )}
     </section>
   )

@@ -127,6 +127,7 @@ export default {
       usual: 'respecto a lo habitual',
       learning: '🔍 Todavía estoy aprendiendo tus hábitos ({seen}/{needed} ciclos).',
       quiet: 'No hay ninguna anomalía que señalar por ahora.',
+      goals: 'Tus objetivos',
     },
   },
   coach: {

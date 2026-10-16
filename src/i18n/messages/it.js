@@ -133,6 +133,7 @@ export default {
       usual: 'rispetto al solito',
       learning: '🔍 Sto ancora imparando le tue abitudini ({seen}/{needed} cicli).',
       quiet: 'Nessuna anomalia da segnalare al momento.',
+      goals: 'I tuoi obiettivi',
     },
   },
   // Fase 4A: frasi di Spendy, Radar, Posso permettermelo?, notifiche,

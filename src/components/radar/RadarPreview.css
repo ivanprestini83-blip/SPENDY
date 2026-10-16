@@ -153,3 +153,74 @@
     scroll-snap-align: start;
   }
 }
+
+/* La tessera degli obiettivi: una sola, a tutta riga, sotto le altre
+   tessere del Radar (o sotto il messaggio quando non ce ne sono). */
+.radar-preview__goals-tile {
+  width: 100%;
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+.radar-preview__head + .radar-preview__goals-tile {
+  margin-top: 0;
+}
+
+/* Dentro, gli obiettivi affiancati: fino a tre riempiono la larghezza;
+   dal quarto la fila scorre e se ne vedono tre più un filo del successivo. */
+.radar-preview__goal-list {
+  --goal-columns: 3;
+
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: calc((100% - (var(--goal-columns) - 1) * 12px) / var(--goal-columns));
+  gap: 12px;
+  width: calc(100% + 22px);
+  margin: 2px -11px 0;
+  padding: 0 11px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 11px;
+  scrollbar-width: none;
+}
+
+.radar-preview__goal-list::-webkit-scrollbar {
+  display: none;
+}
+
+.radar-preview__goal-list--1 { --goal-columns: 1; }
+.radar-preview__goal-list--2 { --goal-columns: 2; }
+.radar-preview__goal-list--many { --goal-columns: 3.3; }
+
+.radar-preview__goal-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+.radar-preview__goal-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  font-size: 16px;
+  line-height: 1;
+  box-shadow: 0 4px 10px -6px rgba(16, 26, 51, 0.25);
+}
+
+.radar-preview__goal-item--done .radar-preview__tile-value {
+  color: var(--color-accent-mint);
+}
+
+.radar-preview__goal-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
