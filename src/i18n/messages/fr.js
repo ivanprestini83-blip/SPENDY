@@ -393,6 +393,7 @@ export default {
       previous: '{change} par rapport à la période précédente',
       open: 'Voir les dépenses',
       all: 'Toutes les catégories ({count})',
+      others: '{count} autres',
     },
   },
   andamento: {

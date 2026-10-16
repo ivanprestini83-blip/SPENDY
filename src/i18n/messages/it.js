@@ -410,6 +410,7 @@ export default {
       previous: '{change} rispetto al periodo precedente',
       open: 'Vedi le spese',
       all: 'Tutte le categorie ({count})',
+      others: 'Altre {count}',
     },
   },
   andamento: {

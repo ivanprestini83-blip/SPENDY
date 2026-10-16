@@ -391,6 +391,7 @@ export default {
       previous: '{change} respecto al periodo anterior',
       open: 'Ver los gastos',
       all: 'Todas las categorías ({count})',
+      others: '{count} más',
     },
   },
   andamento: {

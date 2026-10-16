@@ -391,6 +391,7 @@ export default {
       previous: '{change} vs. the previous period',
       open: 'See expenses',
       all: 'All categories ({count})',
+      others: '{count} more',
     },
   },
   andamento: {

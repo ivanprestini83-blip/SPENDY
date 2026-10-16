@@ -90,12 +90,17 @@ export function AnalyticsPage() {
 
       {monthTotal > 0 ? (
         <>
-          <DonutChart segments={segments} centerLabel={t('analytics.total')} centerValue={formatCurrency(monthTotal)} />
-
-          {/* La mappa delle categorie: area di ogni tessera proporzionale
-              all'importo (stesse righe, stessi importi e colori della
-              ciambella). Il tocco apre lo stesso dettaglio di sempre. */}
+          {/* La mappa delle categorie, protagonista della pagina: area di
+              ogni tessera proporzionale all'importo (stesse righe, stessi
+              importi e colori della ciambella). Il tocco apre lo stesso
+              dettaglio di sempre. */}
           <CategoryTreemap rows={rows} total={monthTotal} onOpenDetail={setOpenCategoryId} />
+
+          {/* La ciambella sotto, più piccola: il totale del periodo e le
+              stesse proporzioni in colpo d'occhio. */}
+          <div className="analytics-page__donut">
+            <DonutChart segments={segments} size={176} thickness={24} centerLabel={t('analytics.total')} centerValue={formatCurrency(monthTotal)} />
+          </div>
 
           {/* La lista completa di prima, con il confronto col periodo
               precedente: chiusa, ma sempre a portata (e leggibile da

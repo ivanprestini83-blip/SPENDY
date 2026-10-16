@@ -233,7 +233,12 @@
   color: var(--color-text-tertiary);
 }
 
-/* La mappa delle categorie sotto la ciambella. */
-.analytics-page .category-treemap {
-  margin-top: 22px;
+/* La ciambella, più piccola, sotto la mappa delle categorie. */
+.analytics-page__donut {
+  margin: 22px 0 18px;
+}
+
+/* Centro della ciambella proporzionato alla misura ridotta. */
+.analytics-page__donut .donut-chart__center-value {
+  font-size: 20px;
 }

@@ -45,8 +45,8 @@ const FILES = [
 // =====================================================================
 section('1. Dizionari: nessuna chiave mancante, stessi segnaposto')
 // =====================================================================
-// +6: la mappa delle categorie in Analisi (analytics.treemap.*).
-check(`chiavi nuove: ${NEW_KEYS.length} (common ${NEW_KEYS.filter((k) => k.startsWith('common.')).length}, analytics ${NEW_KEYS.filter((k) => k.startsWith('analytics.')).length}, andamento ${NEW_KEYS.filter((k) => k.startsWith('andamento.')).length})`, NEW_KEYS.length === 117)
+// +7: la mappa delle categorie in Analisi (analytics.treemap.*).
+check(`chiavi nuove: ${NEW_KEYS.length} (common ${NEW_KEYS.filter((k) => k.startsWith('common.')).length}, analytics ${NEW_KEYS.filter((k) => k.startsWith('analytics.')).length}, andamento ${NEW_KEYS.filter((k) => k.startsWith('andamento.')).length})`, NEW_KEYS.length === 118)
 for (const lang of LANGS) {
   const missing = NEW_KEYS.filter((key) => typeof lookup(MESSAGES[lang], key) !== 'string' || !lookup(MESSAGES[lang], key).trim())
   check(`${lang}: tutte presenti e non vuote`, missing.length === 0, missing.join(', '))

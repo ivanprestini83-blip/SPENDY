@@ -18,7 +18,7 @@ import react from '@vitejs/plugin-react'
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { check, section, report } from '../../sync/testkit.mjs'
-import { squarifiedTreemap, treemapHeight, tileDensity } from '../../utils/treemap.js'
+import { squarifiedTreemap, treemapHeight, tileDensity, groupSmallTiles, OTHERS_ID } from '../../utils/treemap.js'
 import { MESSAGES } from '../../i18n/translate.js'
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
@@ -69,18 +69,33 @@ verify('due categorie uguali', [{ id: 'a', value: 10 }, { id: 'b', value: 10 }],
   check('nessun elemento, o dimensioni non valide → nessuna tessera', squarifiedTreemap([], 200, 200).length === 0 && squarifiedTreemap(SAMPLE, 0, 200).length === 0 && squarifiedTreemap(SAMPLE, 200, Number.NaN).length === 0 && squarifiedTreemap(null, 200, 200).length === 0)
   check('non modifica l\'elenco ricevuto (ordine compreso)', (() => { const input = [{ id: 'p', value: 1 }, { id: 'g', value: 9 }]; squarifiedTreemap(input, 100, 100); return input[0].id === 'p' })())
 }
-check('altezza: più categorie, più spazio; mai sotto 220 px né sopra 1,4 × larghezza', treemapHeight(340, 2) === 220 && treemapHeight(340, 8) > treemapHeight(340, 4) && treemapHeight(340, 30) === Math.round(340 * 1.4) && treemapHeight(0, 5) === 0)
+check('altezza: più categorie, più spazio; mai sotto 260 px né sopra 1,6 × larghezza', treemapHeight(340, 2) === 260 && treemapHeight(340, 8) > treemapHeight(340, 4) && treemapHeight(340, 30) === Math.round(340 * 1.6) && treemapHeight(0, 5) === 0)
+{
+  // Raggruppamento: le categorie troppo piccole per i loro numeri vanno in "Altre".
+  const items = [320, 260, 213.35, 149.99, 129.3, 95, 89.99, 72, 62.5, 58.4, 48, 44.9, 39, 35, 31.5, 23.9, 12, 7.7].map((value, i) => ({ id: `g${i}`, value }))
+  const sum = items.reduce((a, b) => a + b.value, 0)
+  const fits = (r) => tileDensity(r.width, r.height, 7, `${Math.round((r.value / sum) * 100)}%`.length) !== null
+  const { rects, grouped } = groupSmallTiles(items, 360, treemapHeight(360, 18), fits)
+  const others = rects.find((r) => r.id === OTHERS_ID)
+  check('raggruppamento: ogni tessera mostrata riesce a mostrare importo e percentuale', rects.every(fits))
+  check('   le raccolte in "Altre" sono le più piccole, e solo quelle che non ci stavano', grouped.length > 0 && grouped.every((g) => g.value <= Math.min(...rects.filter((r) => r.id !== OTHERS_ID).map((r) => r.value))), grouped.map((g) => g.value).join(','))
+  check('   "Altre" ha l\'area della somma (proporzioni vere) e nessuna categoria si perde', Math.abs(others.value - grouped.reduce((a, b) => a + b.value, 0)) < EPS && rects.length - 1 + grouped.length === items.length)
+  const roomy = groupSmallTiles(items.slice(0, 5), 360, 360, fits)
+  check('   con poche categorie e spazio sufficiente non si raggruppa niente', roomy.grouped.length === 0 && roomy.rects.length === 5)
+  const single = groupSmallTiles([{ id: 's', value: 1 }], 10, 10, () => false)
+  check('   una sola categoria non finisce mai in "Altre"', single.grouped.length === 0 && single.rects.length === 1)
+}
 
 // =====================================================================
 section('2. Quanto contenuto ci sta in una tessera')
 // =====================================================================
-check('grande → icona, nome, importo e percentuale', tileDensity(170, 190, 7) === 'full')
-check('media → icona, nome e importo', tileDensity(95, 110, 7) === 'name')
+check('grande → icona, nome, importo grande e percentuale', tileDensity(170, 190, 7) === 'full')
+check('media → icona, nome, importo e percentuale', tileDensity(95, 125, 7) === 'name')
 check('bassa e larga → icona, importo e percentuale in riga', tileDensity(200, 60, 7) === 'wide')
-check('media e bassa → icona e importo in riga', tileDensity(128, 71, 7) === 'compact')
-check('piccola → icona e percentuale', tileDensity(60, 60, 7) === 'short')
-check('minuscola → solo l\'icona (il resto al tocco)', tileDensity(30, 40, 7) === 'icon')
-check('un importo lungo non entra in una tessera stretta: si scende di livello invece di tagliarlo', tileDensity(115, 140, 7) === 'full' && tileDensity(115, 140, 12) !== 'full' && tileDensity(200, 60, 12) !== 'wide')
+check('media e bassa → icona accanto a importo e percentuale', tileDensity(110, 60, 7) === 'compact')
+check('piccola e stretta → icona, importo e percentuale in colonna', tileDensity(64, 70, 7) === 'stack')
+check('troppo piccola per importo e percentuale → null (va in "Altre")', tileDensity(30, 40, 7) === null && tileDensity(40, 80, 7) === null)
+check('un importo lungo non entra in una tessera stretta: si scende di livello invece di tagliarlo', tileDensity(115, 140, 7) === 'full' && tileDensity(115, 140, 12) !== 'full' && tileDensity(180, 60, 7) === 'wide' && tileDensity(180, 60, 12) !== 'wide')
 
 // =====================================================================
 section('3. CategoryTreemap (componente vero)')
@@ -122,21 +137,33 @@ try {
   const total = rows.reduce((sum, row) => sum + row.current, 0)
   const render = (list = rows) => renderToStaticMarkup(h(CategoryTreemap, { rows: list, total: list.reduce((sum, row) => sum + row.current, 0) }))
   const tilesOf = (html) => html.match(/<button type="button" class="category-treemap__tile[^"]*"[^>]*>[\s\S]*?<\/button>/g) ?? []
-  const styleOf = (tile) => Object.fromEntries([...tile.matchAll(/(left|top|width|height):([\d.]+)px/g)].map((m) => [m[1], Number(m[2])]))
+  // React scrive 0 senza unità ("left:0"), gli altri valori in px.
+  const styleOf = (tile) => Object.fromEntries([...tile.matchAll(/(left|top|width|height):([\d.]+)(?:px)?[;"]/g)].map((m) => [m[1], Number(m[2])]))
   const html = render()
   const tiles = tilesOf(html)
-  check('una tessera per categoria, posizionata (left/top/width/height)', tiles.length === 8 && tiles.every((tile) => ['left', 'top', 'width', 'height'].every((k) => k in styleOf(tile))))
-  const areas = tiles.map((tile) => { const s = styleOf(tile); return (s.width + 6) * (s.height + 6) })
+  // Nome, importo e percentuale di ogni tessera, dall'etichetta accessibile.
+  const infoOf = (tile) => { const m = tile.match(/aria-label="([^"]+), ([^",]+(?:,\d+)?[^",]*), (\d+)%"/); return m ? { name: m[1], amount: m[2], share: Number(m[3]) } : null }
+  const infos = tiles.map(infoOf)
+  const othersInfo = infos.find((info) => /^Altre \d+$/.test(info.name))
+  const groupedCount = othersInfo ? Number(othersInfo.name.split(' ')[1]) : 0
+  check('ogni categoria ha la sua tessera o è contata in "Altre" (nessuna persa)', infos.every(Boolean) && infos.length - (othersInfo ? 1 : 0) + groupedCount === rows.length, `${infos.length} tessere, altre ${groupedCount}`)
+  check('   ogni tessera posizionata (left/top/width/height)', tiles.every((tile) => ['left', 'top', 'width', 'height'].every((k) => k in styleOf(tile))))
+  const areas = tiles.map((tile) => { const s = styleOf(tile); return s.width * s.height })
+  check('   tessere attaccate: insieme riempiono esattamente la mappa (nessuno spazio fra loro)', Math.abs(areas.reduce((x, y) => x + y, 0) - 340 * treemapHeight(340, 8)) < 1)
   check('   le aree seguono gli importi (più spesa → tessera più grande)', areas.every((a, i) => i === 0 || a <= areas[i - 1] + 1) && Math.abs(areas[0] / areas.reduce((x, y) => x + y, 0) - 417 / total) < 0.01)
-  check('   dimensioni diverse fra le tessere (una vera treemap)', new Set(areas.map(Math.round)).size === 8)
-  check('   colore fisso della categoria su ogni tessera', tiles.every((tile) => /--tile-color:#[0-9a-f]{6}/i.test(tile)))
-  check('   etichetta completa per gli screen reader: nome, importo, percentuale', tiles[0].includes(`aria-label="Bolletta luce, ${formatCurrency(417)}, 28%"`) && tiles[7].includes(`aria-label="Altro, ${formatCurrency(33)}, 2%"`))
+  check('   dimensioni diverse fra le tessere (una vera treemap)', new Set(areas.map(Math.round)).size === tiles.length)
+  check('   colore su ogni tessera (fisso della categoria; lilla per "Altre")', tiles.every((tile) => /--tile-color:#[0-9a-f]{6}/i.test(tile)))
+  check('   etichetta completa per gli screen reader: nome, importo, percentuale', tiles[0].includes(`aria-label="Bolletta luce, ${formatCurrency(417)}, 28%"`))
   check('   la più grande mostra icona, nome, importo e percentuale', tiles[0].includes('--full') && tiles[0].includes('⚡') && tiles[0].includes('>Bolletta luce<') && tiles[0].includes(`>${formatCurrency(417)}<`) && tiles[0].includes('>28%<'))
-  check('   le piccole mostrano solo ciò che ci sta (mai nome o importo tagliati)', tiles.slice(5).every((tile) => !/--full|--name/.test(tile) || tile.includes('--name')) && tiles.every((tile) => {
-    const density = tile.match(/category-treemap__tile--(full|name|wide|compact|short|icon)/)[1]
-    const hasName = tile.includes('category-treemap__name')
-    const hasAmount = tile.includes('category-treemap__amount')
-    return hasName === (density === 'full' || density === 'name') && hasAmount === (density !== 'short' && density !== 'icon')
+  check('   OGNI tessera mostra il suo importo e la sua percentuale', tiles.every((tile, i) => tile.includes(`>${infos[i].amount}<`) && tile.includes(`>${infos[i].share}%<`)))
+  check('   importi e percentuali delle categorie sono quelli dei dati', infos.filter((info) => info !== othersInfo).every((info) => { const row = rows.find((r) => r.category.label === info.name); return row && info.amount === formatCurrency(row.current) && info.share === Math.round((row.current / total) * 100) }))
+  if (othersInfo) {
+    const groupedRows = [...rows].sort((a, b) => a.current - b.current).slice(0, groupedCount)
+    check('   "Altre": somma e quota delle categorie raccolte (le più piccole)', othersInfo.amount === formatCurrency(groupedRows.reduce((a, r) => a + r.current, 0)) && othersInfo.share === Math.round((groupedRows.reduce((a, r) => a + r.current, 0) / total) * 100))
+  }
+  check('   il nome solo dove ci sta (tessere grandi e medie)', tiles.every((tile) => {
+    const density = tile.match(/category-treemap__tile--(full|name|wide|compact|stack)/)[1]
+    return tile.includes('category-treemap__name') === (density === 'full' || density === 'name')
   }))
   check('   ogni tessera è un pulsante (tocco = dettaglio)', tiles.every((tile) => tile.includes('aria-pressed="false"')))
   check('senza selezione: suggerimento "Tocca una categoria…"', html.includes(MESSAGES.it.analytics.treemap.hint))
@@ -147,8 +174,13 @@ try {
     const manyTiles = tilesOf(manyHtml)
     const maxBottom = Math.max(...manyTiles.map((tile) => { const s = styleOf(tile); return s.top + s.height }))
     const maxRight = Math.max(...manyTiles.map((tile) => { const s = styleOf(tile); return s.left + s.width }))
-    check('18 categorie: tutte presenti, dentro la mappa, nessun overflow', manyTiles.length === 18 && maxRight <= 340 && maxBottom <= treemapHeight(340, 18))
-    check('   anche le minuscole restano accessibili (pulsante con etichetta completa)', manyTiles.every((tile) => /aria-label="Categoria \d+, [^"]+, \d+%"/.test(tile)))
+    const othersTile = manyTiles.find((tile) => tile.includes('category-treemap__tile--others'))
+    const shown = manyTiles.filter((tile) => !tile.includes('--others')).length
+    const groupedCount = Number(othersTile?.match(/aria-label="Altre (\d+),/)?.[1])
+    check('18 categorie: dentro la mappa, nessun overflow', maxRight <= 340.01 && maxBottom <= treemapHeight(340, 18) + 0.01)
+    check('   le più piccole sono raccolte in "Altre N", nessuna persa', Boolean(othersTile) && shown + groupedCount === 18, `${shown} + ${groupedCount}`)
+    check('   anche "Altre" mostra importo e percentuale', /category-treemap__amount">[^<]+</.test(othersTile) && /category-treemap__share">\d+%</.test(othersTile))
+    check('   tutte le tessere sono pulsanti con etichetta completa', manyTiles.every((tile) => /aria-label="(Categoria \d+|Altre \d+), [^"]+, \d+%"/.test(tile)))
   }
   {
     const one = render([rows[0]])
@@ -159,11 +191,11 @@ try {
     check(`${lang}: suggerimento e area tradotti`, render().includes(MESSAGES[lang].analytics.treemap.hint) && render().includes(`aria-label="${MESSAGES[lang].analytics.treemap.label}"`))
   }
   globalThis.__treemapTest.language = 'it'
-  check('chiavi analytics.treemap.* in it/en/es/fr, stessi segnaposto', ['label', 'hint', 'share', 'previous', 'open', 'all'].every((key) => ['it', 'en', 'es', 'fr'].every((lang) => typeof MESSAGES[lang].analytics.treemap[key] === 'string' && MESSAGES[lang].analytics.treemap[key].trim()
+  check('chiavi analytics.treemap.* in it/en/es/fr, stessi segnaposto', ['label', 'hint', 'share', 'previous', 'open', 'all', 'others'].every((key) => ['it', 'en', 'es', 'fr'].every((lang) => typeof MESSAGES[lang].analytics.treemap[key] === 'string' && MESSAGES[lang].analytics.treemap[key].trim()
     && (MESSAGES[lang].analytics.treemap[key].match(/\{\w+\}/g) ?? []).join() === (MESSAGES.it.analytics.treemap[key].match(/\{\w+\}/g) ?? []).join())))
   {
     const page = readFileSync(join(ROOT, 'src/pages/AnalyticsPage.jsx'), 'utf8')
-    check('Analisi: ciambella invariata, treemap sotto, lista completa in una sezione espandibile', page.indexOf('<DonutChart') < page.indexOf('<CategoryTreemap') && page.indexOf('<CategoryTreemap') < page.indexOf('<details') && page.includes('onOpenDetail={setOpenCategoryId}') && page.includes('analytics-page__legend-row--button'))
+    check('Analisi: treemap in alto, ciambella (stessi dati) sotto e più piccola, poi la lista completa espandibile', page.indexOf('<CategoryTreemap') < page.indexOf('<DonutChart') && page.indexOf('<DonutChart') < page.indexOf('<details') && /<DonutChart segments=\{segments\} size=\{176\}/.test(page) && page.includes('onOpenDetail={setOpenCategoryId}') && page.includes('analytics-page__legend-row--button'))
   }
 } finally {
   await server.close()

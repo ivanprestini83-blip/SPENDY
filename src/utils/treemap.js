@@ -86,39 +86,76 @@ export function squarifiedTreemap(items, width, height) {
   return rects
 }
 
-// L'altezza della treemap per una certa larghezza: più categorie, più
-// spazio, così anche le piccole restano toccabili. Mai sotto i 220 px né
-// sopra 1,4 volte la larghezza.
+// L'altezza della treemap per una certa larghezza: è la protagonista della
+// pagina, e più categorie ha più spazio prende. Mai sotto i 260 px né
+// sopra 1,6 volte la larghezza.
 export function treemapHeight(width, count) {
   if (!(width > 0)) return 0
-  const ratio = count <= 3 ? 0.62 : count <= 6 ? 0.85 : count <= 10 ? 1.05 : count <= 14 ? 1.2 : 1.4
-  return Math.round(Math.max(220, width * ratio))
+  const ratio = count <= 3 ? 0.75 : count <= 6 ? 1 : count <= 10 ? 1.25 : count <= 14 ? 1.45 : 1.6
+  return Math.round(Math.max(260, width * ratio))
 }
 
-// Quanto contenuto ci sta in una tessera di queste dimensioni (px, già al
-// netto dello spazio fra le tessere), sapendo quanti caratteri ha
-// l'importo da scrivere. Le soglie vengono dallo spazio che serve davvero
-// (icona 26–34 px, nome fino a due righe, importo a 15–18 px su una riga,
-// percentuale, margini interni), così nessun testo si sovrappone e nessun
-// importo viene tagliato:
-//   full  → icona, nome, importo e percentuale
-//   name  → icona, nome e importo
+// Quanto contenuto ci sta in una tessera di queste dimensioni (px), sapendo
+// quanti caratteri hanno l'importo e la percentuale. Importo e percentuale
+// ci sono SEMPRE; cambia quanto altro ci sta. Le soglie vengono dallo
+// spazio che serve davvero (icona, nome fino a due righe, importo su una
+// riga, percentuale, margini interni), così nessun testo si sovrappone e
+// nessun numero viene tagliato:
+//   full    → icona, nome, importo grande e percentuale
+//   name    → icona, nome, importo e percentuale
 //   wide    → icona, importo e percentuale su una riga (basse e larghe)
-//   compact → icona e importo su una riga
-//   short   → icona e percentuale
-//   icon  → solo l'icona (il resto nel dettaglio al tocco)
-// Larghezza media di una cifra in Plus Jakarta Sans grassetto: ~0,62 em.
+//   compact → icona a sinistra, importo e percentuale uno sotto l'altro
+//   stack   → icona, importo e percentuale in colonna, piccoli
+//   null    → nemmeno importo e percentuale ci stanno: la categoria va
+//             raccolta in "Altre" (groupSmallTiles qui sotto)
+// Larghezza media di un carattere di cifre in Plus Jakarta Sans grassetto:
+// ~0,62 em.
 const DIGIT_EM = 0.62
-const amountWidth = (chars, fontSize) => chars * DIGIT_EM * fontSize
+const textWidth = (chars, fontSize) => chars * DIGIT_EM * fontSize
 
-export function tileDensity(width, height, amountChars = 9) {
+export function tileDensity(width, height, amountChars = 9, shareChars = 3) {
   const chars = Number.isFinite(amountChars) && amountChars > 0 ? amountChars : 9
-  if (height >= 128 && width >= Math.max(110, amountWidth(chars, 18) + 22)) return 'full'
-  if (height >= 104 && width >= Math.max(84, amountWidth(chars, 15) + 22)) return 'name'
-  // icona 26 + due spazi da 8 + percentuale ~34 + margini 20
-  if (height >= 56 && width >= amountWidth(chars, 15) + 96) return 'wide'
-  // icona 26 + uno spazio da 8 + margini 20
-  if (height >= 48 && width >= amountWidth(chars, 15) + 54) return 'compact'
-  if (height >= 52 && width >= 46) return 'short'
-  return 'icon'
+  const share = Number.isFinite(shareChars) && shareChars > 0 ? shareChars : 3
+  if (height >= 132 && width >= Math.max(110, textWidth(chars, 18) + 24)) return 'full'
+  if (height >= 120 && width >= Math.max(84, textWidth(chars, 15) + 22)) return 'name'
+  // icona 26 + due spazi da 8 + percentuale + margini 22
+  if (height >= 50 && width >= textWidth(chars, 15) + textWidth(share, 12) + 64) return 'wide'
+  // icona 24 + spazio 7 + importo a 14 px + margini 16
+  if (height >= 44 && width >= textWidth(chars, 14) + 47) return 'compact'
+  // icona 18 + importo a 12 px + percentuale a 11 px + margini 10
+  if (height >= 58 && width >= textWidth(chars, 12) + 10) return 'stack'
+  return null
+}
+
+// Le categorie troppo piccole per mostrare importo e percentuale non
+// spariscono: si raccolgono in un'unica tessera "Altre", la cui area è la
+// somma delle loro (le proporzioni restano vere). Si parte da tutte le
+// categorie e, finché una tessera non riesce a mostrare i suoi numeri, la
+// categoria più piccola passa nel gruppo e si ridispone tutto.
+//
+//   items  → [{ id, value, ... }] (qualsiasi ordine)
+//   fits   → (rect) => true se in quella tessera ci stanno i suoi numeri
+//            (rect ha anche `grouped` per la tessera "Altre")
+// Restituisce { rects, grouped }: le tessere da disegnare (l'eventuale
+// "Altre" ha id OTHERS_ID e `grouped` con le categorie raccolte) e le
+// categorie raccolte, dalla più grande alla più piccola.
+export const OTHERS_ID = '__others__'
+
+export function groupSmallTiles(items, width, height, fits) {
+  const valid = (Array.isArray(items) ? items : [])
+    .filter((item) => item && Number.isFinite(item.value) && item.value > 0)
+    .sort((a, b) => b.value - a.value)
+  let visible = valid
+  let grouped = []
+  for (;;) {
+    const others = grouped.length > 0
+      ? [{ id: OTHERS_ID, value: grouped.reduce((sum, item) => sum + item.value, 0), grouped }]
+      : []
+    const rects = squarifiedTreemap([...visible, ...others], width, height)
+    const allFit = rects.every((rect) => fits(rect))
+    // Una sola categoria rimasta (o nessuna): non c'è niente da raccogliere.
+    if (allFit || visible.length <= 1) return { rects, grouped }
+    grouped = [visible[visible.length - 1], ...grouped]
+    visible = visible.slice(0, -1)
+  }
 }
