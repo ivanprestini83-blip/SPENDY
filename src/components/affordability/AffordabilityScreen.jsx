@@ -5,6 +5,7 @@ import { currentCycleSalary } from '../../utils/salary.js'
 import { evaluateAffordability } from '../../utils/affordability.js'
 import { currencySymbol } from '../../utils/format.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
+import { MASCOT_NAME } from '../../brand.js'
 import './AffordabilityScreen.css'
 
 const LEVEL_EMOJI = { green: '🟢', yellow: '🟡', red: '🔴' }
@@ -14,7 +15,7 @@ const LEVEL_EMOJI = { green: '🟢', yellow: '🟡', red: '🔴' }
 // room. No AI involved: evaluateAffordability only ever looks at numbers
 // already in the store.
 export function AffordabilityScreen({ onClose }) {
-  const { language, currency } = useLanguage()
+  const { language, currency, t } = useLanguage()
   const today = useAppStore((state) => state.today)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
@@ -38,15 +39,15 @@ export function AffordabilityScreen({ onClose }) {
   return (
     <div className="affordability-screen">
       <div className="affordability-screen__header">
-        <button type="button" className="affordability-screen__back" onClick={onClose} aria-label="Chiudi">
+        <button type="button" className="affordability-screen__back" onClick={onClose} aria-label={t('affordability.screen.close')}>
           ←
         </button>
-        <p className="affordability-screen__title">Posso permettermelo?</p>
+        <p className="affordability-screen__title">{t('affordability.screen.title')}</p>
       </div>
 
       <div className="affordability-screen__body">
         <label className="affordability-screen__field">
-          <span>Quanto vuoi spendere?</span>
+          <span>{t('affordability.screen.amount')}</span>
           <div className="affordability-screen__amount-input">
             <span>{currencySymbol(language, currency)}</span>
             <input
@@ -63,18 +64,18 @@ export function AffordabilityScreen({ onClose }) {
         </label>
 
         <label className="affordability-screen__field">
-          <span>Cosa vuoi comprare?</span>
+          <span>{t('affordability.screen.item')}</span>
           <input
             type="text"
             className="affordability-screen__text-input"
-            placeholder="Es. Scarpe nuove, weekend fuori…"
+            placeholder={t('affordability.screen.placeholder')}
             value={item}
             onChange={(event) => setItem(event.target.value)}
           />
         </label>
 
         <button type="button" className="affordability-screen__cta" onClick={handleAsk}>
-          Chiedi a Spendy
+          {t('affordability.screen.ask', { name: MASCOT_NAME })}
         </button>
 
         {result && (
@@ -88,8 +89,7 @@ export function AffordabilityScreen({ onClose }) {
         )}
 
         <p className="affordability-screen__disclaimer">
-          Spendy fa una semplice simulazione basata sui tuoi dati locali: non è una consulenza
-          finanziaria professionale.
+          {t('affordability.screen.disclaimer', { name: MASCOT_NAME })}
         </p>
       </div>
     </div>

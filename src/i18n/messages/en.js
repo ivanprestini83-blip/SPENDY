@@ -298,6 +298,15 @@ export default {
       message: 'After this purchase you’d only have {amount} left until the end of the cycle.',
     },
     most: 'This purchase alone would use almost all of your remaining budget ({amount}).',
+    screen: {
+      title: 'Can I afford it?',
+      close: 'Close',
+      amount: 'How much do you want to spend?',
+      item: 'What do you want to buy?',
+      placeholder: 'E.g. New shoes, a weekend away…',
+      ask: 'Ask {name}',
+      disclaimer: '{name} runs a simple simulation based on your own data: this is not professional financial advice.',
+    },
   },
   notifications: {
     action: {

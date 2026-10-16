@@ -300,6 +300,15 @@ export default {
       message: 'Après cette dépense, il ne vous resterait que {amount} jusqu’à la fin du cycle.',
     },
     most: 'Cette dépense à elle seule utiliserait presque tout le budget restant ({amount}).',
+    screen: {
+      title: 'Puis-je me le permettre ?',
+      close: 'Fermer',
+      amount: 'Combien voulez-vous dépenser ?',
+      item: 'Que voulez-vous acheter ?',
+      placeholder: 'Ex. Nouvelles chaussures, un week-end…',
+      ask: 'Demander à {name}',
+      disclaimer: '{name} fait une simple simulation basée sur vos données : ce n’est pas un conseil financier professionnel.',
+    },
   },
   notifications: {
     action: {

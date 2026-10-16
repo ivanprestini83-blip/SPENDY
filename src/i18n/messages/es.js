@@ -298,6 +298,15 @@ export default {
       message: 'Después de este gasto solo te quedarían {amount} hasta el final del ciclo.',
     },
     most: 'Este gasto por sí solo usaría casi todo el presupuesto restante ({amount}).',
+    screen: {
+      title: '¿Me lo puedo permitir?',
+      close: 'Cerrar',
+      amount: '¿Cuánto quieres gastar?',
+      item: '¿Qué quieres comprar?',
+      placeholder: 'Ej. Zapatos nuevos, un fin de semana fuera…',
+      ask: 'Pregunta a {name}',
+      disclaimer: '{name} hace una simulación sencilla basada en tus datos: no es asesoramiento financiero profesional.',
+    },
   },
   notifications: {
     action: {

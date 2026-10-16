@@ -61,7 +61,8 @@ section('1. Dizionari: nessuna chiave mancante, parametri identici')
 // =====================================================================
 // 150 della Fase 4A + 6 testi alternativi dell'immagine di Spendy (mascot.alt.*).
 // Fase 2B.7: +1 (coach.goalreachedtight, obiettivo raggiunto con il budget finito).
-check(`chiavi nuove della Fase 4A: ${NEW_KEYS.length}`, NEW_KEYS.length === 157, NEW_KEYS.length)
+// +7 testi fissi della schermata "Posso permettermelo?" (affordability.screen.*).
+check(`chiavi nuove della Fase 4A: ${NEW_KEYS.length}`, NEW_KEYS.length === 164, NEW_KEYS.length)
 for (const lang of LANGS) {
   const missing = NEW_KEYS.filter((key) => typeof lookup(MESSAGES[lang], key) !== 'string' || !lookup(MESSAGES[lang], key).trim())
   check(`${lang}: tutte presenti e non vuote`, missing.length === 0, missing.join(', '))
@@ -78,7 +79,7 @@ for (const lang of LANGS) {
     'src/utils/affordability.js': 'affordability.', 'src/notifications/notificationRules.js': 'notifications.',
   }
   // Il dettaglio di una scheda usa radarcard.importance (stesso paragrafo del consiglio).
-  for (const path of [...ENGINE_FILES, 'src/components/modals/RadarDetailModal.jsx']) {
+  for (const path of [...ENGINE_FILES, 'src/components/modals/RadarDetailModal.jsx', 'src/components/affordability/AffordabilityScreen.jsx']) {
     const source = code(path)
     for (const m of source.matchAll(/'((?:coach|mascot|radarcard|affordability|notifications|categories)\.[a-z.]+)'/g)) used.add(m[1])
     if (PREFIX[path]) for (const m of source.matchAll(/\bt\('([a-z.]+)'/g)) used.add(PREFIX[path] + m[1])

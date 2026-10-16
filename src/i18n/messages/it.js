@@ -310,6 +310,15 @@ export default {
       message: 'Dopo questa spesa ti resterebbero solo {amount} fino alla fine del ciclo.',
     },
     most: 'Questa spesa da sola userebbe quasi tutto il budget rimanente ({amount}).',
+    screen: {
+      title: 'Posso permettermelo?',
+      close: 'Chiudi',
+      amount: 'Quanto vuoi spendere?',
+      item: 'Cosa vuoi comprare?',
+      placeholder: 'Es. Scarpe nuove, weekend fuori…',
+      ask: 'Chiedi a {name}',
+      disclaimer: '{name} fa una semplice simulazione basata sui tuoi dati locali: non è una consulenza finanziaria professionale.',
+    },
   },
   // Le notifiche si salvano come testo quando nascono: queste valgono per le
   // nuove, quelle già salvate restano nella lingua in cui sono nate.
