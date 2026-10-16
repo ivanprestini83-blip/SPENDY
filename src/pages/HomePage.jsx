@@ -177,20 +177,17 @@ export function HomePage() {
         available={available}
         spent={spentThisMonth}
         monthlyBudget={monthlyBudget}
+        extraIncome={financialData.extraIncomeThisMonth}
         period={cycleLabel}
         hidden={amountHidden}
         onToggleHidden={toggleAmountHidden}
       />
 
-      {/* Entrate del ciclo: lo stipendio del ciclo più le entrate extra, gli
-          stessi due numeri da cui buildFinancialData ricava il disponibile. */}
       <ExpenseSummaryCards
         today={todaySummary}
         month={{ total: spentThisMonth }}
         monthlyBudget={monthlyBudget}
-        income={{ total: monthlyBudget + financialData.extraIncomeThisMonth, salary: monthlyBudget, extra: financialData.extraIncomeThisMonth }}
         onOpenExpenses={openExpenses}
-        onOpenIncomes={() => setActiveTab('incomes')}
       />
 
       <RadarPreview radar={radar} goals={goals} onOpen={() => openModal('radar')} onOpenGoals={() => setActiveTab('goals')} />

@@ -176,7 +176,8 @@ try {
   const currentRange = getCycleRange(today, startDay)
   const previousRange = getPreviousCycleRange(currentRange, startDay)
   const labelIn = (code, range = currentRange) => formatCycleLabel(range, startDay, cycleLabelNames(code))
-  const shownLabel = () => html().match(/· ([^<]+)<\/p>/)?.[1]
+  // Il periodo ha una riga sua sotto entrate e speso (prima stava dopo "· ").
+  const shownLabel = () => html().match(/class="budget-card__period">([^<]+)<\/p>/)?.[1]
   const shown = { it: [], en: [], es: [], fr: [] }
 
   // Le chiavi sempre visibili con questi dati, con i parametri veri.

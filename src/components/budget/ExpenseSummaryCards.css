@@ -1,56 +1,40 @@
-/* Spese ed entrate: due elementi aperti, direttamente sullo sfondo della
-   Home, separati da un filo verticale. Niente card: il colore sta solo
-   nelle icone e nei piccoli dettagli (pillola, barra, linea).
-   Spese in pesca/arancio — spendere è normale, il colore identifica la
-   sezione, non giudica — entrate in verde. */
+/* Spese di oggi e del ciclo: due elementi aperti, direttamente sullo
+   sfondo della Home, separati da un filo verticale. Niente card: il colore
+   sta solo nelle icone e nei piccoli dettagli (linea, barra). Toni pesca/
+   corallo per oggi, arancio per il ciclo — spendere è normale, il colore
+   identifica la sezione, non giudica. */
 .expense-summary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   padding: 0 2px;
 }
 
-.expense-summary--with-income {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  column-gap: 0;
-}
-
 .expense-summary__item {
-  --flow-from: #fb923c;
-  --flow-to: #f59e0b;
-  --flow-soft: rgba(251, 146, 60, 0.14);
-  --flow-text: #b45309;
+  --flow-from: #f87171;
+  --flow-to: #fb923c;
+  --flow-soft: rgba(248, 113, 113, 0.14);
 
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   min-width: 0;
   padding: 2px 14px 4px 6px;
-}
-
-.expense-summary__item--income {
-  --flow-from: #10b981;
-  --flow-to: #34d399;
-  --flow-soft: rgba(16, 185, 129, 0.14);
-  --flow-text: #047857;
-
-  padding: 2px 6px 4px 18px;
-  border-left: 1px solid rgba(23, 32, 51, 0.08);
-}
-
-/* Il totale (del ciclo o delle entrate) è un unico pulsante aperto. */
-.expense-summary__main {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: 100%;
-  min-width: 0;
   text-align: left;
   border-radius: var(--radius-sm);
   transition: transform 0.15s var(--ease-standard);
 }
 
-.expense-summary__main:active {
+.expense-summary__item:active {
   transform: scale(0.97);
+}
+
+.expense-summary__item--cycle {
+  --flow-from: #f59e0b;
+  --flow-to: #fbbf24;
+  --flow-soft: rgba(245, 158, 11, 0.16);
+
+  padding: 2px 6px 4px 18px;
+  border-left: 1px solid rgba(23, 32, 51, 0.08);
 }
 
 .expense-summary__icon {
@@ -89,7 +73,7 @@
   color: var(--color-text-tertiary);
 }
 
-/* Spese: quanto del budget del ciclo è già andato, in piccolo. */
+/* Ciclo: quanto del budget è già andato, in piccolo. */
 .expense-summary__bar {
   display: block;
   width: 100%;
@@ -108,7 +92,7 @@
   background: linear-gradient(90deg, var(--flow-from), var(--flow-to));
 }
 
-/* Entrate: una linea verde piena, il dettaglio che fa coppia con la barra. */
+/* Oggi: una linea piena, il dettaglio che fa coppia con la barra. */
 .expense-summary__line {
   display: block;
   width: 48px;
@@ -116,46 +100,4 @@
   margin-top: 9px;
   border-radius: var(--radius-pill);
   background: linear-gradient(90deg, var(--flow-from), var(--flow-to));
-}
-
-/* "Oggi": una pillola pesca a tutta riga, sopra spese ed entrate; apre
-   la lista di oggi. Etichetta a sinistra, importo e numero a destra. */
-.expense-summary__today {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  column-gap: 8px;
-  row-gap: 2px;
-  margin: 0 0 14px;
-  padding: 8px 14px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(110deg, #ffe7d6 0%, #fff3ea 60%, rgba(255, 243, 234, 0.4) 100%);
-  box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.22);
-  text-align: left;
-  transition: transform 0.15s var(--ease-standard);
-}
-
-.expense-summary__today:active {
-  transform: scale(0.98);
-}
-
-.expense-summary__today-label {
-  font-size: 12.5px;
-  font-weight: 700;
-  color: #b45309;
-}
-
-.expense-summary__today-value {
-  margin-left: auto;
-  font-size: 14px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text-primary);
-}
-
-.expense-summary__today-count {
-  font-size: 12px;
-  font-weight: 600;
-  color: #9a6b4b;
 }

@@ -58,6 +58,8 @@ export default {
     remaining: 'Queda el {percent}%',
     exhausted: 'Presupuesto agotado',
     gauge: 'gastado',
+    income: 'Presupuesto del mes',
+    spent: 'Gastado',
     status: {
       ok: '¡Vas bien con tu presupuesto!',
       near: 'Atención, te estás acercando al límite.',
@@ -93,7 +95,6 @@ export default {
       countone: '{count} movimiento',
       countmany: '{count} movimientos',
       of: 'de {amount}',
-      income: 'Ingresos del mes',
     },
     page: {
       periods: 'Periodo',

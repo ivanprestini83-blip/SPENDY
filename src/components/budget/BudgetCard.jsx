@@ -40,7 +40,10 @@ function budgetBarState(spentRatio, monthlyBudget) {
 // from the store (budgetCalculations.js) — this component only formats
 // and displays them, so it doesn't care whether they came from mock
 // expenses or a real API.
-export function BudgetCard({ available, spent, monthlyBudget, period, hidden, onToggleHidden }) {
+// `extraIncome`: le entrate extra del ciclo (buildFinancialData), che con lo
+// stipendio formano il budget del mese mostrato sotto l'arco. Solo per
+// mostrarlo: il disponibile arriva già calcolato.
+export function BudgetCard({ available, spent, monthlyBudget, extraIncome = 0, period, hidden, onToggleHidden }) {
   const { t } = useLanguage()
   const spentRatio = monthlyBudget > 0 ? (spent / monthlyBudget) * 100 : 0
 
@@ -56,7 +59,14 @@ export function BudgetCard({ available, spent, monthlyBudget, period, hidden, on
   const barState = budgetBarState(spentRatio, monthlyBudget)
   const { tone, remainingPercent } = budgetTone({ available, spent })
   const amountText = hidden ? maskedCurrency() : formatCurrency(available)
+  // Explicit "X spesi di Y", never the old bare "speso di Y" — that read as
+  // ambiguous (spent how much?). Ora è l'etichetta accessibile dell'arco.
   const spentLabel = t('budget.spentof', { spent: formatCurrency(spent), budget: formatCurrency(monthlyBudget) })
+  const extra = Number.isFinite(extraIncome) && extraIncome > 0 ? extraIncome : 0
+  const incomeTotal = (monthlyBudget > 0 ? monthlyBudget : 0) + extra
+  const incomeNote = monthlyBudget > 0
+    ? (extra > 0 ? t('andamento.summary.extra', { amount: formatCurrency(extra) }) : null)
+    : t('budget.nosalary')
 
   return (
     <section className={`budget-card budget-card--${tone}`}>
@@ -110,14 +120,33 @@ export function BudgetCard({ available, spent, monthlyBudget, period, hidden, on
         </div>
       </div>
 
-      {/* Il budget è lo stipendio di QUESTO ciclo (utils/salary.js): a inizio
-          ciclo, finché non viene inserito, è 0 e lo si dice. */}
-      <p className="budget-card__period">
-        {monthlyBudget > 0 ? t('budget.monthly', { amount: formatCurrency(monthlyBudget) }) : t('budget.nosalary')} · {period}
-      </p>
-      {/* Explicit "X spesi di Y", never the old bare "speso di Y" —
-          that read as ambiguous (spent how much?). */}
-      <p className="budget-card__progress-total">{spentLabel}</p>
+      {/* Quanto è entrato e quanto è uscito, ben in vista sotto l'arco.
+          Il budget del mese è lo stipendio di QUESTO ciclo (utils/salary.js)
+          più le entrate extra: a inizio ciclo, finché lo stipendio non è
+          inserito, lo si dice. */}
+      <div className="budget-card__stats">
+        <div
+          className="budget-card__stat budget-card__stat--income"
+          role="group"
+          aria-label={monthlyBudget > 0 ? t('budget.monthly', { amount: formatCurrency(monthlyBudget) }) : t('budget.nosalary')}
+        >
+          <span className="budget-card__stat-head">
+            <span className="budget-card__stat-icon" aria-hidden="true"><ArrowUpIcon /></span>
+            <span className="budget-card__stat-label">{t('budget.income')}</span>
+          </span>
+          <span className="budget-card__stat-value">{formatCurrency(incomeTotal)}</span>
+          {incomeNote && <span className="budget-card__stat-note">{incomeNote}</span>}
+        </div>
+        <div className="budget-card__stat budget-card__stat--spent">
+          <span className="budget-card__stat-head">
+            <span className="budget-card__stat-icon" aria-hidden="true"><ArrowDownIcon /></span>
+            <span className="budget-card__stat-label">{t('budget.spent')}</span>
+          </span>
+          <span className="budget-card__stat-value">{formatCurrency(spent)}</span>
+        </div>
+      </div>
+
+      <p className="budget-card__period">{period}</p>
 
       <p className={`budget-card__status budget-card__status--${barState}`}>
         <span className="budget-card__status-icon" aria-hidden="true">
@@ -126,6 +155,22 @@ export function BudgetCard({ available, spent, monthlyBudget, period, hidden, on
         {t(statusMessage(spentRatio))}
       </p>
     </section>
+  )
+}
+
+function ArrowUpIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M17 17L7 7M7 14.5V7h7.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function ArrowDownIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M7 7l10 10M17 9.5V17H9.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   )
 }
 

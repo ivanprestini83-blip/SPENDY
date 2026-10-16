@@ -133,27 +133,32 @@ try {
   }
   globalThis.__budgetToneTest.language = 'it'
 
-  // ---- Spese ed entrate (stesso banco di prova: lingua finta, dizionari veri)
+  // ---- Budget del mese e speso, ben visibili sotto l'arco
+  {
+    const { formatCurrency } = await server.ssrLoadModule('/src/utils/format.js')
+    const stat = (html, kind) => (html.match(new RegExp(`budget-card__stat--${kind}[\\s\\S]*?<span class="budget-card__stat-value">([^<]*)<`))?.[1] ?? '')
+    const withExtra = renderToStaticMarkup(h(BudgetCard, { available: 1200, spent: 1250, monthlyBudget: 2250, extraIncome: 200, period: 'ottobre 2026', hidden: false, onToggleHidden: () => {} }))
+    check('budget del mese in vista: stipendio + extra (2.450,00) e "di cui 200,00 € extra"', withExtra.includes(MESSAGES.it.budget.income) && stat(withExtra, 'income') === formatCurrency(2450, 'it', 'EUR') && withExtra.includes(`di cui ${formatCurrency(200, 'it', 'EUR')} extra`), stat(withExtra, 'income'))
+    check('   speso accanto (1.250,00)', withExtra.includes(MESSAGES.it.budget.spent) && stat(withExtra, 'spent') === formatCurrency(1250, 'it', 'EUR'))
+    const plain = renderToStaticMarkup(h(BudgetCard, { available: 1864.16, spent: 585.84, monthlyBudget: 2450, period: 'ottobre 2026', hidden: false, onToggleHidden: () => {} }))
+    check('   senza extra: solo lo stipendio del ciclo, nessuna nota', stat(plain, 'income') === formatCurrency(2450, 'it', 'EUR') && !plain.includes('budget-card__stat-note'))
+    const noSalary = renderToStaticMarkup(h(BudgetCard, { available: 0, spent: 0, monthlyBudget: 0, period: 'ottobre 2026', hidden: false, onToggleHidden: () => {} }))
+    check('   stipendio non ancora inserito: 0,00 e lo dice', stat(noSalary, 'income') === formatCurrency(0, 'it', 'EUR') && noSalary.includes(MESSAGES.it.budget.nosalary))
+    check('   budget.income e budget.spent in it/en/es/fr', ['it', 'en', 'es', 'fr'].every((lang) => MESSAGES[lang].budget.income?.trim() && MESSAGES[lang].budget.spent?.trim()))
+    const home = (await import('node:fs')).readFileSync(join(ROOT, 'src/pages/HomePage.jsx'), 'utf8')
+    check('   la Home passa le entrate extra già calcolate da buildFinancialData', home.includes('extraIncome={financialData.extraIncomeThisMonth}'))
+  }
+
+  // ---- Spese di oggi e del ciclo (stesso banco di prova: lingua finta, dizionari veri)
   const { ExpenseSummaryCards } = await server.ssrLoadModule('/src/components/budget/ExpenseSummaryCards.jsx')
   const { formatCurrency } = await server.ssrLoadModule('/src/utils/format.js')
-  const flow = (props) => renderToStaticMarkup(h(ExpenseSummaryCards, { today: { total: 56, count: 2 }, month: { total: 585.84 }, monthlyBudget: 2450, ...props }))
   {
-    const html = flow({ income: { total: 2650, salary: 2450, extra: 200 } })
+    const html = renderToStaticMarkup(h(ExpenseSummaryCards, { today: { total: 56, count: 2 }, month: { total: 585.84 }, monthlyBudget: 2450 }))
     const buttons = html.match(/<button type="button" class="([^"]+)"/g) ?? []
-    check('spese ed entrate: "Oggi" (1°), spese del mese (2°), entrate (3°)', buttons.length === 3 && buttons[0].includes('expense-summary__today') && buttons[2].includes('expense-summary__item--income'), buttons.join(' | '))
-    check('   entrate: etichetta, totale (stipendio + extra) e "di cui 200,00 € extra"', html.includes(MESSAGES.it.expenses.summary.income) && html.includes(formatCurrency(2650, 'it', 'EUR')) && html.includes(`di cui ${formatCurrency(200, 'it', 'EUR')} extra`))
-    check('   nessun NaN', !/NaN|Infinity/.test(html))
+    check('spese: "Spese di oggi" (1°) e "Spese di questo mese" (2°), niente entrate', buttons.length === 2 && buttons[0].includes('--today') && buttons[1].includes('--cycle') && !html.includes('income'), buttons.join(' | '))
+    check('   oggi: importo e numero di transazioni; mese: importo e "su 2.450,00 €"', html.includes(MESSAGES.it.expenses.summary.today) && html.includes(formatCurrency(56, 'it', 'EUR')) && html.includes('2 transazioni') && html.includes(MESSAGES.it.expenses.summary.cycle) && html.includes(formatCurrency(585.84, 'it', 'EUR')) && html.includes(`su ${formatCurrency(2450, 'it', 'EUR')}`))
+    check('   nessun NaN, anche senza budget', !/NaN|Infinity/.test(html) && !/NaN|Infinity/.test(renderToStaticMarkup(h(ExpenseSummaryCards, { today: { total: 0, count: 0 }, month: { total: 12 }, monthlyBudget: 0 }))))
   }
-  {
-    const html = flow({ income: { total: 0, salary: 0, extra: 0 } })
-    check('entrate senza stipendio nel ciclo: lo dice (non un numero inventato)', html.includes(MESSAGES.it.andamento.summary.nosalary) && html.includes(formatCurrency(0, 'it', 'EUR')))
-  }
-  check('senza `income` (uso di prima): solo le spese, due pulsanti', (flow({}).match(/<button /g) ?? []).length === 2 && !flow({}).includes('expense-summary__item--income'))
-  {
-    const home = (await import('node:fs')).readFileSync(join(ROOT, 'src/pages/HomePage.jsx'), 'utf8')
-    check('Home: le entrate aprono la scheda Entrate e usano i numeri di buildFinancialData', home.includes("onOpenIncomes={() => setActiveTab('incomes')}") && home.includes('monthlyBudget + financialData.extraIncomeThisMonth'))
-  }
-  check('expenses.summary.income in it/en/es/fr', ['it', 'en', 'es', 'fr'].every((lang) => typeof MESSAGES[lang].expenses.summary.income === 'string' && MESSAGES[lang].expenses.summary.income.trim()))
   check('budget.gauge in it/en/es/fr', ['it', 'en', 'es', 'fr'].every((lang) => typeof MESSAGES[lang].budget.gauge === 'string' && MESSAGES[lang].budget.gauge.trim()))
 } finally {
   await server.close()

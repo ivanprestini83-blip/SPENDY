@@ -235,16 +235,79 @@
   color: var(--tone-text);
 }
 
-.budget-card__period {
-  margin-top: 14px;
+/* Entrate del mese e speso: due valori grandi sotto l'arco, separati da un
+   filo, su una fascia bianca traslucida. Il budget del mese si vede subito,
+   non è più una riga grigia. */
+.budget-card__stats {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  margin-top: 16px;
+  padding: 12px 4px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(23, 32, 51, 0.05);
+}
+
+.budget-card__stat {
+  --stat-color: #059669;
+  --stat-soft: rgba(16, 185, 129, 0.14);
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 0 8px;
   text-align: center;
-  font-size: 13px;
-  font-weight: 600;
+}
+
+.budget-card__stat--spent {
+  --stat-color: #c2410c;
+  --stat-soft: rgba(245, 158, 11, 0.16);
+
+  border-left: 1px solid rgba(23, 32, 51, 0.08);
+}
+
+.budget-card__stat-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.budget-card__stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--stat-soft);
+  color: var(--stat-color);
+}
+
+.budget-card__stat-label {
+  font-size: 12px;
+  font-weight: 700;
   color: var(--color-text-secondary);
 }
 
-.budget-card__progress-total {
-  margin-top: 3px;
+.budget-card__stat-value {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--stat-color);
+}
+
+.budget-card__stat-note {
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-text-tertiary);
+}
+
+.budget-card__period {
+  margin-top: 10px;
   text-align: center;
   font-size: 12.5px;
   font-weight: 600;
