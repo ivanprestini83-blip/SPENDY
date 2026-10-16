@@ -37,7 +37,7 @@ const AREAS = ['common', 'analytics', 'andamento']
 const NEW_KEYS = keysOf(MESSAGES.it).filter((key) => AREAS.includes(key.split('.')[0]))
 const SCREEN_KEYS = NEW_KEYS.filter((key) => !key.startsWith('common.') || key === 'common.close')
 const FILES = [
-  'src/pages/AnalyticsPage.jsx', 'src/components/modals/CategoryDetailModal.jsx', 'src/components/modals/Modal.jsx',
+  'src/pages/AnalyticsPage.jsx', 'src/components/analytics/CategoryTreemap.jsx', 'src/components/modals/CategoryDetailModal.jsx', 'src/components/modals/Modal.jsx',
   'src/components/andamento/AndamentoScreen.jsx', 'src/components/andamento/CycleSummary.jsx', 'src/components/andamento/CycleCategories.jsx', 'src/components/andamento/CycleTrendChart.jsx',
   'src/components/andamento/CycleComparison.jsx', 'src/components/andamento/CategoryComparison.jsx', 'src/components/andamento/andamentoFormat.js',
 ]
@@ -45,7 +45,8 @@ const FILES = [
 // =====================================================================
 section('1. Dizionari: nessuna chiave mancante, stessi segnaposto')
 // =====================================================================
-check(`chiavi nuove: ${NEW_KEYS.length} (common ${NEW_KEYS.filter((k) => k.startsWith('common.')).length}, analytics ${NEW_KEYS.filter((k) => k.startsWith('analytics.')).length}, andamento ${NEW_KEYS.filter((k) => k.startsWith('andamento.')).length})`, NEW_KEYS.length === 111)
+// +6: la mappa delle categorie in Analisi (analytics.treemap.*).
+check(`chiavi nuove: ${NEW_KEYS.length} (common ${NEW_KEYS.filter((k) => k.startsWith('common.')).length}, analytics ${NEW_KEYS.filter((k) => k.startsWith('analytics.')).length}, andamento ${NEW_KEYS.filter((k) => k.startsWith('andamento.')).length})`, NEW_KEYS.length === 117)
 for (const lang of LANGS) {
   const missing = NEW_KEYS.filter((key) => typeof lookup(MESSAGES[lang], key) !== 'string' || !lookup(MESSAGES[lang], key).trim())
   check(`${lang}: tutte presenti e non vuote`, missing.length === 0, missing.join(', '))

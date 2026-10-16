@@ -5,6 +5,7 @@ import { formatCurrency, formatSignedPercent } from '../utils/format.js'
 import { lastCycles, formatCycleLabel } from '../utils/cycle.js'
 import { getCategoryColor } from '../data/categoryColors.js'
 import { DonutChart } from '../components/analytics/DonutChart.jsx'
+import { CategoryTreemap } from '../components/analytics/CategoryTreemap.jsx'
 import { CategoryDetailModal } from '../components/modals/CategoryDetailModal.jsx'
 import { buildCategoryDetail } from '../utils/categoryDetail.js'
 import { useLanguage } from '../i18n/useLanguage.js'
@@ -91,44 +92,58 @@ export function AnalyticsPage() {
         <>
           <DonutChart segments={segments} centerLabel={t('analytics.total')} centerValue={formatCurrency(monthTotal)} />
 
-          <ul className="analytics-page__legend">
-            {rows.map((row) => {
-              const share = (row.current / monthTotal) * 100
-              const isIncrease = row.previous > 0 && row.changeAmount > 0
-              const isDecrease = row.previous > 0 && row.changeAmount < 0
+          {/* La mappa delle categorie: area di ogni tessera proporzionale
+              all'importo (stesse righe, stessi importi e colori della
+              ciambella). Il tocco apre lo stesso dettaglio di sempre. */}
+          <CategoryTreemap rows={rows} total={monthTotal} onOpenDetail={setOpenCategoryId} />
 
-              return (
-                <li key={row.categoryId}>
-                  <button
-                    type="button"
-                    className="analytics-page__legend-row analytics-page__legend-row--button"
-                    onClick={() => setOpenCategoryId(row.categoryId)}
-                  >
-                    <span
-                      className="analytics-page__legend-dot"
-                      style={{ background: getCategoryColor(row.categoryId) }}
-                      aria-hidden="true"
-                    />
-                    <span className="analytics-page__legend-label">
-                      <span aria-hidden="true">{row.category.emoji}</span> {row.category.label}
-                    </span>
-                    <span className="analytics-page__legend-amount">{formatCurrency(row.current)}</span>
-                    <span className="analytics-page__legend-percent">{Math.round(share)}%</span>
-                    {row.previous > 0 && (
+          {/* La lista completa di prima, con il confronto col periodo
+              precedente: chiusa, ma sempre a portata (e leggibile da
+              tastiera e screen reader). */}
+          <details className="analytics-page__all">
+            <summary className="analytics-page__all-toggle">
+              {t('analytics.treemap.all', { count: rows.length })}
+              <span className="analytics-page__all-chevron" aria-hidden="true">›</span>
+            </summary>
+            <ul className="analytics-page__legend">
+              {rows.map((row) => {
+                const share = (row.current / monthTotal) * 100
+                const isIncrease = row.previous > 0 && row.changeAmount > 0
+                const isDecrease = row.previous > 0 && row.changeAmount < 0
+
+                return (
+                  <li key={row.categoryId}>
+                    <button
+                      type="button"
+                      className="analytics-page__legend-row analytics-page__legend-row--button"
+                      onClick={() => setOpenCategoryId(row.categoryId)}
+                    >
                       <span
-                        className={`analytics-page__legend-change ${
-                          isIncrease ? 'analytics-page__legend-change--up' : isDecrease ? 'analytics-page__legend-change--down' : ''
-                        }`}
-                      >
-                        {formatSignedPercent(row.changePercent)}
+                        className="analytics-page__legend-dot"
+                        style={{ background: getCategoryColor(row.categoryId) }}
+                        aria-hidden="true"
+                      />
+                      <span className="analytics-page__legend-label">
+                        <span aria-hidden="true">{row.category.emoji}</span> {row.category.label}
                       </span>
-                    )}
-                    <span className="analytics-page__legend-chevron" aria-hidden="true">›</span>
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
+                      <span className="analytics-page__legend-amount">{formatCurrency(row.current)}</span>
+                      <span className="analytics-page__legend-percent">{Math.round(share)}%</span>
+                      {row.previous > 0 && (
+                        <span
+                          className={`analytics-page__legend-change ${
+                            isIncrease ? 'analytics-page__legend-change--up' : isDecrease ? 'analytics-page__legend-change--down' : ''
+                          }`}
+                        >
+                          {formatSignedPercent(row.changePercent)}
+                        </span>
+                      )}
+                      <span className="analytics-page__legend-chevron" aria-hidden="true">›</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </details>
         </>
       ) : (
         <p className="analytics-page__empty">{t('analytics.empty')}</p>

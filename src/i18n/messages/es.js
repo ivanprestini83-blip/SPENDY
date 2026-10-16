@@ -383,6 +383,15 @@ export default {
     next: 'Periodo siguiente',
     total: 'Total',
     empty: 'No hay gastos registrados en este periodo.',
+    // Mappa delle categorie (components/analytics/CategoryTreemap.jsx).
+    treemap: {
+      label: 'Gastos por categoría',
+      hint: 'Toca una categoría para ver los detalles.',
+      share: '{percent}% del total',
+      previous: '{change} respecto al periodo anterior',
+      open: 'Ver los gastos',
+      all: 'Todas las categorías ({count})',
+    },
   },
   andamento: {
     title: 'Evolución',

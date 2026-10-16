@@ -383,6 +383,15 @@ export default {
     next: 'Next period',
     total: 'Total',
     empty: 'No expenses recorded in this period.',
+    // Mappa delle categorie (components/analytics/CategoryTreemap.jsx).
+    treemap: {
+      label: 'Spending by category',
+      hint: 'Tap a category to see its details.',
+      share: '{percent}% of total',
+      previous: '{change} vs. the previous period',
+      open: 'See expenses',
+      all: 'All categories ({count})',
+    },
   },
   andamento: {
     title: 'Trends',
