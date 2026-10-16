@@ -1,101 +1,94 @@
-/* La card del disponibile è il punto focale della Home: una "carta" a
-   colore pieno, il cui gradiente racconta lo stato del budget del ciclo
-   (utils/budgetTone.js, percentuale RESIDUA). Ogni tono definisce le
-   stesse variabili, così il markup non cambia mai:
-     --card-from / --card-to     il gradiente
-     --card-glow                 la luce nell'angolo in alto
-     --card-ink / --card-ink-soft  testo (contrasto AA sul proprio fondo)
-     --card-track / --card-fill  la barra
-     --card-glass                chip e pillola traslucidi
-     --card-shadow               l'ombra, del colore della card
-   Verde, rosso e blu notte usano inchiostro bianco; giallo e arancione,
-   troppo chiari per il bianco, un inchiostro scuro dello stesso colore. */
+/* La card del disponibile, protagonista della Home: una superficie bianca
+   illuminata da sinistra da una luce del colore dello stato (menta quando
+   va tutto bene), con un bordo sottile dello stesso colore e due forme
+   morbide sullo sfondo. Il testo resta sempre blu notte su fondo chiaro.
+
+   Lo stato (utils/budgetTone.js, percentuale RESIDUA del ciclo) cambia
+   solo queste variabili:
+     --tone-light   la luce a sinistra e le forme organiche
+     --tone-accent  l'arco e i piccoli dettagli
+     --tone-text    etichetta e chip (contrasto AA su bianco)
+     --tone-border  il bordo sottile */
 .budget-card {
-  /* Neutro: nessun budget o dato non attendibile. Blu notte, mai rosso. */
-  --card-from: #172033;
-  --card-to: #2b3858;
-  --card-glow: rgba(185, 242, 213, 0.28);
-  --card-ink: #ffffff;
-  --card-ink-soft: rgba(255, 255, 255, 0.8);
-  --card-track: rgba(255, 255, 255, 0.2);
-  --card-fill: #b9f2d5;
-  --card-glass: rgba(255, 255, 255, 0.14);
-  --card-glass-border: rgba(255, 255, 255, 0.22);
-  --card-shadow: rgba(23, 32, 51, 0.45);
+  /* Neutro: nessun budget o dato non attendibile. Grigio-azzurro, mai rosso. */
+  --tone-light: #e2e8f0;
+  --tone-accent: #94a3b8;
+  --tone-text: #475569;
+  --tone-border: rgba(148, 163, 184, 0.45);
 
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  padding: 22px 22px 18px;
-  border-radius: var(--radius-lg);
+  padding: 20px 20px 18px;
+  border: 1.5px solid var(--tone-border);
+  border-radius: 34px;
   background:
-    radial-gradient(70% 90% at 100% 0%, var(--card-glow), transparent 60%),
-    linear-gradient(135deg, var(--card-from) 0%, var(--card-to) 100%);
+    radial-gradient(85% 120% at 0% 35%, var(--tone-light) 0%, rgba(255, 255, 255, 0) 62%),
+    linear-gradient(180deg, #ffffff 0%, #fbfdfc 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.25),
-    0 24px 44px -24px var(--card-shadow),
-    0 6px 14px -10px var(--card-shadow);
-  color: var(--card-ink);
+    0 1px 2px rgba(23, 32, 51, 0.04),
+    0 26px 48px -32px var(--tone-accent);
+  color: var(--color-text-primary);
 }
 
-/* Due anelli sottili nell'angolo in basso a destra: un dettaglio da carta
-   premium, non un'illustrazione. Dietro al contenuto, mai sopra al testo. */
+/* Le forme organiche: una macchia morbida in basso a sinistra e un'onda
+   in alto a destra, appena accennate, sempre dietro al contenuto. */
+.budget-card::before,
 .budget-card::after {
   content: '';
   position: absolute;
-  right: -70px;
-  bottom: -90px;
   z-index: -1;
-  width: 240px;
-  height: 240px;
-  border-radius: 50%;
-  border: 1px solid var(--card-glass-border);
-  box-shadow: 0 0 0 28px var(--card-glass), 0 0 0 29px var(--card-glass-border);
-  opacity: 0.55;
   pointer-events: none;
 }
 
+.budget-card::before {
+  left: -60px;
+  bottom: -80px;
+  width: 220px;
+  height: 200px;
+  border-radius: 58% 42% 55% 45% / 52% 60% 40% 48%;
+  background: var(--tone-light);
+  opacity: 0.55;
+  filter: blur(2px);
+}
+
+.budget-card::after {
+  top: -70px;
+  right: -60px;
+  width: 200px;
+  height: 160px;
+  border-radius: 45% 55% 40% 60% / 60% 45% 55% 40%;
+  background: radial-gradient(closest-side, var(--tone-light), transparent);
+  opacity: 0.5;
+}
+
 .budget-card--good {
-  --card-from: #065f46;
-  --card-to: #0b8a63;
-  --card-glow: rgba(185, 242, 213, 0.55);
-  --card-fill: #b9f2d5;
-  --card-shadow: rgba(6, 95, 70, 0.5);
+  --tone-light: #b9f2d5;
+  --tone-accent: #10b981;
+  --tone-text: #047857;
+  --tone-border: rgba(16, 185, 129, 0.38);
 }
 
 .budget-card--caution {
-  --card-from: #facc15;
-  --card-to: #fde68a;
-  --card-glow: rgba(255, 255, 255, 0.6);
-  --card-ink: #3b2c00;
-  --card-ink-soft: rgba(59, 44, 0, 0.78);
-  --card-track: rgba(59, 44, 0, 0.14);
-  --card-fill: #3b2c00;
-  --card-glass: rgba(255, 255, 255, 0.45);
-  --card-glass-border: rgba(59, 44, 0, 0.12);
-  --card-shadow: rgba(202, 138, 4, 0.45);
+  --tone-light: #fef3a6;
+  --tone-accent: #facc15;
+  --tone-text: #854d0e;
+  --tone-border: rgba(234, 179, 8, 0.45);
 }
 
 .budget-card--warning {
-  --card-from: #f59e0b;
-  --card-to: #fcd29a;
-  --card-glow: rgba(255, 255, 255, 0.5);
-  --card-ink: #3f1d00;
-  --card-ink-soft: rgba(63, 29, 0, 0.78);
-  --card-track: rgba(63, 29, 0, 0.14);
-  --card-fill: #3f1d00;
-  --card-glass: rgba(255, 255, 255, 0.42);
-  --card-glass-border: rgba(63, 29, 0, 0.12);
-  --card-shadow: rgba(217, 119, 6, 0.5);
+  --tone-light: #fed7aa;
+  --tone-accent: #f59e0b;
+  --tone-text: #9a3412;
+  --tone-border: rgba(245, 158, 11, 0.45);
 }
 
 .budget-card--danger,
 .budget-card--over {
-  --card-from: #b42318;
-  --card-to: #dc3a36;
-  --card-glow: rgba(248, 113, 113, 0.7);
-  --card-fill: #ffffff;
-  --card-shadow: rgba(180, 35, 24, 0.5);
+  --tone-light: #fecaca;
+  --tone-accent: #f87171;
+  --tone-text: #b91c1c;
+  --tone-border: rgba(248, 113, 113, 0.5);
 }
 
 .budget-card__top {
@@ -109,28 +102,27 @@
   font-weight: 800;
   letter-spacing: 1.2px;
   text-transform: uppercase;
-  color: var(--card-ink-soft);
+  color: var(--tone-text);
 }
 
 /* Quanto resta, in percentuale: lo stesso numero che decide il colore. */
 .budget-card__left {
   margin-left: auto;
   margin-right: 6px;
-  padding: 5px 11px;
-  border: 1px solid var(--card-glass-border);
+  padding: 4px 10px;
   border-radius: var(--radius-pill);
-  background: var(--card-glass);
-  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 0 0 1px var(--tone-border);
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
-  color: var(--card-ink);
+  color: var(--tone-text);
 }
 
 .budget-card--over .budget-card__left {
-  border-color: transparent;
-  background: #ffffff;
-  color: #b42318;
+  background: var(--tone-text);
+  box-shadow: none;
+  color: #ffffff;
 }
 
 .budget-card__hide-toggle {
@@ -140,32 +132,79 @@
   width: 32px;
   height: 32px;
   border-radius: var(--radius-pill);
-  background: var(--card-glass);
-  color: var(--card-ink);
-  transition: opacity 0.15s var(--ease-standard), transform 0.15s var(--ease-standard);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--color-text-secondary);
+  transition: color 0.15s var(--ease-standard), transform 0.15s var(--ease-standard);
 }
 
 .budget-card__hide-toggle:hover {
-  opacity: 0.85;
+  color: var(--color-text-primary);
 }
 
 .budget-card__hide-toggle:active {
   transform: scale(0.9);
 }
 
+/* --- L'arco ------------------------------------------------------------- */
+.budget-card__gauge {
+  position: relative;
+  width: min(100%, 290px);
+  margin: 10px auto 0;
+}
+
+.budget-card__arc {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.budget-card__arc-track,
+.budget-card__arc-fill {
+  fill: none;
+  stroke-width: 13;
+  stroke-linecap: round;
+}
+
+.budget-card__arc-track {
+  stroke: rgba(23, 32, 51, 0.07);
+}
+
+.budget-card__arc-fill {
+  stroke: var(--tone-accent);
+  stroke-dasharray: 100;
+  transition: stroke-dashoffset 0.9s var(--ease-standard), stroke 0.4s var(--ease-standard);
+  filter: drop-shadow(0 4px 8px color-mix(in srgb, var(--tone-accent) 45%, transparent));
+}
+
+/* Importo e quota spesa, al centro dell'arco. */
+.budget-card__center {
+  position: absolute;
+  inset: auto 0 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
 .budget-card__amount {
-  margin-top: 10px;
-  font-size: clamp(40px, 12.5vw, 50px);
+  font-size: clamp(34px, 11vw, 46px);
   font-weight: 800;
   letter-spacing: -1.6px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
-  color: var(--card-ink);
+  white-space: nowrap;
+  color: var(--color-text-primary);
 }
 
-/* Vicino al limite l'importo pulsa piano (comportamento di prima), sempre
-   nell'inchiostro della card, così resta leggibile sul rosso. */
+.budget-card__amount--long {
+  font-size: clamp(30px, 9.4vw, 40px);
+  letter-spacing: -1.2px;
+}
+
+/* Vicino al limite l'importo pulsa piano (comportamento di prima). */
 .budget-card__amount--alarm {
+  color: var(--tone-text);
   animation: budget-card-alarm-pulse 1.6s ease-in-out infinite;
 }
 
@@ -178,57 +217,55 @@
   .budget-card__amount--alarm {
     animation: none;
   }
+
+  .budget-card__arc-fill {
+    transition: none;
+  }
+}
+
+.budget-card__share {
+  margin-top: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.budget-card__share strong {
+  font-weight: 800;
+  color: var(--tone-text);
 }
 
 .budget-card__period {
-  margin-top: 8px;
+  margin-top: 14px;
+  text-align: center;
   font-size: 13px;
   font-weight: 600;
-  color: var(--card-ink-soft);
-}
-
-.budget-card__progress {
-  margin-top: 18px;
-}
-
-.budget-card .progress-bar {
-  height: 10px;
-  background: var(--card-track);
-}
-
-.budget-card .progress-bar__fill {
-  box-shadow: 0 0 12px -2px var(--card-fill);
-}
-
-.budget-card__progress-labels {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 8px;
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--card-ink);
+  color: var(--color-text-secondary);
 }
 
 .budget-card__progress-total {
+  margin-top: 3px;
+  text-align: center;
+  font-size: 12.5px;
   font-weight: 600;
-  text-align: right;
-  color: var(--card-ink-soft);
+  color: var(--color-text-tertiary);
 }
 
 .budget-card__status {
   display: flex;
   align-items: center;
-  gap: 9px;
-  margin-top: 14px;
-  padding: 8px 14px 8px 8px;
-  border: 1px solid var(--card-glass-border);
+  justify-content: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 14px auto 0;
+  padding: 7px 14px 7px 7px;
   border-radius: var(--radius-pill);
-  background: var(--card-glass);
-  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 0 0 1px var(--tone-border);
   font-size: 13px;
   font-weight: 700;
-  color: var(--card-ink);
+  color: var(--color-text-primary);
 }
 
 .budget-card__status-icon {
@@ -239,8 +276,13 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: var(--card-ink);
-  color: var(--card-from);
+  background: var(--tone-accent);
+  color: #ffffff;
   font-size: 12px;
   font-weight: 800;
+}
+
+/* Sul giallo la spunta bianca non si leggerebbe. */
+.budget-card--caution .budget-card__status-icon {
+  color: #3b2c00;
 }

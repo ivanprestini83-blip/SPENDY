@@ -1,7 +1,7 @@
 .home-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 
 /* Spendy is standing on the budget card: give its top edge room so her
@@ -31,27 +31,25 @@
   transform: scale(0.98);
 }
 
-/* Le card obiettivo della Home (solo qui: GoalsPage resta com'era).
-   L'obiettivo in evidenza prende il dorato della sua barra; il fondo
-   emergenza l'azzurro, il colore della sicurezza. Rotaia sempre visibile. */
+/* Le card obiettivo della Home (solo qui: GoalsPage resta com'era)
+   diventano righe aperte sullo sfondo, senza riquadro: un filo le separa,
+   il colore sta nell'icona e nella barra. Fondo emergenza in azzurro (la
+   sicurezza), obiettivo in evidenza nel dorato della sua barra. */
 .home-page .goal-card {
-  padding: 14px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  background:
-    radial-gradient(80% 90% at 100% 0%, rgba(255, 255, 255, 0.9), transparent 60%),
-    linear-gradient(160deg, #fff4dc 0%, #fffaf0 100%);
-  box-shadow: 0 1px 2px rgba(23, 32, 51, 0.04), 0 16px 30px -22px rgba(202, 138, 4, 0.5);
+  padding: 10px 6px 12px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .home-page .goal-card .progress-bar {
+  height: 6px;
   background: rgba(23, 32, 51, 0.07);
 }
 
+.home-page__goal-link + .home-page__goal-link .goal-card,
 .home-page__goal-link--emergency .goal-card {
-  background:
-    radial-gradient(80% 90% at 100% 0%, rgba(255, 255, 255, 0.9), transparent 60%),
-    linear-gradient(160deg, #e3efff 0%, #f5f9ff 100%);
-  box-shadow: 0 1px 2px rgba(23, 32, 51, 0.04), 0 16px 30px -22px rgba(37, 99, 235, 0.45);
+  border-top: 1px solid rgba(23, 32, 51, 0.07);
 }
 
 .home-page__goal-link--emergency .goal-card__icon {
@@ -94,4 +92,10 @@
   .home-page > * {
     animation: none;
   }
+}
+
+/* Il fondo emergenza non ha né stima né azioni: il suo footer resterebbe
+   uno spazio vuoto sotto la barra. */
+.home-page__goal-link--emergency .goal-card__footer {
+  display: none;
 }

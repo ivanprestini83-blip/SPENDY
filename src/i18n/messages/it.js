@@ -61,6 +61,7 @@ export default {
     spentof: '{spent} spesi di {budget}',
     remaining: '{percent}% residuo',
     exhausted: 'Budget esaurito',
+    gauge: 'speso',
     status: {
       ok: 'Sei in linea con il tuo budget!',
       near: 'Attenzione, ti stai avvicinando al limite.',
@@ -96,6 +97,7 @@ export default {
       countone: '{count} transazione',
       countmany: '{count} transazioni',
       of: 'su {amount}',
+      income: 'Entrate di questo mese',
     },
     page: {
       periods: 'Periodo',

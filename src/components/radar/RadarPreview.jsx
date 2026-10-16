@@ -91,57 +91,61 @@ export function RadarPreview({ radar, goals = [], onOpen = () => {}, onOpenGoals
         </button>
       )}
 
-      {/* UNA sola tessera, quella dell'obiettivo del Radar, ma con dentro
-          tutti gli obiettivi affiancati: percentuale e sotto il nome. Ne
-          stanno tre; dal quarto in poi la fila scorre dentro la tessera. */}
+      {/* Gli obiettivi, tutti, come righe dentro la stessa area del Radar
+          (nessuna card per obiettivo): anello di avanzamento attorno
+          all'icona, nome intero, importi veri dello store, percentuale e una
+          barra sottile con la rotaia sempre visibile, anche a 0%. */}
       {goalRows.length > 0 && (
-        <div
-          role="button"
-          tabIndex={0}
-          className="radar-preview__tile radar-preview__tile--goal radar-preview__goals-tile"
-          onClick={onOpenGoals}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              onOpenGoals()
-            }
-          }}
-        >
-          <span className="radar-preview__tile-badge" aria-hidden="true">🎯</span>
-          <span className="radar-preview__tile-title">{goalTitle}</span>
-          <span
-            className={`radar-preview__goal-list radar-preview__goal-list--${goalRows.length > 3 ? 'many' : goalRows.length}`}
-            role="list"
-            aria-label={t('radar.preview.goals')}
-          >
+        <div className="radar-preview__goals">
+          <p className="radar-preview__goals-title">{goalTitle}</p>
+          <ul className="radar-preview__goal-list" aria-label={t('radar.preview.goals')}>
             {goalRows.map((goal, index) => (
-              <span
+              <li
                 key={goal.id ?? index}
-                role="listitem"
-                className={`radar-preview__goal-item radar-preview__goal-item--accent-${index % GOAL_ACCENTS}${goal.completed ? ' radar-preview__goal-item--done' : ''}`}
+                className={`radar-preview__goal radar-preview__goal--accent-${index % GOAL_ACCENTS}${goal.completed ? ' radar-preview__goal--done' : ''}`}
               >
-                {/* Dal nome dell'obiettivo ("Casa" → 🏠), se non ne ha già una sua. */}
-                <span className="radar-preview__goal-icon" aria-hidden="true">{goalIcon(goal)}</span>
-                <span className="radar-preview__tile-value">{goal.percent}%</span>
-                <span className="radar-preview__tile-label radar-preview__goal-name">{goal.label}</span>
-                {/* Gli importi veri dello store, con i centesimi (format.js):
-                    possono andare a capo, mai essere tagliati. */}
-                <span className="radar-preview__goal-amounts">
-                  <span className="radar-preview__goal-saved">{money(goal.saved)}</span> / {money(goal.target)}
-                </span>
-                <span
-                  className="radar-preview__goal-bar"
-                  role="progressbar"
-                  aria-label={goal.label}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={goal.percent}
-                >
-                  <span className="radar-preview__goal-bar-fill" style={{ width: `${goal.percent}%` }} />
-                </span>
-              </span>
+                <button type="button" className="radar-preview__goal-row" onClick={onOpenGoals}>
+                  <span className="radar-preview__goal-ring" aria-hidden="true">
+                    <svg viewBox="0 0 44 44">
+                      <circle className="radar-preview__ring-track" cx="22" cy="22" r="19" pathLength="100" />
+                      {/* A 0% niente riempimento: l'estremità arrotondata
+                          disegnerebbe comunque un puntino. Resta la rotaia. */}
+                      {goal.percent > 0 && (
+                        <circle
+                          className="radar-preview__ring-fill"
+                          cx="22"
+                          cy="22"
+                          r="19"
+                          pathLength="100"
+                          style={{ strokeDashoffset: 100 - goal.percent }}
+                        />
+                      )}
+                    </svg>
+                    {/* Dal nome dell'obiettivo ("Casa" → 🏠), se non ne ha già una sua. */}
+                    <span className="radar-preview__goal-icon">{goalIcon(goal)}</span>
+                  </span>
+                  <span className="radar-preview__goal-text">
+                    <span className="radar-preview__goal-name">{goal.label}</span>
+                    {/* Gli importi veri dello store, con i centesimi (format.js). */}
+                    <span className="radar-preview__goal-amounts">
+                      <span className="radar-preview__goal-saved">{money(goal.saved)}</span> / {money(goal.target)}
+                    </span>
+                  </span>
+                  <span className="radar-preview__goal-percent">{goal.percent}%</span>
+                  <span
+                    className="radar-preview__goal-bar"
+                    role="progressbar"
+                    aria-label={goal.label}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={goal.percent}
+                  >
+                    <span className="radar-preview__goal-bar-fill" style={{ width: `${goal.percent}%` }} />
+                  </span>
+                </button>
+              </li>
             ))}
-          </span>
+          </ul>
         </div>
       )}
     </section>

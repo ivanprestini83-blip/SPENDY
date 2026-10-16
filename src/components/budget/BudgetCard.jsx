@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { ProgressBar } from '../ProgressBar/ProgressBar.jsx'
 import { formatCurrency, maskedCurrency } from '../../utils/format.js'
 import { budgetTone } from '../../utils/budgetTone.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
@@ -19,11 +18,11 @@ function statusMessage(spentRatio) {
 const BUDGET_WARNING_AT = 70 // % of monthlyBudget spent
 const BUDGET_DANGER_AT = 90 // % of monthlyBudget spent — "ultimo 10%" left
 
-// La barra prende il colore di riempimento del tono della card
-// (--card-fill in BudgetCard.css, scelto per contrastare con quel fondo):
-// card e barra dicono la stessa cosa. budgetBarState sotto resta per il
-// messaggio e per l'importo che pulsa.
-const BAR_FILL = 'var(--card-fill)'
+// L'arco della card: mezza circonferenza, lunghezza normalizzata a 100
+// (pathLength), così il riempimento è direttamente la percentuale spesa.
+// Il colore viene dal tono della card (BudgetCard.css), lo stesso che
+// decide fondo e bordo; budgetBarState sotto resta per messaggio e importo.
+const ARC_PATH = 'M 14 110 A 96 96 0 0 1 206 110'
 
 // No budget set yet isn't a "danger" — there's nothing to overspend
 // against, just nothing configured (Spendy's own message already says
@@ -46,8 +45,8 @@ export function BudgetCard({ available, spent, monthlyBudget, period, hidden, on
   const spentRatio = monthlyBudget > 0 ? (spent / monthlyBudget) * 100 : 0
 
   // Starts at 0 and jumps to the real ratio one tick after mount, purely so
-  // the progress bar's own width transition (see ProgressBar.css) plays as
-  // an animated fill on load instead of appearing already-full.
+  // the arc's own transition (BudgetCard.css) plays as an animated fill on
+  // load instead of appearing already-full.
   const [animatedRatio, setAnimatedRatio] = useState(0)
   useEffect(() => {
     const id = requestAnimationFrame(() => setAnimatedRatio(spentRatio))
@@ -56,6 +55,8 @@ export function BudgetCard({ available, spent, monthlyBudget, period, hidden, on
 
   const barState = budgetBarState(spentRatio, monthlyBudget)
   const { tone, remainingPercent } = budgetTone({ available, spent })
+  const amountText = hidden ? maskedCurrency() : formatCurrency(available)
+  const spentLabel = t('budget.spentof', { spent: formatCurrency(spent), budget: formatCurrency(monthlyBudget) })
 
   return (
     <section className={`budget-card budget-card--${tone}`}>
@@ -78,27 +79,45 @@ export function BudgetCard({ available, spent, monthlyBudget, period, hidden, on
         </button>
       </div>
 
-      <p className={`budget-card__amount ${barState === 'danger' ? 'budget-card__amount--alarm' : ''}`}>
-        {hidden ? maskedCurrency() : formatCurrency(available)}
-      </p>
+      {/* L'arco: quanta parte del budget del ciclo è già spesa (la stessa
+          percentuale di prima, solo disegnata ad arco). Dentro, l'importo
+          disponibile, che resta il numero più grande della Home. */}
+      <div className="budget-card__gauge">
+        <svg
+          className="budget-card__arc"
+          viewBox="0 0 220 118"
+          role="progressbar"
+          aria-label={spentLabel}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(Math.min(100, Math.max(0, spentRatio)))}
+        >
+          <path className="budget-card__arc-track" d={ARC_PATH} pathLength="100" />
+          <path
+            className="budget-card__arc-fill"
+            d={ARC_PATH}
+            pathLength="100"
+            style={{ strokeDashoffset: 100 - Math.min(100, Math.max(0, animatedRatio)) }}
+          />
+        </svg>
+        <div className="budget-card__center">
+          <p className={`budget-card__amount${amountText.length > 9 ? ' budget-card__amount--long' : ''}${barState === 'danger' ? ' budget-card__amount--alarm' : ''}`}>
+            {amountText}
+          </p>
+          <p className="budget-card__share">
+            <strong>{Math.round(spentRatio)}%</strong> {t('budget.gauge')}
+          </p>
+        </div>
+      </div>
 
       {/* Il budget è lo stipendio di QUESTO ciclo (utils/salary.js): a inizio
           ciclo, finché non viene inserito, è 0 e lo si dice. */}
       <p className="budget-card__period">
         {monthlyBudget > 0 ? t('budget.monthly', { amount: formatCurrency(monthlyBudget) }) : t('budget.nosalary')} · {period}
       </p>
-
-      <div className="budget-card__progress">
-        <ProgressBar value={animatedRatio} colorValue={BAR_FILL} label={t('budget.spentof', { spent: formatCurrency(spent), budget: formatCurrency(monthlyBudget) })} />
-        <div className="budget-card__progress-labels">
-          <span>{Math.round(spentRatio)}%</span>
-          {/* Explicit "X spesi di Y", never the old bare "speso di Y" —
-              that read as ambiguous (spent how much?). */}
-          <span className="budget-card__progress-total">
-            {t('budget.spentof', { spent: formatCurrency(spent), budget: formatCurrency(monthlyBudget) })}
-          </span>
-        </div>
-      </div>
+      {/* Explicit "X spesi di Y", never the old bare "speso di Y" —
+          that read as ambiguous (spent how much?). */}
+      <p className="budget-card__progress-total">{spentLabel}</p>
 
       <p className={`budget-card__status budget-card__status--${barState}`}>
         <span className="budget-card__status-icon" aria-hidden="true">

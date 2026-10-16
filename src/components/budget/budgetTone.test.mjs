@@ -73,7 +73,7 @@ const harnessPlugin = {
   name: 'budget-tone-harness',
   enforce: 'pre',
   resolveId(source, importer) {
-    if (importer?.includes('BudgetCard.jsx') && source === '../../i18n/useLanguage.js') return '\0budget-tone:useLanguage'
+    if ((importer?.includes('BudgetCard.jsx') || importer?.includes('ExpenseSummaryCards.jsx')) && source === '../../i18n/useLanguage.js') return '\0budget-tone:useLanguage'
     return null
   },
   load(id) {
@@ -118,7 +118,13 @@ try {
   }
   {
     const html = render(400, 600)
-    check('la barra è accessibile (progressbar con valore) e del colore del tono (--card-fill della card)', /role="progressbar"[^>]*aria-valuemin="0"[^>]*aria-valuemax="100"/.test(html) && html.includes('var(--card-fill)') && cardClass(html) === 'caution')
+    check('l\'arco è accessibile: progressbar 0–100 col valore della quota spesa (60%)', /<svg class="budget-card__arc"[^>]*role="progressbar"[^>]*aria-valuemin="0"[^>]*aria-valuemax="100"[^>]*aria-valuenow="60"/.test(html))
+    check('   l\'importo disponibile sta dentro l\'arco, con la quota spesa sotto', /budget-card__center[\s\S]*budget-card__amount[^>]*>€?\s?400,00/.test(html) && html.includes('<strong>60%</strong> speso'))
+    {
+      const over = render(-120.5, 1120.5)
+      check('   sforato: arco pieno (valore 100, mai oltre)', /aria-valuenow="100"/.test(over))
+      check('   budget non configurato: arco a 0, nessun NaN', /aria-valuenow="0"/.test(render(0, 0, 0)) && !/NaN/.test(render(0, 0, 0)))
+    }
     check('il messaggio di stato resta quello di prima (soglie 70/95 sullo speso)', html.includes(MESSAGES.it.budget.status.ok))
   }
   for (const [lang, expected] of [['en', '80% left'], ['es', 'Queda el 80%'], ['fr', 'Reste 80 %']]) {
@@ -126,6 +132,29 @@ try {
     check(`${lang}: chip tradotto ("${expected}")`, chip(render(800, 200)) === expected, chip(render(800, 200)))
   }
   globalThis.__budgetToneTest.language = 'it'
+
+  // ---- Spese ed entrate (stesso banco di prova: lingua finta, dizionari veri)
+  const { ExpenseSummaryCards } = await server.ssrLoadModule('/src/components/budget/ExpenseSummaryCards.jsx')
+  const { formatCurrency } = await server.ssrLoadModule('/src/utils/format.js')
+  const flow = (props) => renderToStaticMarkup(h(ExpenseSummaryCards, { today: { total: 56, count: 2 }, month: { total: 585.84 }, monthlyBudget: 2450, ...props }))
+  {
+    const html = flow({ income: { total: 2650, salary: 2450, extra: 200 } })
+    const buttons = html.match(/<button type="button" class="([^"]+)"/g) ?? []
+    check('spese ed entrate: "Oggi" (1°), spese del mese (2°), entrate (3°)', buttons.length === 3 && buttons[0].includes('expense-summary__today') && buttons[2].includes('expense-summary__item--income'), buttons.join(' | '))
+    check('   entrate: etichetta, totale (stipendio + extra) e "di cui 200,00 € extra"', html.includes(MESSAGES.it.expenses.summary.income) && html.includes(formatCurrency(2650, 'it', 'EUR')) && html.includes(`di cui ${formatCurrency(200, 'it', 'EUR')} extra`))
+    check('   nessun NaN', !/NaN|Infinity/.test(html))
+  }
+  {
+    const html = flow({ income: { total: 0, salary: 0, extra: 0 } })
+    check('entrate senza stipendio nel ciclo: lo dice (non un numero inventato)', html.includes(MESSAGES.it.andamento.summary.nosalary) && html.includes(formatCurrency(0, 'it', 'EUR')))
+  }
+  check('senza `income` (uso di prima): solo le spese, due pulsanti', (flow({}).match(/<button /g) ?? []).length === 2 && !flow({}).includes('expense-summary__item--income'))
+  {
+    const home = (await import('node:fs')).readFileSync(join(ROOT, 'src/pages/HomePage.jsx'), 'utf8')
+    check('Home: le entrate aprono la scheda Entrate e usano i numeri di buildFinancialData', home.includes("onOpenIncomes={() => setActiveTab('incomes')}") && home.includes('monthlyBudget + financialData.extraIncomeThisMonth'))
+  }
+  check('expenses.summary.income in it/en/es/fr', ['it', 'en', 'es', 'fr'].every((lang) => typeof MESSAGES[lang].expenses.summary.income === 'string' && MESSAGES[lang].expenses.summary.income.trim()))
+  check('budget.gauge in it/en/es/fr', ['it', 'en', 'es', 'fr'].every((lang) => typeof MESSAGES[lang].budget.gauge === 'string' && MESSAGES[lang].budget.gauge.trim()))
 } finally {
   await server.close()
 }

@@ -142,66 +142,63 @@ const server = await createServer({
 try {
   const { RadarPreview } = await server.ssrLoadModule('/src/components/radar/RadarPreview.jsx')
   const render = (goals, radar = radarWith(goals)) => renderToStaticMarkup(h(RadarPreview, { radar, goals }))
-  // La tessera degli obiettivi (una sola) e gli obiettivi al suo interno.
-  const goalsTileOf = (html) => html.match(/<div role="button"[^>]*class="radar-preview__tile radar-preview__tile--goal radar-preview__goals-tile"[\s\S]*?<\/div>/)?.[0] ?? ''
-  const tilesIn = (html) => html.match(/class="radar-preview__tile[ "]/g) ?? []
-  const itemsOf = (html) => goalsTileOf(html).match(/<span role="listitem"[\s\S]*?<\/span><\/span>/g) ?? []
-  const listClass = (html) => goalsTileOf(html).match(/radar-preview__goal-list--(\w+)/)?.[1]
+  // L'area degli obiettivi dentro My Radar e le sue righe (una per obiettivo).
+  const goalsOf = (html) => html.match(/<div class="radar-preview__goals">[\s\S]*?<\/ul><\/div>/)?.[0] ?? ''
+  const itemsOf = (html) => goalsOf(html).match(/<li class="radar-preview__goal[ "][\s\S]*?<\/li>/g) ?? []
   const text = (fragment) => fragment.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
-  const valueOf = (item) => text(item.match(/<span class="radar-preview__tile-value">([\s\S]*?)<\/span>/)?.[1] ?? '')
-  const nameOf = (item) => text(item.match(/<span class="radar-preview__tile-label radar-preview__goal-name">([\s\S]*?)<\/span>/)?.[1] ?? '')
-  const titleOf = (html) => text(goalsTileOf(html).match(/<span class="radar-preview__tile-title">([\s\S]*?)<\/span>/)?.[1] ?? '')
+  const valueOf = (item) => text(item.match(/<span class="radar-preview__goal-percent">([\s\S]*?)<\/span>/)?.[1] ?? '')
+  const nameOf = (item) => text(item.match(/<span class="radar-preview__goal-name">([\s\S]*?)<\/span>/)?.[1] ?? '')
+  const iconOf = (item) => text(item.match(/<span class="radar-preview__goal-icon">([\s\S]*?)<\/span>/)?.[1] ?? '')
+  const amountsOf = (item) => text(item.match(/<span class="radar-preview__goal-amounts">([\s\S]*?<\/span>[\s\S]*?)<\/span><\/span>/)?.[1] ?? '')
+  const titleOf = (html) => text(goalsOf(html).match(/<p class="radar-preview__goals-title">([\s\S]*?)<\/p>/)?.[1] ?? '')
+  const { formatCurrency } = await server.ssrLoadModule('/src/utils/format.js')
 
   {
     const html = render([])
-    check('nessun obiettivo: niente tessera obiettivi, il resto di My Radar c\'è', !html.includes('radar-preview__goals-tile') && html.includes('radar-preview__title'))
+    check('nessun obiettivo: niente area obiettivi, il resto di My Radar c\'è', !html.includes('radar-preview__goals') && html.includes('radar-preview__title'))
   }
   {
     const html = render([GOALS[0]])
     const items = itemsOf(html)
-    check('un obiettivo: una tessera, un obiettivo dentro', tilesIn(html).length === 1 && items.length === 1 && listClass(html) === '1')
-    check('   come la tessera del Radar: badge, "Obiettivo", percentuale e sotto il nome', goalsTileOf(html).includes('radar-preview__tile-badge') && titleOf(html) === 'Obiettivo' && valueOf(items[0]) === '25%' && nameOf(items[0]) === 'Vacanze', `${titleOf(html)} | ${valueOf(items[0])} | ${nameOf(items[0])}`)
+    check('un obiettivo: una riga, nessuna card per obiettivo', items.length === 1 && !html.includes('radar-preview__goals-tile') && !goalsOf(html).includes('radar-preview__tile'))
+    check('   titolo "Obiettivo", percentuale, nome e importi', titleOf(html) === 'Obiettivo' && valueOf(items[0]) === '25%' && nameOf(items[0]) === 'Vacanze' && amountsOf(items[0]) === `${formatCurrency(500, 'it', 'EUR')} / ${formatCurrency(2000, 'it', 'EUR')}`, `${titleOf(html)} | ${valueOf(items[0])} | ${nameOf(items[0])} | ${amountsOf(items[0])}`)
+    check('   la riga è un pulsante (porta alla scheda Obiettivi)', /<li[^>]*><button type="button" class="radar-preview__goal-row">/.test(items[0]))
   }
   {
     const html = render(GOALS)
     const items = itemsOf(html)
-    check('tre obiettivi: UNA sola tessera, tre obiettivi affiancati dentro', tilesIn(html).length === 1 && items.length === 3 && listClass(html) === '3', `${tilesIn(html).length} tessere, ${items.length} obiettivi`)
+    check('tre obiettivi: tre righe in un\'unica area', items.length === 3 && (html.match(/class="radar-preview__goals"/g) ?? []).length === 1)
     check('   titolo al plurale', titleOf(html) === 'Obiettivi', titleOf(html))
-    const icons = items.map((item) => text(item.match(/<span class="radar-preview__goal-icon"[^>]*>([\s\S]*?)<\/span>/)?.[1] ?? ''))
-    check('   un\'icona sopra ogni obiettivo, quella del SUO nome', icons.join(' ') === `${goalIcon(GOALS[0])} ${goalIcon(GOALS[1])} ${goalIcon(GOALS[2])}` && icons.every(Boolean), icons.join(' '))
-    const named = itemsOf(render([{ id: 'c', emoji: '🎯', label: 'Casa', saved: 0, target: 100 }, { id: 'v', emoji: '🎯', label: 'Vacanza', saved: 0, target: 100 }, { id: 'p', emoji: '🎯', label: 'Computer', saved: 0, target: 100 }]))
-      .map((item) => text(item.match(/<span class="radar-preview__goal-icon"[^>]*>([\s\S]*?)<\/span>/)?.[1] ?? ''))
+    check('   un\'icona per obiettivo, quella del SUO nome', items.map(iconOf).join(' ') === `${goalIcon(GOALS[0])} ${goalIcon(GOALS[1])} ${goalIcon(GOALS[2])}`, items.map(iconOf).join(' '))
+    const named = itemsOf(render([{ id: 'c', emoji: '🎯', label: 'Casa', saved: 0, target: 100 }, { id: 'v', emoji: '🎯', label: 'Vacanza', saved: 0, target: 100 }, { id: 'p', emoji: '🎯', label: 'Computer', saved: 0, target: 100 }])).map(iconOf)
     check('   obiettivi creati dall\'app (🎯): Casa 🏠, Vacanza 🏖️, Computer 💻', named.join(' ') === '🏠 🏖️ 💻', named.join(' '))
     check('   percentuali 25 / 30 / 50, ognuna col SUO nome', items.map((item) => `${valueOf(item)} ${nameOf(item)}`).join(' | ') === '25% Vacanze | 30% Nuova auto | 50% Fondo emergenze', items.map((item) => `${valueOf(item)} ${nameOf(item)}`).join(' | '))
   }
   {
     const html = render([...GOALS, NEW_GOAL, DONE_GOAL])
     const items = itemsOf(html)
-    check('cinque obiettivi: sempre una tessera, cinque obiettivi nell\'ordine dello store (fila che scorre)', tilesIn(html).length === 1 && items.length === 5 && listClass(html) === 'many' && ['Vacanze', 'Nuova auto', 'Fondo emergenze', 'Chitarra', 'PC'].every((label, i) => nameOf(items[i]) === label))
+    check('cinque obiettivi: cinque righe, tutte visibili, nell\'ordine dello store', items.length === 5 && ['Vacanze', 'Nuova auto', 'Fondo emergenze', 'Chitarra', 'PC'].every((label, i) => nameOf(items[i]) === label))
     const expected = ['25%', '30%', '50%', '0%', '100%']
     check('   ogni obiettivo ha la SUA percentuale', items.every((item, i) => valueOf(item) === expected[i]), items.map(valueOf).join(' | '))
     check('   appena creato: 0%', valueOf(items[3]) === '0%' && !items[3].includes('--done'))
-    const { formatCurrency } = await server.ssrLoadModule('/src/utils/format.js')
     const amounts = [[500, 2000], [3000, 10000], [750, 1500], [0, 800], [900, 900]]
-    const amountsOf = (item) => text(item.match(/<span class="radar-preview__goal-amounts">([\s\S]*?)<\/span>\s*<span class="radar-preview__goal-bar"/)?.[1] ?? '')
     const wrongAmounts = amounts.filter(([saved, target], i) => amountsOf(items[i]) !== `${formatCurrency(saved, 'it', 'EUR')} / ${formatCurrency(target, 'it', 'EUR')}`)
     check('   ogni obiettivo mostra i SUOI importi (risparmiato / totale, con i centesimi)', wrongAmounts.length === 0, items.map(amountsOf).join(' | '))
     const bars = items.map((item) => item.match(/<span class="radar-preview__goal-bar" role="progressbar"[^>]*aria-valuenow="(\d+)"[^>]*><span class="radar-preview__goal-bar-fill" style="width:(\d+)%"/)?.slice(1).join('/'))
     check('   ogni obiettivo ha la SUA barra (progressbar accessibile, larghezza = percentuale vera)', bars.join(' ') === '25/25 30/30 50/50 0/0 100/100', bars.join(' '))
-    check('   accenti a rotazione fra gli obiettivi', ['accent-0', 'accent-1', 'accent-2', 'accent-3', 'accent-0'].every((accent, i) => items[i].includes(`radar-preview__goal-item--${accent}`)))
-    check('   completato: 100% segnato come tale (in verde)', valueOf(items[4]) === '100%' && items[4].includes('radar-preview__goal-item--done'))
+    const rings = items.map((item) => item.match(/radar-preview__ring-fill"[^>]*style="stroke-dashoffset:(\d+)"/)?.[1])
+    check('   ogni anello è riempito della SUA percentuale (a 0% solo la rotaia, nessun puntino)', rings.join(' ') === '75 70 50  0' && items[3].includes('radar-preview__ring-track'), rings.join(' '))
+    check('   accenti a rotazione fra gli obiettivi', ['accent-0', 'accent-1', 'accent-2', 'accent-3', 'accent-0'].every((accent, i) => items[i].includes(`radar-preview__goal--${accent}`)))
+    check('   completato: 100% segnato come tale (in verde)', valueOf(items[4]) === '100%' && items[4].includes('radar-preview__goal--done'))
     check('   nessun NaN, nessuna percentuale negativa', !/NaN|-\d+%/.test(text(html)))
   }
   {
+    const decimals = itemsOf(render([{ id: 'd', emoji: '🎯', label: 'Deposito per la nuova casa a Milano', saved: 3333.33, target: 12345.67 }]))[0]
+    check('importi decimali mostrati così come sono salvati (3.333,33 / 12.345,67) e 27%', amountsOf(decimals) === `${formatCurrency(3333.33, 'it', 'EUR')} / ${formatCurrency(12345.67, 'it', 'EUR')}` && valueOf(decimals) === '27%')
+    check('   nome lungo: intero, mai tagliato', nameOf(decimals) === 'Deposito per la nuova casa a Milano')
     const css = (await import('node:fs')).readFileSync(join(ROOT, 'src/components/radar/RadarPreview.css'), 'utf8')
-    check('CSS: dentro la tessera tre obiettivi per riga, 3 e un filo oltre i tre', /\.radar-preview__goal-list \{[^}]*--goal-columns: 3;/.test(css) && css.includes('.radar-preview__goal-list--many { --goal-columns: 3.3; }'))
-  }
-  {
-    const decimals = itemsOf(render([{ id: 'd', emoji: '🎯', label: 'Casa', saved: 3333.33, target: 12345.67 }]))[0]
-    const { formatCurrency } = await server.ssrLoadModule('/src/utils/format.js')
-    check('importi decimali mostrati così come sono salvati (3.333,33 / 12.345,67) e 27%', text(decimals).includes(`${formatCurrency(3333.33, 'it', 'EUR')} / ${formatCurrency(12345.67, 'it', 'EUR')}`) && text(decimals).includes('27%'))
-    const css = (await import('node:fs')).readFileSync(join(ROOT, 'src/components/radar/RadarPreview.css'), 'utf8')
-    check('CSS: la rotaia della barra ha un colore suo (visibile a 0%)', /\.radar-preview__goal-bar \{[^}]*background: var\(--radar-track\)/.test(css))
+    check('CSS: la rotaia della barra e dell\'anello ha un colore suo (visibile a 0%)', /\.radar-preview__goal-bar \{[^}]*background: var\(--radar-track\)/.test(css) && /\.radar-preview__ring-track \{[^}]*stroke: var\(--radar-track\)/.test(css))
+    check('CSS: barra con estremità arrotondate, nome senza ellissi', /\.radar-preview__goal-bar \{[^}]*border-radius: var\(--radius-pill\)/.test(css) && !/\.radar-preview__goal-name \{[^}]*ellipsis/.test(css))
   }
   {
     globalThis.__radarGoalsTest.language = 'en'
