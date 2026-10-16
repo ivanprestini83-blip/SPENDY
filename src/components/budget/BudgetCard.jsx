@@ -4,37 +4,20 @@ import { budgetTone } from '../../utils/budgetTone.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import './BudgetCard.css'
 
-function statusMessage(spentRatio) {
-  if (spentRatio < 70) return 'budget.status.ok'
-  if (spentRatio < 95) return 'budget.status.near'
-  return 'budget.status.over'
+// Il messaggio sotto la card segue lo stesso livello del colore (e di
+// Andamento, utils/budgetTone.js): in linea sotto il 60% speso, "attento"
+// fino al 100%, superato oltre. Senza stipendio non c'è niente da giudicare.
+function statusMessage(level) {
+  if (level === 'ok' || level === 'neutral') return 'budget.status.ok'
+  if (level === 'over') return 'budget.status.over'
+  return 'budget.status.near'
 }
-
-// On the spent PERCENTAGE, not a fixed euro residuo — a bar fixed at
-// "always green" for anyone with a mid/large budget was the actual bug
-// here (small residuo in € almost never happened for them even at 95%
-// spent). "cambia colore quando arriva al 70% del disponibile spese, e
-// rosso quando arriva all'ultimo 10%" is exactly these two thresholds.
-const BUDGET_WARNING_AT = 70 // % of monthlyBudget spent
-const BUDGET_DANGER_AT = 90 // % of monthlyBudget spent — "ultimo 10%" left
 
 // L'arco della card: mezza circonferenza, lunghezza normalizzata a 100
 // (pathLength), così il riempimento è direttamente la percentuale spesa.
 // Il colore viene dal tono della card (BudgetCard.css), lo stesso che
-// decide fondo e bordo; budgetBarState sotto resta per messaggio e importo.
+// decide fondo, bordo e messaggio.
 const ARC_PATH = 'M 14 110 A 96 96 0 0 1 206 110'
-
-// No budget set yet isn't a "danger" — there's nothing to overspend
-// against, just nothing configured (Spendy's own message already says
-// so, see spendyCoach.js's tier 0). Only judge spentRatio once there's a
-// real budget behind it. spentRatio already reads >100 once over
-// budget, which the danger check below covers with no extra case.
-function budgetBarState(spentRatio, monthlyBudget) {
-  if (monthlyBudget <= 0) return 'ok'
-  if (spentRatio >= BUDGET_DANGER_AT) return 'danger'
-  if (spentRatio >= BUDGET_WARNING_AT) return 'warning'
-  return 'ok'
-}
 
 // `available`/`spent`/`monthlyBudget` are plain numbers the caller derives
 // from the store (budgetCalculations.js) — this component only formats
@@ -56,8 +39,9 @@ export function BudgetCard({ available, spent, monthlyBudget, extraIncome = 0, p
     return () => cancelAnimationFrame(id)
   }, [spentRatio])
 
-  const barState = budgetBarState(spentRatio, monthlyBudget)
-  const { tone, remainingPercent } = budgetTone({ available, spent })
+  // Un solo livello per colore, messaggio e importo (lo stesso di Andamento).
+  const { tone, level } = budgetTone({ spent, monthlyBudget })
+  const statusState = level === 'ok' || level === 'neutral' ? 'ok' : level === 'caution' || level === 'warning' ? 'warning' : 'danger'
   const amountText = hidden ? maskedCurrency() : formatCurrency(available)
   // Explicit "X spesi di Y", never the old bare "speso di Y" — that read as
   // ambiguous (spent how much?). Ora è l'etichetta accessibile dell'arco.
@@ -75,11 +59,12 @@ export function BudgetCard({ available, spent, monthlyBudget, extraIncome = 0, p
           <p className="budget-card__label">{t('budget.available')}</p>
           <p className="budget-card__period">{period}</p>
         </div>
-        {/* Quanto resta del budget del ciclo, la stessa percentuale che
-            decide il colore. Nessun chip senza un budget su cui calcolarla. */}
+        {/* Quanto resta del budget del ciclo: il complemento della quota
+            spesa mostrata nell'arco (64% speso → 36% residuo, sempre 100 in
+            tutto). Nessun chip senza un budget su cui calcolarla. */}
         {tone !== 'neutral' && (
           <span className="budget-card__left">
-            {tone === 'over' ? t('budget.exhausted') : t('budget.remaining', { percent: Math.floor(remainingPercent) })}
+            {tone === 'over' ? t('budget.exhausted') : t('budget.remaining', { percent: Math.max(0, 100 - Math.round(spentRatio)) })}
           </span>
         )}
         <button
@@ -96,7 +81,7 @@ export function BudgetCard({ available, spent, monthlyBudget, extraIncome = 0, p
           l'arco: quanta parte del budget del ciclo è già spesa (la stessa
           percentuale di prima, solo disegnata ad arco). */}
       <div className="budget-card__main">
-        <p className={`budget-card__amount${amountText.length > 9 ? ' budget-card__amount--long' : ''}${barState === 'danger' ? ' budget-card__amount--alarm' : ''}`}>
+        <p className={`budget-card__amount${amountText.length > 9 ? ' budget-card__amount--long' : ''}${statusState === 'danger' ? ' budget-card__amount--alarm' : ''}`}>
           {amountText}
         </p>
         <div className="budget-card__gauge">
@@ -149,11 +134,11 @@ export function BudgetCard({ available, spent, monthlyBudget, extraIncome = 0, p
         </div>
       </div>
 
-      <p className={`budget-card__status budget-card__status--${barState}`}>
+      <p className={`budget-card__status budget-card__status--${statusState}`}>
         <span className="budget-card__status-icon" aria-hidden="true">
-          {barState === 'ok' ? '✓' : '!'}
+          {statusState === 'ok' ? '✓' : '!'}
         </span>
-        {t(statusMessage(spentRatio))}
+        {t(statusMessage(level))}
       </p>
     </section>
   )

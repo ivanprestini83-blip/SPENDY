@@ -1,17 +1,23 @@
 import { formatCurrency } from '../../utils/format.js'
-import { NOTIFICATION_THRESHOLDS } from '../../notifications/notificationRules.js'
+import { budgetLevel } from '../../utils/budgetTone.js'
 import { ProgressBar } from '../ProgressBar/ProgressBar.jsx'
 import { spendyStates } from '../spendy/spendyStates.js'
 import { formatPercent } from './andamentoFormat.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import './CycleSummary.css'
 
-// Stesse soglie della barra del budget in Home (BudgetCard, 70% e 90%):
-// verde finché c'è margine, oro quando si stringe, coral nell'ultimo 10%.
+// La stessa scala della card del budget in Home (utils/budgetTone.js): verde
+// sotto il 60% speso, giallo, arancione dal 75%, rosso dal 90%. Così Home e
+// Andamento hanno sempre lo stesso colore per lo stesso budget.
+const LEVEL_COLORS = {
+  ok: '#10b981',
+  caution: '#eab308',
+  warning: '#f59e0b',
+  danger: '#f87171',
+  over: '#f87171',
+}
 function budgetColor(budgetUsed) {
-  if (budgetUsed >= 90) return 'var(--color-accent-coral)'
-  if (budgetUsed >= 70) return 'var(--color-accent-gold)'
-  return 'var(--color-accent-mint)'
+  return LEVEL_COLORS[budgetLevel(budgetUsed)] ?? 'var(--color-accent-mint)'
 }
 
 // La sintesi in cima, come la conclusione di "Confronta periodi": solo stati
@@ -20,8 +26,9 @@ function budgetColor(budgetUsed) {
 //   1. risparmio negativo (uscite oltre le entrate: la nota che il riquadro
 //      Risparmio mostra già);
 //   2. nessuno stipendio nel ciclo (budget utilizzato = null);
-//   3. budget ≥ 100% (la soglia "superato" delle notifiche);
-//   4. ≥ 90% e 5. ≥ 70% (le soglie della barra, budgetColor);
+//   3.–5. il livello del budget, la stessa scala della Home
+//      (utils/budgetTone.js): superato dal 100%, quasi finito dal 90%,
+//      attenzione dal 60%;
 //   6. altrimenti, tutto sotto controllo.
 // Con un budget, la frase dice quanto è stato usato e quanto resta: il
 // "resta" è il risparmio del ciclo (entrate − spese), lo stesso del riquadro.
@@ -33,9 +40,10 @@ function overviewOf(cycle, t) {
     return { tone: 'flat', title: t('andamento.overview.nosalary'), text: t('andamento.overview.spenttext', { amount: formatCurrency(cycle.spent) }) }
   }
   const used = t(cycle.isCurrent ? 'andamento.overview.usedleft' : 'andamento.overview.usedleftdone', { percent: formatPercent(cycle.budgetUsed), amount: formatCurrency(cycle.savings) })
-  if (cycle.budgetUsed >= NOTIFICATION_THRESHOLDS.budgetOver) return { tone: 'bad', title: t('andamento.overview.over'), text: used }
-  if (cycle.budgetUsed >= 90) return { tone: 'bad', title: t('andamento.overview.near'), text: used }
-  if (cycle.budgetUsed >= 70) return { tone: 'warn', title: t('andamento.overview.tight'), text: used }
+  const level = budgetLevel(cycle.budgetUsed)
+  if (level === 'over') return { tone: 'bad', title: t('andamento.overview.over'), text: used }
+  if (level === 'danger') return { tone: 'bad', title: t('andamento.overview.near'), text: used }
+  if (level === 'caution' || level === 'warning') return { tone: 'warn', title: t('andamento.overview.tight'), text: used }
   return { tone: 'good', title: t('andamento.overview.ok'), text: used }
 }
 
@@ -43,13 +51,15 @@ function overviewOf(cycle, t) {
 // immagini della Home, components/spendy/spendyStates.js).
 const MASCOT_BY_TONE = { good: 'happy', warn: 'attentive', bad: 'concerned', flat: 'advisor' }
 
-// "Ritmo di spesa": la stessa regola del messaggio del budget in Home
-// (BudgetCard.getStatusKey: sotto il 70% in linea, sotto il 95% vicino al
-// limite, poi al limite). Solo per il ciclo in corso e solo con uno stipendio.
+// "Ritmo di spesa": lo stesso livello della card del budget in Home
+// (utils/budgetTone.js). In linea sotto il 60% speso; vicino al limite dal
+// 60% (giallo) e dal 75% (arancione); al limite dal 90% (rosso). Solo per
+// il ciclo in corso e solo con uno stipendio.
 function paceOf(budgetUsed) {
-  if (budgetUsed < 70) return 'ok'
-  if (budgetUsed < 95) return 'near'
-  return 'over'
+  const level = budgetLevel(budgetUsed)
+  if (level === 'ok') return { pace: 'ok', level }
+  if (level === 'caution' || level === 'warning') return { pace: 'near', level }
+  return { pace: 'over', level }
 }
 
 // I tracciati delle icone (stile a linea, come le icone delle schede).
@@ -88,7 +98,8 @@ export function CycleSummary({ cycle, cycles = [cycle], onSelect = () => {}, tim
   const overview = overviewOf(cycle, t)
   // Prudenza: i giorni solo se sono davvero quelli di questo ciclo.
   const showDays = Boolean(cycle.isCurrent && timing && timing.start === cycle.range?.start)
-  const pace = cycle.isCurrent && cycle.budgetUsed !== null ? paceOf(cycle.budgetUsed) : null
+  const paceInfo = cycle.isCurrent && cycle.budgetUsed !== null ? paceOf(cycle.budgetUsed) : null
+  const pace = paceInfo?.pace ?? null
   const daysPercent = showDays ? Math.round((timing.dayOfCycle / timing.cycleDays) * 100) : 0
   const daysLeft = !showDays ? null
     : timing.daysRemaining === 0 ? t('andamento.overview.lastday')
@@ -176,7 +187,7 @@ export function CycleSummary({ cycle, cycles = [cycle], onSelect = () => {}, tim
               <span className="cycle-summary__fact-icon"><Icon name="clock" /></span>
               <span className="cycle-summary__fact-body">
                 <span className="cycle-summary__fact-label">{t('andamento.pace.label')}</span>
-                <span className={`cycle-summary__pace cycle-summary__pace--${pace}`}>
+                <span className={`cycle-summary__pace cycle-summary__pace--${pace} cycle-summary__pace--level-${paceInfo.level}`}>
                   <span className="cycle-summary__pace-dot" aria-hidden="true" />
                   {t(`andamento.pace.${pace}`)}
                 </span>

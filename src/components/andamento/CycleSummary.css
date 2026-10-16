@@ -382,6 +382,9 @@
 .cycle-summary__pace--ok { color: #0b8a62; }
 .cycle-summary__pace--near { color: #b97a06; }
 .cycle-summary__pace--over { color: #d9443f; }
+/* Stesso colore della card del budget in Home: giallo dal 60%, arancione dal 75%. */
+.cycle-summary__pace--level-caution { color: #a16207; }
+.cycle-summary__pace--level-warning { color: #c2410c; }
 
 /* ---------------------------------------------------------- categorie */
 

@@ -1,10 +1,10 @@
-// Colore della card "Disponibile" in Home: dipende dalla PERCENTUALE di
-// budget residuo del ciclo (utils/budgetTone.js), mai dall'importo in euro.
-// `npm test`, senza rete.
+// Colore della card "Disponibile" in Home e livello del budget in
+// Andamento: UNA sola scala sulla PERCENTUALE di budget speso del ciclo
+// (utils/budgetTone.js), mai sull'importo in euro. `npm test`, senza rete.
 //
 // Si controllano le soglie (anche ai bordi), i casi limite (nessun budget,
 // sforamento, decimali, valori mancanti) e la VERA BudgetCard.jsx caricata
-// da Vite: classe del tono, chip con la percentuale, barra e testi nelle
+// da Vite: classe del tono, chip con la percentuale, arco e testi nelle
 // quattro lingue.
 
 import { tmpdir } from 'node:os'
@@ -15,38 +15,40 @@ import react from '@vitejs/plugin-react'
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { check, section, report } from '../../sync/testkit.mjs'
-import { budgetTone, BUDGET_TONE_THRESHOLDS, BUDGET_TONES } from '../../utils/budgetTone.js'
+import { budgetTone, budgetLevel, spentPercentOf, BUDGET_LEVEL_THRESHOLDS, BUDGET_TONES, BUDGET_LEVELS } from '../../utils/budgetTone.js'
 import { MESSAGES } from '../../i18n/translate.js'
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
-const toneOf = (available, spent) => budgetTone({ available, spent }).tone
+const toneOf = (spent, monthlyBudget = 1000) => budgetTone({ spent, monthlyBudget }).tone
 
 // =====================================================================
-section('1. Soglie sulla percentuale residua')
+section('1. Soglie sulla percentuale spesa (una sola scala per Home e Andamento)')
 // =====================================================================
-check('soglie dichiarate: >50 verde, 25–50 giallo, 10–25 arancione, <10 rosso', BUDGET_TONE_THRESHOLDS.good === 50 && BUDGET_TONE_THRESHOLDS.caution === 25 && BUDGET_TONE_THRESHOLDS.warning === 10)
-check('1.000 € di budget, ne restano 800 → verde (80%)', toneOf(800, 200) === 'good' && budgetTone({ available: 800, spent: 200 }).remainingPercent === 80)
-check('1.000 € di budget, ne restano 50 → rosso (5%)', toneOf(50, 950) === 'danger')
-check('stessi 50 € ma su un budget di 60 → verde: conta la percentuale, non l\'importo', toneOf(50, 10) === 'good')
-check('bordi: 50,01% verde, 50% giallo', toneOf(500.1, 499.9) === 'good' && toneOf(500, 500) === 'caution')
-check('bordi: 25% giallo, 24,99% arancione', toneOf(250, 750) === 'caution' && toneOf(249.9, 750.1) === 'warning')
-check('bordi: 10% arancione, 9,99% rosso', toneOf(100, 900) === 'warning' && toneOf(99.9, 900.1) === 'danger')
-check('budget finito (0 €) → esaurito', toneOf(0, 1000) === 'over' && budgetTone({ available: 0, spent: 1000 }).remainingPercent === 0)
-check('budget superato → esaurito, percentuale 0 (mai negativa)', toneOf(-30.5, 1030.5) === 'over' && budgetTone({ available: -30.5, spent: 1030.5 }).remainingPercent === 0)
+check('soglie dichiarate: <60 verde, 60–75 giallo, 75–90 arancione, 90–100 rosso, ≥100 superato', BUDGET_LEVEL_THRESHOLDS.caution === 60 && BUDGET_LEVEL_THRESHOLDS.warning === 75 && BUDGET_LEVEL_THRESHOLDS.danger === 90 && BUDGET_LEVEL_THRESHOLDS.over === 100)
+check('1.000 € di budget, spesi 200 → verde, resta l\'80%', toneOf(200) === 'good' && budgetTone({ spent: 200, monthlyBudget: 1000 }).remainingPercent === 80)
+check('il caso segnalato: 64% speso → giallo (in Home e in Andamento)', toneOf(640) === 'caution' && budgetLevel(64) === 'caution')
+check('1.000 € di budget, spesi 950 → rosso (5% residuo)', toneOf(950) === 'danger')
+check('conta la percentuale, non l\'importo: 50 € spesi su 60 → arancione, su 1.000 → verde', toneOf(50, 60) === 'warning' && toneOf(50, 1000) === 'good')
+check('bordi: 59,99% verde, 60% giallo', toneOf(599.9) === 'good' && toneOf(600) === 'caution')
+check('bordi: 74,99% giallo, 75% arancione', toneOf(749.9) === 'caution' && toneOf(750) === 'warning')
+check('bordi: 89,99% arancione, 90% rosso', toneOf(899.9) === 'warning' && toneOf(900) === 'danger')
+check('budget finito (100%) → esaurito', toneOf(1000) === 'over' && budgetTone({ spent: 1000, monthlyBudget: 1000 }).remainingPercent === 0)
+check('budget superato → esaurito, percentuale residua 0 (mai negativa)', toneOf(1030.5) === 'over' && budgetTone({ spent: 1030.5, monthlyBudget: 1000 }).remainingPercent === 0)
+check('livelli della scala: ok/caution/warning/danger/over', [0, 59, 60, 75, 90, 100, 140].map(budgetLevel).join() === 'ok,ok,caution,warning,danger,over,over')
 
 // =====================================================================
 section('2. Casi limite: niente rosso "per default", niente NaN')
 // =====================================================================
-check('budget non configurato (0 e nessuna spesa) → neutro, senza percentuale', toneOf(0, 0) === 'neutral' && budgetTone({ available: 0, spent: 0 }).remainingPercent === null)
-check('nessun budget ma spese registrate → neutro, non rosso', toneOf(-20, 20) === 'neutral')
-check('valori mancanti o non numerici → neutro', [budgetTone(), budgetTone({}), budgetTone({ available: Number.NaN, spent: 10 }), budgetTone({ available: 10, spent: Infinity })].every((r) => r.tone === 'neutral' && r.remainingPercent === null))
-check('ciclo appena iniziato (niente speso) → verde 100%', toneOf(2451, 0) === 'good' && budgetTone({ available: 2451, spent: 0 }).remainingPercent === 100)
+check('budget non configurato (stipendio 0) → neutro, senza percentuale', toneOf(0, 0) === 'neutral' && budgetTone({ spent: 0, monthlyBudget: 0 }).remainingPercent === null)
+check('nessuno stipendio ma spese registrate → neutro, non rosso', toneOf(20, 0) === 'neutral')
+check('valori mancanti o non numerici → neutro', [budgetTone(), budgetTone({}), budgetTone({ spent: Number.NaN, monthlyBudget: 10 }), budgetTone({ spent: 10, monthlyBudget: Infinity })].every((r) => r.tone === 'neutral' && r.remainingPercent === null) && budgetLevel(null) === 'neutral' && budgetLevel(Number.NaN) === 'neutral')
+check('ciclo appena iniziato (niente speso) → verde 100%', toneOf(0, 2451) === 'good' && budgetTone({ spent: 0, monthlyBudget: 2451 }).remainingPercent === 100)
 {
-  const r = budgetTone({ available: 878.07, spent: 1572.93 })
-  check('importi decimali: 878,07 su 2.451,00 → 35,8% giallo', r.tone === 'caution' && Math.abs(r.remainingPercent - 35.8247) < 0.001, r.remainingPercent)
+  const r = budgetTone({ spent: 1572.93, monthlyBudget: 2451 })
+  check('importi decimali: 1.572,93 spesi su 2.451,00 → 64,2% giallo, 35,8% residuo', r.tone === 'caution' && Math.abs(r.remainingPercent - 35.8247) < 0.001, r.remainingPercent)
 }
-check('entrate extra contano nel budget del ciclo (disponibile + speso)', toneOf(600, 600) === 'caution' && toneOf(900, 100) === 'good')
-check('ogni risultato è uno dei toni dichiarati', [[800, 200], [0, 0], [-1, 1], [5, 95], [30, 70], [-5, 105]].every(([a, s]) => BUDGET_TONES.includes(toneOf(a, s))))
+check('la base è la stessa di Andamento (speso ÷ stipendio del ciclo)', spentPercentOf({ spent: 500, monthlyBudget: 2000 }) === 25 && spentPercentOf({ spent: 5, monthlyBudget: 0 }) === null)
+check('ogni risultato è uno dei toni e livelli dichiarati', [[200, 1000], [0, 0], [1, 0], [95, 100], [70, 100], [105, 100]].every(([sp, b]) => BUDGET_TONES.includes(toneOf(sp, b)) && BUDGET_LEVELS.includes(budgetTone({ spent: sp, monthlyBudget: b }).level)))
 
 // =====================================================================
 section('3. Testi nuovi nelle quattro lingue')
@@ -114,7 +116,7 @@ try {
   }
   {
     const html = render(878.07, 1572.93)
-    check('decimali: chip "35% residuo" (per difetto, mai arrotondato verso il verde)', chip(html) === '35% residuo' && cardClass(html) === 'caution', chip(html))
+    check('decimali: 64,17% speso → chip "36% residuo", arco "64%": insieme fanno sempre 100', chip(html) === '36% residuo' && html.includes('<strong>64%</strong>') && cardClass(html) === 'caution', chip(html))
   }
   {
     const html = render(400, 600)
@@ -126,7 +128,8 @@ try {
       check('   sforato: arco pieno (valore 100, mai oltre)', /aria-valuenow="100"/.test(over))
       check('   budget non configurato: arco a 0, nessun NaN', /aria-valuenow="0"/.test(render(0, 0, 0)) && !/NaN/.test(render(0, 0, 0)))
     }
-    check('il messaggio di stato resta quello di prima (soglie 70/95 sullo speso)', html.includes(MESSAGES.it.budget.status.ok))
+    check('il messaggio di stato segue lo stesso livello: al 60% "Attenzione, ti stai avvicinando al limite."', html.includes(MESSAGES.it.budget.status.near))
+    check('   sotto il 60% "Sei in linea", oltre il 100% "Hai superato"', render(800, 200).includes(MESSAGES.it.budget.status.ok) && render(-120.5, 1120.5).includes(MESSAGES.it.budget.status.over))
   }
   for (const [lang, expected] of [['en', '80% left'], ['es', 'Queda el 80%'], ['fr', 'Reste 80 %']]) {
     globalThis.__budgetToneTest.language = lang

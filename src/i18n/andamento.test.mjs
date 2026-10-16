@@ -408,6 +408,7 @@ try {
   const { getCycleTiming } = await server.ssrLoadModule('/src/utils/cycle.js')
   const { registerCustomCategories: registerCustom } = await server.ssrLoadModule('/src/data/categories.js')
   const { NOTIFICATION_THRESHOLDS } = await server.ssrLoadModule('/src/notifications/notificationRules.js')
+  const { budgetLevel, budgetTone, BUDGET_LEVEL_THRESHOLDS } = await server.ssrLoadModule('/src/utils/budgetTone.js')
   const box = dom.createContainer()
   let boxRoot = null
   const mount = async (state) => {
@@ -424,8 +425,10 @@ try {
   const spentOf = (amount) => [expense('o-e1', 'spesa', amount, '2026-10-12')]
   const CASES = [
     ['budget al 25%', base(spentOf(500), [salary(2000)]), 'good', 'ok', 'usedleft'],
-    ['budget al 69,95% (sotto la soglia del 70%)', base(spentOf(1399), [salary(2000)]), 'good', 'ok', 'usedleft'],
-    ['budget al 70% esatto', base(spentOf(1400), [salary(2000)]), 'warn', 'tight', 'usedleft'],
+    ['budget al 59,95% (sotto la soglia del 60%)', base(spentOf(1199), [salary(2000)]), 'good', 'ok', 'usedleft'],
+    ['budget al 60% esatto', base(spentOf(1200), [salary(2000)]), 'warn', 'tight', 'usedleft'],
+    ['budget al 64% (giallo, come in Home)', base(spentOf(1280), [salary(2000)]), 'warn', 'tight', 'usedleft'],
+    ['budget al 75% esatto (arancione)', base(spentOf(1500), [salary(2000)]), 'warn', 'tight', 'usedleft'],
     ['budget all\'89,95%', base(spentOf(1799), [salary(2000)]), 'warn', 'tight', 'usedleft'],
     ['budget al 90% esatto (quasi esaurito)', base(spentOf(1800), [salary(2000)]), 'bad', 'near', 'usedleft'],
     ['budget oltre il 100%, ma entrate extra: risparmio ancora positivo', base(spentOf(2200), [salary(2000), income('o-x', 'extra', 500, '2026-10-09')]), 'bad', 'over', 'usedleft'],
@@ -455,13 +458,21 @@ try {
     const expected = [formatCurrency(cycle.spent), formatCurrency(cycle.income), cycle.savings < 0 ? `-${formatCurrency(Math.abs(cycle.savings))}` : formatCurrency(cycle.savings)]
     check('   spese, entrate, risparmio e budget: stessi valori del motore', byClass(box, 'cycle-summary__metric-value').map(text).join('|') === expected.join('|')
       && text(one(box, 'cycle-summary__percent')) === fmt.formatPercent(cycle.budgetUsed), `${byClass(box, 'cycle-summary__metric-value').map(text).join('|')} ${text(one(box, 'cycle-summary__percent'))}`)
-    // Ritmo di spesa: le soglie del messaggio del budget in Home (BudgetCard: < 70 in linea, < 95 vicino al limite, poi al limite).
-    const pace = cycle.budgetUsed === null ? null : cycle.budgetUsed < 70 ? 'ok' : cycle.budgetUsed < 95 ? 'near' : 'over'
+    // Ritmo di spesa: lo stesso livello della card del budget in Home (utils/budgetTone.js):
+    // < 60 in linea, < 90 vicino al limite (giallo fino a 75, poi arancione), poi al limite.
+    const level = budgetLevel(cycle.budgetUsed)
+    const pace = cycle.budgetUsed === null ? null : level === 'ok' ? 'ok' : level === 'caution' || level === 'warning' ? 'near' : 'over'
     const paceNode = one(box, 'cycle-summary__pace')
-    check(`   ritmo di spesa: ${pace ?? 'assente (nessuno stipendio)'}`, pace === null ? !paceNode : text(paceNode) === translate('it', `andamento.pace.${pace}`) && cls(paceNode).includes(`cycle-summary__pace--${pace}`))
+    check(`   ritmo di spesa: ${pace ?? 'assente (nessuno stipendio)'}${pace ? ` (${level})` : ''}`, pace === null ? !paceNode : text(paceNode) === translate('it', `andamento.pace.${pace}`) && cls(paceNode).includes(`cycle-summary__pace--${pace}`) && cls(paceNode).includes(`cycle-summary__pace--level-${level}`))
+    // Lo stesso budget, nella card della Home: stesso livello, stesso colore.
+    if (cycle.isCurrent && cycle.budgetUsed !== null) {
+      const home = budgetTone({ spent: cycle.spent, monthlyBudget: cycle.budgetUsed > 0 ? (cycle.spent / cycle.budgetUsed) * 100 : 0 })
+      check(`   stesso livello della card in Home (${level})`, home.level === level)
+    }
   }
-  check('soglie: 70 e 90 della barra, 100 delle notifiche (nessuna soglia nuova)', NOTIFICATION_THRESHOLDS.budgetOver === 100 && NOTIFICATION_THRESHOLDS.budgetNear === 90
-    && read('src/components/andamento/CycleSummary.jsx').includes('NOTIFICATION_THRESHOLDS.budgetOver'))
+  check('soglie: una sola scala (60/75/90/100) per Home e Andamento; "superato" = soglia delle notifiche', BUDGET_LEVEL_THRESHOLDS.caution === 60 && BUDGET_LEVEL_THRESHOLDS.warning === 75 && BUDGET_LEVEL_THRESHOLDS.danger === 90 && BUDGET_LEVEL_THRESHOLDS.over === NOTIFICATION_THRESHOLDS.budgetOver
+    && read('src/components/andamento/CycleSummary.jsx').includes("from '../../utils/budgetTone.js'") && read('src/components/budget/BudgetCard.jsx').includes("from '../../utils/budgetTone.js'")
+    && !/budgetUsed [<>]=? ?\d/.test(read('src/components/andamento/CycleSummary.jsx')))
 
   // Giorni del ciclo in corso: getCycleTiming, con il ciclo personalizzato.
   const DAY_CASES = [['a metà ciclo', '2026-10-20'], ['penultimo giorno (1 giorno rimasto)', '2026-11-05'], ['ultimo giorno', '2026-11-06'], ['primo giorno', '2026-10-07']]
