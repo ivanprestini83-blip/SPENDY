@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ProgressBar } from '../ProgressBar/ProgressBar.jsx'
 import { formatCurrency, maskedCurrency } from '../../utils/format.js'
+import { budgetTone } from '../../utils/budgetTone.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import './BudgetCard.css'
 
@@ -18,11 +19,11 @@ function statusMessage(spentRatio) {
 const BUDGET_WARNING_AT = 70 // % of monthlyBudget spent
 const BUDGET_DANGER_AT = 90 // % of monthlyBudget spent — "ultimo 10%" left
 
-const BUDGET_BAR_COLORS = {
-  ok: '#12b886',
-  warning: '#f0ab1f',
-  danger: '#f4645f',
-}
+// La barra prende il colore di riempimento del tono della card
+// (--card-fill in BudgetCard.css, scelto per contrastare con quel fondo):
+// card e barra dicono la stessa cosa. budgetBarState sotto resta per il
+// messaggio e per l'importo che pulsa.
+const BAR_FILL = 'var(--card-fill)'
 
 // No budget set yet isn't a "danger" — there's nothing to overspend
 // against, just nothing configured (Spendy's own message already says
@@ -54,11 +55,19 @@ export function BudgetCard({ available, spent, monthlyBudget, period, hidden, on
   }, [spentRatio])
 
   const barState = budgetBarState(spentRatio, monthlyBudget)
+  const { tone, remainingPercent } = budgetTone({ available, spent })
 
   return (
-    <section className="budget-card">
+    <section className={`budget-card budget-card--${tone}`}>
       <div className="budget-card__top">
         <p className="budget-card__label">{t('budget.available')}</p>
+        {/* Quanto resta del budget del ciclo, la stessa percentuale che
+            decide il colore. Nessun chip senza un budget su cui calcolarla. */}
+        {tone !== 'neutral' && (
+          <span className="budget-card__left">
+            {tone === 'over' ? t('budget.exhausted') : t('budget.remaining', { percent: Math.floor(remainingPercent) })}
+          </span>
+        )}
         <button
           type="button"
           className="budget-card__hide-toggle"
@@ -80,7 +89,7 @@ export function BudgetCard({ available, spent, monthlyBudget, period, hidden, on
       </p>
 
       <div className="budget-card__progress">
-        <ProgressBar value={animatedRatio} colorValue={BUDGET_BAR_COLORS[barState]} />
+        <ProgressBar value={animatedRatio} colorValue={BAR_FILL} label={t('budget.spentof', { spent: formatCurrency(spent), budget: formatCurrency(monthlyBudget) })} />
         <div className="budget-card__progress-labels">
           <span>{Math.round(spentRatio)}%</span>
           {/* Explicit "X spesi di Y", never the old bare "speso di Y" —

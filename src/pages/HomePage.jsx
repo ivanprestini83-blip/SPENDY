@@ -191,7 +191,7 @@ export function HomePage() {
 
       <RadarPreview radar={radar} goals={goals} onOpen={() => openModal('radar')} onOpenGoals={() => setActiveTab('goals')} />
 
-      <button type="button" className="home-page__goal-link" onClick={() => openModal('emergencyFund')}>
+      <button type="button" className="home-page__goal-link home-page__goal-link--emergency" onClick={() => openModal('emergencyFund')}>
         <GoalCard goal={emergencyFundGoal} />
       </button>
 

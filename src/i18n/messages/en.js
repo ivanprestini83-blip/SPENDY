@@ -55,6 +55,8 @@ export default {
     monthly: 'Monthly budget {amount}',
     nosalary: 'This cycle’s salary hasn’t been added yet',
     spentof: '{spent} spent of {budget}',
+    remaining: '{percent}% left',
+    exhausted: 'Budget used up',
     status: {
       ok: 'You’re within your budget!',
       near: 'Careful, you’re getting close to the limit.',

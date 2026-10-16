@@ -12,11 +12,16 @@ import './ProgressBar.css'
 // thresholds) transition smoothly via `background-color` — swapping
 // between two different gradient classes can't animate, a flat color
 // value on one persistent element can.
-export function ProgressBar({ value, color = 'mint', colorValue = null, trackClassName = '' }) {
-  const clamped = Math.max(0, Math.min(100, value))
+// `label`, quando c'è, rende la barra leggibile dagli screen reader
+// (role="progressbar" con il valore 0–100); senza, resta decorativa come prima.
+export function ProgressBar({ value, color = 'mint', colorValue = null, trackClassName = '', label = null }) {
+  const clamped = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0))
+  const a11y = label
+    ? { role: 'progressbar', 'aria-label': label, 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': Math.round(clamped) }
+    : {}
 
   return (
-    <div className={`progress-bar ${trackClassName}`}>
+    <div className={`progress-bar ${trackClassName}`} {...a11y}>
       <div
         className={`progress-bar__fill ${colorValue ? '' : `progress-bar__fill--${color}`}`}
         style={{ width: `${clamped}%`, ...(colorValue ? { background: colorValue } : {}) }}

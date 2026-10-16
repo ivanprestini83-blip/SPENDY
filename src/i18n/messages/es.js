@@ -55,6 +55,8 @@ export default {
     monthly: 'Presupuesto mensual {amount}',
     nosalary: 'Todavía no has añadido el sueldo de este ciclo',
     spentof: '{spent} gastados de {budget}',
+    remaining: 'Queda el {percent}%',
+    exhausted: 'Presupuesto agotado',
     status: {
       ok: '¡Vas bien con tu presupuesto!',
       near: 'Atención, te estás acercando al límite.',

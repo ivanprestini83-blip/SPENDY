@@ -1,12 +1,22 @@
+/* "Posso permettermelo?": blu notte con una luce menta, così non si
+   confonde con il viola del Radar e chiude la Home con un tono deciso.
+   A sinistra il volto della mascotte, a cui è rivolta la domanda. */
 .affordability-cta {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   display: flex;
   align-items: center;
   gap: 14px;
   width: 100%;
-  padding: 18px;
+  padding: 16px 18px 16px 16px;
   border-radius: var(--radius-lg);
-  background: var(--color-accent-violet);
-  box-shadow: var(--shadow-card);
+  background:
+    radial-gradient(70% 120% at 0% 50%, rgba(185, 242, 213, 0.22), transparent 60%),
+    linear-gradient(135deg, #172033 0%, #2b3858 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 22px 40px -24px rgba(23, 32, 51, 0.6);
   transition: transform 0.15s var(--ease-standard);
 }
 
@@ -18,28 +28,35 @@
   transform: scale(0.98);
 }
 
-.affordability-cta__icon {
+/* Il ritratto: l'immagine intera della mascotte, ingrandita e spostata in
+   modo che nel cerchio resti il viso. */
+.affordability-cta__avatar {
+  position: relative;
   flex-shrink: 0;
-  font-size: 26px;
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.22);
+  width: 54px;
+  height: 54px;
+  overflow: hidden;
+  border-radius: 50%;
+  /* L'immagine arriva dal componente (spendyStates.happy); qui solo il
+     ritaglio: ingrandita e spostata perché nel cerchio resti il viso. */
+  background-color: #b9f2d5;
+  background-repeat: no-repeat;
+  background-size: 98px auto;
+  background-position: -21px -2px;
+  box-shadow: 0 0 0 3px rgba(185, 242, 213, 0.25);
 }
 
 .affordability-cta__text {
   flex: 1;
-  text-align: left;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 3px;
+  text-align: left;
 }
 
 .affordability-cta__title {
-  font-size: 16px;
+  font-size: 16.5px;
   font-weight: 800;
   color: #ffffff;
 }
@@ -47,10 +64,20 @@
 .affordability-cta__subtitle {
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .affordability-cta__arrow {
-  font-size: 18px;
-  color: #ffffff;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #b9f2d5;
+  font-size: 16px;
+  font-weight: 800;
+  color: #172033;
 }

@@ -181,12 +181,27 @@ try {
     const expected = ['25%', '30%', '50%', '0%', '100%']
     check('   ogni obiettivo ha la SUA percentuale', items.every((item, i) => valueOf(item) === expected[i]), items.map(valueOf).join(' | '))
     check('   appena creato: 0%', valueOf(items[3]) === '0%' && !items[3].includes('--done'))
+    const { formatCurrency } = await server.ssrLoadModule('/src/utils/format.js')
+    const amounts = [[500, 2000], [3000, 10000], [750, 1500], [0, 800], [900, 900]]
+    const amountsOf = (item) => text(item.match(/<span class="radar-preview__goal-amounts">([\s\S]*?)<\/span>\s*<span class="radar-preview__goal-bar"/)?.[1] ?? '')
+    const wrongAmounts = amounts.filter(([saved, target], i) => amountsOf(items[i]) !== `${formatCurrency(saved, 'it', 'EUR')} / ${formatCurrency(target, 'it', 'EUR')}`)
+    check('   ogni obiettivo mostra i SUOI importi (risparmiato / totale, con i centesimi)', wrongAmounts.length === 0, items.map(amountsOf).join(' | '))
+    const bars = items.map((item) => item.match(/<span class="radar-preview__goal-bar" role="progressbar"[^>]*aria-valuenow="(\d+)"[^>]*><span class="radar-preview__goal-bar-fill" style="width:(\d+)%"/)?.slice(1).join('/'))
+    check('   ogni obiettivo ha la SUA barra (progressbar accessibile, larghezza = percentuale vera)', bars.join(' ') === '25/25 30/30 50/50 0/0 100/100', bars.join(' '))
+    check('   accenti a rotazione fra gli obiettivi', ['accent-0', 'accent-1', 'accent-2', 'accent-3', 'accent-0'].every((accent, i) => items[i].includes(`radar-preview__goal-item--${accent}`)))
     check('   completato: 100% segnato come tale (in verde)', valueOf(items[4]) === '100%' && items[4].includes('radar-preview__goal-item--done'))
     check('   nessun NaN, nessuna percentuale negativa', !/NaN|-\d+%/.test(text(html)))
   }
   {
     const css = (await import('node:fs')).readFileSync(join(ROOT, 'src/components/radar/RadarPreview.css'), 'utf8')
     check('CSS: dentro la tessera tre obiettivi per riga, 3 e un filo oltre i tre', /\.radar-preview__goal-list \{[^}]*--goal-columns: 3;/.test(css) && css.includes('.radar-preview__goal-list--many { --goal-columns: 3.3; }'))
+  }
+  {
+    const decimals = itemsOf(render([{ id: 'd', emoji: '🎯', label: 'Casa', saved: 3333.33, target: 12345.67 }]))[0]
+    const { formatCurrency } = await server.ssrLoadModule('/src/utils/format.js')
+    check('importi decimali mostrati così come sono salvati (3.333,33 / 12.345,67) e 27%', text(decimals).includes(`${formatCurrency(3333.33, 'it', 'EUR')} / ${formatCurrency(12345.67, 'it', 'EUR')}`) && text(decimals).includes('27%'))
+    const css = (await import('node:fs')).readFileSync(join(ROOT, 'src/components/radar/RadarPreview.css'), 'utf8')
+    check('CSS: la rotaia della barra ha un colore suo (visibile a 0%)', /\.radar-preview__goal-bar \{[^}]*background: var\(--radar-track\)/.test(css))
   }
   {
     globalThis.__radarGoalsTest.language = 'en'

@@ -1,12 +1,14 @@
 import { RADAR_STATUS } from '../../utils/radarEngine.js'
 import { BEHAVIOR_TYPES } from '../../utils/behaviorEngine.js'
-import { formatSignedPercent } from '../../utils/format.js'
+import { formatCurrency, formatSignedPercent } from '../../utils/format.js'
 import { goalsProgress } from '../../utils/goalProgress.js'
 import { goalIcon } from '../../utils/goalIcon.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import './RadarPreview.css'
 
 const PREVIEW_LIMIT = 3
+// Quanti colori d'accento si alternano fra gli obiettivi (RadarPreview.css).
+const GOAL_ACCENTS = 4
 
 // "Rispetto al solito" only makes sense when the insight really is a
 // comparison with the user's own average; everything else (budget,
@@ -32,7 +34,8 @@ function tileTitle(card) {
 // scelto dal BehaviorEngine), quindi qui la sua tessera lascia il posto
 // alla lista completa. RadarScreen e il motore restano come sono.
 export function RadarPreview({ radar, goals = [], onOpen = () => {}, onOpenGoals = onOpen }) {
-  const { t } = useLanguage()
+  const { t, language, currency } = useLanguage()
+  const money = (value) => formatCurrency(value, language, currency)
   const goalRows = goalsProgress(goals)
   const tileCards = goalRows.length > 0 ? radar.cards.filter((card) => card.type !== BEHAVIOR_TYPES.GOAL_PROGRESS) : radar.cards
   const cards = radar.status === RADAR_STATUS.ACTIVE ? tileCards.slice(0, PREVIEW_LIMIT) : []
@@ -115,12 +118,27 @@ export function RadarPreview({ radar, goals = [], onOpen = () => {}, onOpenGoals
               <span
                 key={goal.id ?? index}
                 role="listitem"
-                className={`radar-preview__goal-item${goal.completed ? ' radar-preview__goal-item--done' : ''}`}
+                className={`radar-preview__goal-item radar-preview__goal-item--accent-${index % GOAL_ACCENTS}${goal.completed ? ' radar-preview__goal-item--done' : ''}`}
               >
                 {/* Dal nome dell'obiettivo ("Casa" → 🏠), se non ne ha già una sua. */}
                 <span className="radar-preview__goal-icon" aria-hidden="true">{goalIcon(goal)}</span>
                 <span className="radar-preview__tile-value">{goal.percent}%</span>
                 <span className="radar-preview__tile-label radar-preview__goal-name">{goal.label}</span>
+                {/* Gli importi veri dello store, con i centesimi (format.js):
+                    possono andare a capo, mai essere tagliati. */}
+                <span className="radar-preview__goal-amounts">
+                  <span className="radar-preview__goal-saved">{money(goal.saved)}</span> / {money(goal.target)}
+                </span>
+                <span
+                  className="radar-preview__goal-bar"
+                  role="progressbar"
+                  aria-label={goal.label}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={goal.percent}
+                >
+                  <span className="radar-preview__goal-bar-fill" style={{ width: `${goal.percent}%` }} />
+                </span>
               </span>
             ))}
           </span>

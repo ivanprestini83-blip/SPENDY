@@ -25,14 +25,14 @@
 
 :root {
   /* Surfaces — light, off-white, premium (not a dark-mode fintech app) */
-  --color-bg: #f6f8fc;
+  --color-bg: #f3f5fa;
   --color-bg-glow: #eef2fb;
   --color-surface: #ffffff;
   --color-surface-raised: #f7f9fd;
   --color-border: rgba(16, 26, 51, 0.045);
 
   /* Text — dark navy, not pure black, so it stays soft on the light bg */
-  --color-text-primary: #10182b;
+  --color-text-primary: #172033;
   --color-text-secondary: #5b6478;
   --color-text-tertiary: #98a1b3;
 
@@ -45,6 +45,21 @@
   --color-accent-coral-soft: rgba(244, 100, 95, 0.12);
   --color-accent-gold: #f0ab1f;
   --color-accent-gold-soft: rgba(240, 171, 31, 0.14);
+
+  --color-accent-sky: #60a5fa;
+
+  /* Spese (ExpenseSummaryCards): toni caldi, non il rosso — spendere è
+     normale, il colore distingue la sezione, non giudica. */
+  --spend-accent: #ea7a1a;
+
+  /* Radar: la rotaia delle barre degli obiettivi, visibile anche a 0%. */
+  --radar-track: rgba(109, 92, 240, 0.16);
+
+  /* Luci ambientali dello sfondo: tre macchie tenui (menta, lilla, pesca)
+     che tolgono l'effetto "pagina bianca" senza diventare un colore. */
+  --ambient-mint: rgba(185, 242, 213, 0.55);
+  --ambient-lilac: rgba(196, 181, 253, 0.32);
+  --ambient-peach: rgba(255, 214, 186, 0.4);
 
   /* Radii */
   --radius-lg: 28px;
@@ -76,11 +91,27 @@ body {
 }
 
 body {
-  background: radial-gradient(120% 80% at 50% -10%, var(--color-bg-glow) 0%, var(--color-bg) 55%);
+  background: var(--color-bg);
   color: var(--color-text-primary);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+/* Le luci ambientali stanno ferme mentre la pagina scorre (un livello
+   fisso dietro a tutto, niente background-attachment: fixed, che su
+   mobile non funziona). */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 40% at 0% 0%, var(--ambient-mint), transparent 70%),
+    radial-gradient(50% 45% at 100% 38%, var(--ambient-lilac), transparent 70%),
+    radial-gradient(70% 40% at 20% 100%, var(--ambient-peach), transparent 70%),
+    linear-gradient(180deg, #f6f8fc 0%, var(--color-bg) 100%);
 }
 
 #root {
