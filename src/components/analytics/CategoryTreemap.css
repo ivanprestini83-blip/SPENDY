@@ -94,6 +94,27 @@
   color: #172033;
 }
 
+/* Nome (se c'è) e numeri, insieme. */
+.category-treemap__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Nelle tessere medie e piccole: una riga, un po' più piccola; se il nome
+   è più lungo dello spazio finisce con "…" (intero al tocco). */
+.category-treemap__name--line {
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  -webkit-line-clamp: unset;
+}
+
 .category-treemap__figures {
   display: flex;
   flex-direction: column;
@@ -137,6 +158,10 @@
 
 .category-treemap__tile--wide .category-treemap__icon + * {
   margin-top: 0;
+}
+
+.category-treemap__tile--wide .category-treemap__text {
+  flex: 1;
 }
 
 .category-treemap__tile--wide .category-treemap__figures {
@@ -192,6 +217,17 @@
 
 .category-treemap__tile--stack .category-treemap__icon + * {
   margin-top: 3px;
+}
+
+.category-treemap__tile--stack .category-treemap__text {
+  align-items: center;
+  width: 100%;
+}
+
+.category-treemap__tile--stack .category-treemap__name--line {
+  max-width: 100%;
+  font-size: 11px;
+  text-align: center;
 }
 
 .category-treemap__tile--stack .category-treemap__figures {

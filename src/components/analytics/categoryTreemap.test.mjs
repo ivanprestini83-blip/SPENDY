@@ -18,7 +18,7 @@ import react from '@vitejs/plugin-react'
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { check, section, report } from '../../sync/testkit.mjs'
-import { squarifiedTreemap, treemapHeight, tileDensity, groupSmallTiles, areaWeight, AREA_EXPONENT, OTHERS_ID } from '../../utils/treemap.js'
+import { squarifiedTreemap, treemapHeight, tileDensity, groupSmallTiles, areaWeight, nameFit, AREA_EXPONENT, OTHERS_ID } from '../../utils/treemap.js'
 import { MESSAGES } from '../../i18n/translate.js'
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url))
@@ -104,6 +104,11 @@ check('bassa e larga → icona, importo e percentuale in riga', tileDensity(200,
 check('media e bassa → icona accanto a importo e percentuale', tileDensity(110, 60, 7) === 'compact')
 check('piccola e stretta → icona, importo e percentuale in colonna', tileDensity(64, 70, 7) === 'stack')
 check('troppo piccola per importo e percentuale → null (va in "Altre")', tileDensity(30, 40, 7) === null && tileDensity(40, 80, 7) === null)
+check('nome: due righe nelle tessere grandi', nameFit('full', 200, 200, 30) === 'full' && nameFit('name', 90, 125, 30) === 'full')
+check('nome: una riga nelle medie e piccole, se c\'è altezza e spazio per almeno 5 caratteri', nameFit('wide', 200, 60, 12) === 'line' && nameFit('compact', 110, 64, 12) === 'line' && nameFit('stack', 64, 80, 12) === 'line')
+check('   troppo basse per una riga in più → niente nome (restano importo e percentuale)', nameFit('wide', 200, 48, 12) === null && nameFit('compact', 110, 56, 12) === null)
+check('   piccole e basse: il nome prende il posto dell\'icona', nameFit('stack', 64, 60, 12) === 'replace' && nameFit('stack', 64, 50, 12) === null)
+check('   troppo strette per 5 caratteri → niente nome; un nome corto ("Bar") basta che ci stia intero', nameFit('stack', 34, 90, 12) === null && nameFit('stack', 34, 90, 3) === 'line')
 check('un importo lungo non entra in una tessera stretta: si scende di livello invece di tagliarlo', tileDensity(115, 140, 7) === 'full' && tileDensity(115, 140, 12) !== 'full' && tileDensity(180, 60, 7) === 'wide' && tileDensity(180, 60, 12) !== 'wide')
 
 // =====================================================================
@@ -172,10 +177,14 @@ try {
     const groupedRows = [...rows].sort((a, b) => a.current - b.current).slice(0, groupedCount)
     check('   "Altre": somma e quota delle categorie raccolte (le più piccole)', othersInfo.amount === formatCurrency(groupedRows.reduce((a, r) => a + r.current, 0)) && othersInfo.share === Math.round((groupedRows.reduce((a, r) => a + r.current, 0) / total) * 100))
   }
-  check('   il nome solo dove ci sta (tessere grandi e medie)', tiles.every((tile) => {
+  check('   il nome compare esattamente dove ci sta (regola nameFit), una riga nelle tessere piccole', tiles.every((tile, i) => {
     const density = tile.match(/category-treemap__tile--(full|name|wide|compact|stack)/)[1]
-    return tile.includes('category-treemap__name') === (density === 'full' || density === 'name')
+    const s = styleOf(tile)
+    const fit = nameFit(density, s.width, s.height, infos[i].name.length)
+    const shown = tile.includes('class="category-treemap__name')
+    return shown === Boolean(fit) && (fit === 'full' || !fit || tile.includes('category-treemap__name--line')) && (fit !== 'replace' || !tile.includes('category-treemap__icon')) && (!shown || tile.includes(`>${infos[i].name}<`))
   }))
+  check('   con i dati di esempio il nome si legge nella maggior parte delle tessere', tiles.filter((tile) => tile.includes('class="category-treemap__name')).length >= Math.ceil(tiles.length * 0.75), tiles.filter((tile) => tile.includes('class="category-treemap__name')).length)
   check('   ogni tessera è un pulsante (tocco = dettaglio)', tiles.every((tile) => tile.includes('aria-pressed="false"')))
   check('senza selezione: suggerimento "Tocca una categoria…"', html.includes(MESSAGES.it.analytics.treemap.hint))
   check('nessun NaN, nessuna percentuale o misura negativa', !/NaN|Infinity|-\d+(\.\d+)?px|-\d+%/.test(html))

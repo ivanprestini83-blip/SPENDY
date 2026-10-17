@@ -176,3 +176,40 @@ export function groupSmallTiles(items, width, height, fits, weight = (amount) =>
     visible = visible.slice(0, -1)
   }
 }
+
+// Il nome della categoria nelle tessere: Ivan vuole leggerlo il più
+// spesso possibile. Nelle tessere grandi (full, name) ha fino a due righe;
+// in quelle medie e piccole ha una riga, più piccola, sopra importo e
+// percentuale, purché ci sia l'altezza per una riga in più e la larghezza
+// per leggerne almeno 5 caratteri (o tutto, se è più corto). Se il nome
+// è più lungo dello spazio finisce con "…"; il nome intero resta
+// nell'etichetta accessibile e nel dettaglio al tocco.
+//   'full'    → fino a due righe
+//   'line'    → una riga, sotto l'icona
+//   'replace' → una riga AL POSTO dell'icona (tessere strette e basse: il
+//               nome dice già di che categoria si tratta)
+//   null      → niente nome
+const NAME_EM = 0.56
+const MIN_NAME_CHARS = 5
+const NAME_ROOM = {
+  // altezza minima, larghezza occupata da icona/spazi/margini, corpo del testo
+  wide: { height: 50, used: 56, size: 11.5 },
+  compact: { height: 58, used: 47, size: 11.5 },
+  stack: { height: 72, used: 10, size: 11 },
+}
+
+// Senza icona, una tessera "stack" ha bisogno di: nome 14 + importo 15 +
+// percentuale 13 + margini 8 = ~50 px.
+const STACK_REPLACE_HEIGHT = 52
+
+export function nameFit(density, width, height, nameLength) {
+  if (density === 'full' || density === 'name') return 'full'
+  const room = NAME_ROOM[density]
+  if (!room) return null
+  const capacity = (width - room.used) / (NAME_EM * room.size)
+  const needed = Math.min(Math.max(1, nameLength || 0), MIN_NAME_CHARS)
+  if (capacity < needed) return null
+  if (height >= room.height) return 'line'
+  if (density === 'stack' && height >= STACK_REPLACE_HEIGHT) return 'replace'
+  return null
+}

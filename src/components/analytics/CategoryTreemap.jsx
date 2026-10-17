@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 import { formatCurrency, formatSignedPercent } from '../../utils/format.js'
 import { getCategoryColor } from '../../data/categoryColors.js'
-import { groupSmallTiles, treemapHeight, tileDensity, areaWeight, OTHERS_ID } from '../../utils/treemap.js'
+import { groupSmallTiles, treemapHeight, tileDensity, nameFit, areaWeight, OTHERS_ID } from '../../utils/treemap.js'
 import { useLanguage } from '../../i18n/useLanguage.js'
 import './CategoryTreemap.css'
 
@@ -77,6 +77,9 @@ export function CategoryTreemap({ rows, total, onOpenDetail = () => {} }) {
           // Se per arrotondamento una tessera non ci sta più (resize), resta
           // comunque nel formato più piccolo: importo e percentuale sempre.
           const density = tileDensity(rect.width, rect.height, amountText.length, `${share}%`.length) ?? 'stack'
+          // Il nome il più spesso possibile: due righe nelle grandi, una
+          // nelle medie e piccole finché ci sta (utils/treemap.js nameFit).
+          const showName = nameFit(density, rect.width, rect.height, label.length)
           const isSelected = rect.id === selectedId
           return (
             <button
@@ -94,13 +97,15 @@ export function CategoryTreemap({ rows, total, onOpenDetail = () => {} }) {
               aria-label={`${label}, ${amountText}, ${share}%`}
               onClick={() => toggle(rect.id)}
             >
-              <span className="category-treemap__icon" aria-hidden="true">{emoji}</span>
-              {(density === 'full' || density === 'name') && (
-                <span className="category-treemap__name" aria-hidden="true">{label}</span>
-              )}
-              <span className="category-treemap__figures" aria-hidden="true">
-                <span className="category-treemap__amount">{amountText}</span>
-                <span className="category-treemap__share">{share}%</span>
+              {showName !== 'replace' && <span className="category-treemap__icon" aria-hidden="true">{emoji}</span>}
+              <span className="category-treemap__text" aria-hidden="true">
+                {showName && (
+                  <span className={`category-treemap__name${showName === 'full' ? '' : ' category-treemap__name--line'}`}>{label}</span>
+                )}
+                <span className="category-treemap__figures">
+                  <span className="category-treemap__amount">{amountText}</span>
+                  <span className="category-treemap__share">{share}%</span>
+                </span>
               </span>
             </button>
           )
