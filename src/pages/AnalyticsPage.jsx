@@ -9,6 +9,7 @@ import { CategoryTreemap } from '../components/analytics/CategoryTreemap.jsx'
 import { CategoryDetailModal } from '../components/modals/CategoryDetailModal.jsx'
 import { buildCategoryDetail } from '../utils/categoryDetail.js'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { cycleLabelNames } from '../i18n/cycleLabelNames.js'
 import './AnalyticsPage.css'
 
 // Real spending by category for the SELECTED cycle — current by default,
@@ -20,7 +21,7 @@ import './AnalyticsPage.css'
 // renders (and therefore the donut/legend) update automatically whenever
 // `expenses`/`today`/the selected cycle change.
 export function AnalyticsPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const today = useAppStore((state) => state.today)
   const expenses = useAppStore((state) => state.expenses)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
@@ -33,6 +34,8 @@ export function AnalyticsPage() {
 
   const viewedRange = lastCycles(today, cyclesBack + 1, cycleStartDay)[0]
   const viewedReferenceDate = viewedRange.start
+  // L'etichetta del ciclo nella lingua scelta (solo il testo: date e confini restano quelli di viewedRange).
+  const periodLabel = formatCycleLabel(viewedRange, cycleStartDay, cycleLabelNames(language))
 
   const monthTotal = totalForMonth(expenses, viewedReferenceDate, cycleStartDay)
   const rows = categoryComparison(expenses, viewedReferenceDate, cycleStartDay)
@@ -76,7 +79,7 @@ export function AnalyticsPage() {
         >
           ←
         </button>
-        <p className="analytics-page__heading">{formatCycleLabel(viewedRange, cycleStartDay)}</p>
+        <p className="analytics-page__heading">{periodLabel}</p>
         <button
           type="button"
           className="analytics-page__period-nav"
@@ -157,7 +160,7 @@ export function AnalyticsPage() {
       {categoryDetail && (
         <CategoryDetailModal
           detail={categoryDetail}
-          periodLabel={formatCycleLabel(viewedRange, cycleStartDay)}
+          periodLabel={periodLabel}
           onClose={() => setOpenCategoryId(null)}
         />
       )}

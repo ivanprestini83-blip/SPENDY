@@ -186,6 +186,9 @@ function mount(tree) {
 
 try {
   const { ErrorBoundary, ErrorFallback } = await server.ssrLoadModule('/src/components/ErrorBoundary/ErrorBoundary.jsx')
+  // I testi seguono la lingua dell'app (tr): qui un dispositivo in italiano.
+  // Le altre lingue sono provate in i18n/settingsScreens.test.mjs.
+  ;(await server.ssrLoadModule('/src/i18n/currentLanguage.js')).setCurrentLanguageSource(() => 'it')
   const TITLE = 'Ops, qualcosa non è andato come previsto.'
   const TEXT = 'Prova a riaprire SPENDY.'
 

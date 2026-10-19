@@ -17,6 +17,15 @@ export const SALARY_CATEGORY_ID = 'stipendio'
 
 export const isSalary = (income) => income?.categoryId === SALARY_CATEGORY_ID
 
+// Le descrizioni che l'app salva da sola per uno stipendio (useAppStore
+// addSalary, CycleStartCard): nei dati restano così; a schermo si mostra la
+// chiave di traduzione. Quelle scritte dall'utente non hanno chiave.
+const AUTO_SALARY_DESCRIPTIONS = {
+  Stipendio: 'settings.salary.autodefault',
+  'Stipendio (impostazione precedente)': 'settings.salary.autolegacy',
+}
+export const autoSalaryDescriptionKey = (income) => (isSalary(income) ? AUTO_SALARY_DESCRIPTIONS[income.description] ?? null : null)
+
 export const extraIncomes = (incomes = []) => incomes.filter((income) => !isSalary(income))
 
 export const salaryForPeriod = (incomes = [], range) =>

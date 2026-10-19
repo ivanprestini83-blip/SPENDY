@@ -291,7 +291,8 @@ section('I. Il selettore in Impostazioni (componente vero, store vero)')
     check('   titolo in italiano, nessuna nota "traduzione in corso"', text(container).startsWith('Lingua') && !text(container).includes('in corso'))
     await act(() => propsOf(options()[1]).onClick({}))
     check('tocco su English: salvata subito e il selettore la mostra', useAppStore.getState().language === 'en' && checked().join() === '🇬🇧English')
-    check('   il selettore stesso è già in inglese, senza reload', text(container).startsWith('Language') && text(container).includes('Current language: English') && text(container).includes('still in Italian'))
+    // Nessuna nota "traduzione in corso": l'app è tradotta (i18n/settingsScreens.test.mjs).
+    check('   il selettore stesso è già in inglese, senza reload', text(container).startsWith('Language') && text(container).includes('Current language: English') && !text(container).includes('still in Italian'))
     check('   getCurrentLanguage / t fuori da React leggono la stessa fonte', hook.getCurrentLanguage() === 'en' && hook.t('settings.language.title') === 'Language')
     for (const [index, title] of [[3, 'Langue'], [2, 'Idioma'], [0, 'Lingua']]) {
       await act(() => propsOf(options()[index]).onClick({}))

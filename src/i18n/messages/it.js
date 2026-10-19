@@ -2,11 +2,122 @@
 // lingue possono restare indietro (si ricade su questa, vedi translate.js).
 export default {
   settings: {
+    // Impostazioni: la schermata e le sue card (components/modals/SettingsScreen.jsx, components/settings/*).
+    screen: {
+      title: 'Impostazioni',
+    },
+    cycle: {
+      title: 'Giorno di inizio ciclo',
+      current: 'Ciclo attuale: {period}.',
+      notset: 'Non ancora impostato — l\'app usa il mese di calendario.',
+      ofmonth: 'del mese',
+      saved: '✓ Salvato',
+    },
+    salary: {
+      title: 'Stipendio di questo ciclo',
+      hint: 'Ciclo {period}. Modifica ed eliminazione valgono solo per questo ciclo: i cicli precedenti restano come sono in Andamento.',
+      amount: 'Importo dello stipendio di questo ciclo',
+      confirmdelete: 'Tocca di nuovo per confermare',
+      empty: 'Nessuno stipendio inserito per questo ciclo',
+      add: 'Inserisci stipendio',
+      // Le descrizioni che l'app salva da sola per uno stipendio (utils/salary.js): a schermo nella lingua scelta.
+      autodefault: 'Stipendio',
+      autolegacy: 'Stipendio (impostazione precedente)',
+    },
+    ai: {
+      title: '✨ Spendy AI',
+      hint: 'Consenti a Spendy di usare l\'AI per generare messaggi personalizzati basati sui dati finanziari necessari al funzionamento di questa funzione.',
+      detail: 'Se attiva, al servizio AI vengono inviati solo dati di riepilogo: budget, speso e disponibile, giorni rimanenti, l\'evento del momento con la sua categoria (anche personalizzata) e, se rilevante, il nome di un obiettivo. Non vengono inviati note, elenco delle spese, email o identificativi. Funziona solo con un account.',
+      link: 'Dettagli nella Privacy Policy',
+      on: 'Attiva',
+      off: 'Disattivata: Spendy usa solo le sue frasi',
+    },
+    privacy: {
+      title: '🔒 Privacy',
+      exportlabel: 'Esporta i miei dati:',
+      exporttext: 'usa "Esporta backup" nella card "Backup dei dati" qui sotto, che salva tutti i tuoi dati in un file JSON.',
+      deletelabel: 'Elimina account:',
+      deletetext: 'in fondo a questa pagina, con il tuo account attivo.',
+    },
+    // {word} è la parola da scrivere nella seconda conferma (delete.word).
+    delete: {
+      title: '🗑️ Elimina account',
+      hint: 'L\'eliminazione dell\'account è permanente. I tuoi dati sincronizzati verranno eliminati e non potranno essere recuperati.',
+      start: 'Elimina account',
+      question: 'Vuoi davvero eliminare l\'account {email}?',
+      text: 'Verranno eliminati dal cloud spese, entrate, obiettivi, categorie, fondo emergenza, impostazioni e utilizzo di Spendy AI, e su questo dispositivo i dati di questo account. Se vuoi tenerne una copia, prima scarica un backup dalla card qui sopra.',
+      continue: 'Sì, continua',
+      finaltitle: 'Ultima conferma',
+      finaltext: 'Per eliminare definitivamente l\'account scrivi {word}.',
+      word: 'ELIMINA',
+      busy: 'Eliminazione in corso…',
+      final: 'Elimina definitivamente',
+      error: {
+        offline: 'Sei offline: per eliminare l’account serve la connessione. Non è stato eliminato niente.',
+        unauthenticated: 'La sessione non è più valida. Esci, rientra e riprova: non è stato eliminato niente.',
+        failed: 'Non è stato possibile eliminare l’account. Non è stato eliminato niente: riprova tra poco.',
+        nosession: 'Nessun account attivo su questo dispositivo.',
+      },
+    },
+    backup: {
+      title: '💾 Backup dei dati',
+      hint: 'Esporta tutte le tue spese, entrate, obiettivi e impostazioni in un file JSON. Serve anche per spostare i dati tra due indirizzi diversi dell\'app.',
+      exported: '✓ File scaricato',
+      export: '📤 Esporta backup',
+      import: '📥 Importa backup',
+      failed: 'Import non riuscito',
+      untouched: 'I tuoi dati attuali non sono stati toccati.',
+      exportedon: 'Esportato il {date}',
+      nodate: 'Nessuna data di esportazione nel file',
+      from: ' da {source}',
+      now: 'ora {count}',
+      skipped: '{count} già presenti',
+      repaired: 'Righe riparate durante la lettura:',
+      more: '…e altre {count}.',
+      merge: 'Unisci — aggiungi {count} righe',
+      nothing: 'Niente di nuovo da aggiungere',
+      mergenote: 'Unisci non tocca nulla di quello che hai già: aggiunge solo le righe mancanti.',
+      replace: 'Sostituisci tutto con il file',
+      replaceconfirm: 'Tocca di nuovo: sostituisco tutto con il file',
+      done: '✓ Import completato ({mode})',
+      modereplace: 'sostituzione',
+      modemerge: 'unione',
+      total: 'totale {count}',
+      autosaved: 'Copia dello stato precedente salvata in "{key}".',
+      autofailed: 'Attenzione: non è stato possibile salvare la copia di sicurezza automatica (storage pieno o bloccato).',
+      fields: {
+        expenses: 'Spese',
+        incomes: 'Entrate extra',
+        goals: 'Obiettivi',
+        goalcontributions: 'Versamenti sugli obiettivi',
+        customcategories: 'Categorie personalizzate',
+        emergencyfundcontributions: 'Versamenti fondo emergenza',
+      },
+      error: {
+        invalidjson: 'Il file non è un JSON valido.',
+        notbackup: 'Il file non sembra un backup di Spendy: non contiene nessuna delle sezioni attese.',
+        empty: 'Il backup è vuoto: non contiene né transazioni né stipendio. Import annullato.',
+      },
+      // {index} = numero della riga nel file, da 1.
+      warning: {
+        expense: 'Spesa #{index}: importo non valido, riga ignorata',
+        income: 'Entrata #{index}: importo non valido, riga ignorata',
+        expensedate: 'Spesa #{index}: data mancante, impostata al {date}',
+        incomedate: 'Entrata #{index}: data mancante, impostata al {date}',
+        category: 'Categoria #{index}: nome mancante, riga ignorata',
+        goal: 'Obiettivo #{index}: importo obiettivo non valido, riga ignorata',
+        contribution: 'Versamento obiettivo #{index}: importo non valido, riga ignorata',
+        contributiongoal: 'Versamento obiettivo #{index}: obiettivo di destinazione mancante, riga ignorata',
+        fund: 'Versamento fondo #{index}: importo non valido, riga ignorata',
+        legacygoalsone: '1 obiettivo senza storico dei versamenti: ricostruita una voce con il totale.',
+        legacygoalsmany: '{count} obiettivi senza storico dei versamenti: ricostruita una voce con il totale.',
+        legacyfund: 'Fondo emergenza senza storico: ricostruita una voce unica con il totale.',
+      },
+    },
     language: {
       title: 'Lingua',
       hint: 'La lingua di Spendy su questo dispositivo, per questo account. Non cambia nessun dato.',
       current: 'Lingua attuale: {language}',
-      partial: 'La traduzione dell’app è in corso: alcune schermate restano per ora in italiano.',
     },
     // La valuta di riferimento dell'account (utils/currency.js): nessuna conversione.
     currency: {
@@ -562,6 +673,7 @@ export default {
   spendypage: {
     blurb: "Sono Spendy, il tuo coach personale per le spese. Tengo d'occhio il tuo budget e intervengo al momento giusto — senza giudicarti (troppo).",
     learning: '🔍 Sto ancora imparando le tue abitudini.',
+    radar: 'Radar Spendy',
   },
   // Schermata Radar Spendy (components/radar/RadarScreen.jsx) e titoli del dettaglio scheda.
   radarscreen: {
@@ -710,6 +822,7 @@ export default {
     continue: 'Continua',
   },
   auth: {
+    outboxother: 'Ci sono {count} modifiche non ancora inviate dell\'account precedente. Rientra con quell\'account per sincronizzarle, poi cambia account.',
     title: 'Sincronizzazione',
     notconfigured: 'Non configurata: Spendy sta salvando tutto solo su questo dispositivo. Per attivarla servono l\'indirizzo del progetto Supabase e la chiave pubblica in un file .env.local.',
     intro: 'Accedi per ritrovare le stesse spese su telefono e computer. I dati già presenti su questo dispositivo restano dove sono: non viene cancellato niente.',
@@ -861,5 +974,37 @@ export default {
       linkinvalid: 'Il link non è valido o è scaduto. Richiedine uno nuovo da Impostazioni → Password dimenticata?',
       generic: 'Qualcosa non ha funzionato. Riprova tra poco.',
     },
+  },
+  // Il centro notifiche (components/notifications/NotificationsScreen.jsx).
+  notificationcenter: {
+    screen: {
+      title: 'Notifiche',
+      markall: 'Segna tutte come lette',
+      empty: 'Non ci sono nuove notifiche.',
+      unread: 'Non letta. ',
+      remove: 'Elimina la notifica: {title}',
+    },
+    types: {
+      budget: 'Budget',
+      goal: 'Obiettivo',
+      radar: 'Radar',
+      sync: 'Sincronizzazione',
+      ai: 'Spendy',
+    },
+    time: {
+      now: 'adesso',
+      minutes: '{count} min fa',
+      hours: '{count} h fa',
+      yesterday: 'ieri',
+      days: '{count} giorni fa',
+    },
+  },
+  // La schermata di errore (components/ErrorBoundary/ErrorBoundary.jsx).
+  crash: {
+    title: 'Ops, qualcosa non è andato come previsto.',
+    pagetext: 'Prova a riaprire questa schermata o scegli un\'altra sezione dal menu. I tuoi dati non sono stati toccati.',
+    apptext: 'Prova a riaprire SPENDY. I tuoi dati non sono stati toccati.',
+    retry: 'Riprova',
+    reopen: 'Riapri SPENDY',
   },
 }

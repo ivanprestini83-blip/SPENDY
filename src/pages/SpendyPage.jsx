@@ -67,7 +67,7 @@ export function SpendyPage() {
       <p className="spendy-page__blurb">{t('spendypage.blurb')}</p>
 
       <button type="button" className="spendy-page__radar" onClick={handleOpenRadar}>
-        <span aria-hidden="true">🔥</span> Radar Spendy
+        <span aria-hidden="true">🔥</span> {t('spendypage.radar')}
         {radarCount > 0 && <span className="spendy-page__radar-count">{radarCount}</span>}
         <span className="spendy-page__radar-arrow" aria-hidden="true">→</span>
       </button>

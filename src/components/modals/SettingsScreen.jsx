@@ -10,6 +10,8 @@ import { DeletedAccountsCard } from '../settings/DeletedAccountsCard.jsx'
 import { PrivacyCard } from '../settings/PrivacyCard.jsx'
 import { SpendyAICard } from '../settings/SpendyAICard.jsx'
 import { SyncCard } from '../settings/SyncCard.jsx'
+import { useLanguage } from '../../i18n/useLanguage.js'
+import { cycleLabelNames } from '../../i18n/cycleLabelNames.js'
 import './SettingsScreen.css'
 
 // Reachable from the Header's gear icon (previously a no-op — see
@@ -23,6 +25,7 @@ import './SettingsScreen.css'
 // CurrentSalaryCard mostra quello del ciclo in corso e permette di
 // modificarlo, eliminarlo o reinserirlo.
 export function SettingsScreen({ onClose }) {
+  const { t, language } = useLanguage()
   const today = useAppStore((state) => state.today)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay)
   const setCycleStartDay = useAppStore((state) => state.setCycleStartDay)
@@ -39,7 +42,8 @@ export function SettingsScreen({ onClose }) {
   const canSave = Number.isInteger(dayValue) && dayValue >= 1 && dayValue <= 31
 
   const currentRange = getCycleRange(today, cycleStartDay ?? 1)
-  const currentLabel = formatCycleLabel(currentRange, cycleStartDay ?? 1)
+  // Solo il testo nella lingua scelta: date e confini restano quelli di currentRange.
+  const currentLabel = formatCycleLabel(currentRange, cycleStartDay ?? 1, cycleLabelNames(language))
 
   const handleSave = () => {
     if (!canSave) return
@@ -50,21 +54,21 @@ export function SettingsScreen({ onClose }) {
   return (
     <div className="settings-screen">
       <div className="settings-screen__header">
-        <button type="button" className="settings-screen__back" onClick={onClose} aria-label="Chiudi">
+        <button type="button" className="settings-screen__back" onClick={onClose} aria-label={t('common.close')}>
           ←
         </button>
-        <p className="settings-screen__title">Impostazioni</p>
+        <p className="settings-screen__title">{t('settings.screen.title')}</p>
       </div>
 
       <div className="settings-screen__body">
         <CurrentSalaryCard />
 
         <div className="settings-screen__card">
-          <p className="settings-screen__label">Giorno di inizio ciclo</p>
+          <p className="settings-screen__label">{t('settings.cycle.title')}</p>
           <p className="settings-screen__hint">
             {cycleStartDay
-              ? `Il ciclo attuale va dal ${currentLabel}.`
-              : "Non ancora impostato — l'app usa il mese di calendario."}
+              ? t('settings.cycle.current', { period: currentLabel })
+              : t('settings.cycle.notset')}
           </p>
 
           <div className="settings-screen__field">
@@ -79,11 +83,11 @@ export function SettingsScreen({ onClose }) {
                 setSaved(false)
               }}
             />
-            <span>del mese</span>
+            <span>{t('settings.cycle.ofmonth')}</span>
           </div>
 
           <button type="button" className="settings-screen__save" disabled={!canSave} onClick={handleSave}>
-            {saved ? '✓ Salvato' : 'Salva'}
+            {saved ? t('settings.cycle.saved') : t('common.save')}
           </button>
         </div>
 

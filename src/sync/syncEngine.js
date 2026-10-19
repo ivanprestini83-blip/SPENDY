@@ -1,6 +1,7 @@
 import { COLLECTION_KEYS, SETTINGS_TABLE, SYNC_COLLECTIONS, collectionForTable, settingsToRemote, toLocalRow, toRemoteRow } from './mappers.js'
 import { SETTINGS_KEY, groupByCollection, pendingIds } from './outbox.js'
 import { isUserScope, ownerOf, scopeFor } from '../store/scope.js'
+import { tr } from '../i18n/currentLanguage.js'
 
 // Il motore: spinge la coda locale verso il cloud (push), riporta a casa
 // quello che hanno scritto gli altri dispositivi (pull incrementale),
@@ -311,7 +312,7 @@ export function createSyncEngine({ store, remote, autoFlushMs = 1200, onStatus =
       if (state().sync.outbox.length > 0) {
         setStatus({
           status: 'error',
-          error: `Ci sono ${state().sync.outbox.length} modifiche non ancora inviate dell'account precedente. Rientra con quell'account per sincronizzarle, poi cambia account.`,
+          error: tr('auth.outboxother', { count: state().sync.outbox.length }),
         })
         return Promise.resolve({ skipped: 'coda-di-un-altro-utente' })
       }

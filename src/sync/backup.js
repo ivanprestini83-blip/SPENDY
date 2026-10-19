@@ -1,6 +1,7 @@
 import { todayStr } from '../utils/date.js'
 import { normalizeCurrency } from '../utils/currency.js'
 import { goalReachedOn } from '../utils/goalReached.js'
+import { tr } from '../i18n/currentLanguage.js'
 
 // Fase 0 del passaggio al cloud: export/import di tutto lo stato
 // persistito, in un JSON leggibile da un umano.
@@ -39,13 +40,14 @@ export const COLLECTION_FIELDS = [
 // mergeScalar più sotto per come vengono trattate in import).
 export const SCALAR_FIELDS = ['monthlyBudget', 'currency', 'cycleStartDay', 'amountHidden']
 
+// Nella lingua dell'app, letti nel momento in cui servono.
 export const FIELD_LABELS = {
-  expenses: 'Spese',
-  incomes: 'Entrate extra',
-  goals: 'Obiettivi',
-  goalContributions: 'Versamenti sugli obiettivi',
-  customCategories: 'Categorie personalizzate',
-  emergencyFundContributions: 'Versamenti fondo emergenza',
+  get expenses() { return tr('settings.backup.fields.expenses') },
+  get incomes() { return tr('settings.backup.fields.incomes') },
+  get goals() { return tr('settings.backup.fields.goals') },
+  get goalContributions() { return tr('settings.backup.fields.goalcontributions') },
+  get customCategories() { return tr('settings.backup.fields.customcategories') },
+  get emergencyFundContributions() { return tr('settings.backup.fields.emergencyfundcontributions') },
 }
 
 // Volutamente ESCLUSI dall'export:
@@ -189,13 +191,13 @@ function sanitizeTransaction(row, index, prefix, warnings, fallbackDate, assignI
   if (!isPlainObject(row)) return null
   const amount = toNumber(row.amount)
   if (amount === null) {
-    warnings.push(`${prefix === 'e' ? 'Spesa' : 'Entrata'} #${index + 1}: importo non valido, riga ignorata`)
+    warnings.push(tr(prefix === 'e' ? 'settings.backup.warning.expense' : 'settings.backup.warning.income', { index: index + 1 }))
     return null
   }
   let date = row.date
   if (!isDateStr(date)) {
     date = fallbackDate
-    warnings.push(`${prefix === 'e' ? 'Spesa' : 'Entrata'} #${index + 1}: data mancante, impostata al ${date}`)
+    warnings.push(tr(prefix === 'e' ? 'settings.backup.warning.expensedate' : 'settings.backup.warning.incomedate', { index: index + 1, date }))
   }
   return {
     id: typeof row.id === 'string' && row.id ? row.id : assignId([date, amount, row.categoryId ?? 'altro']),
@@ -212,7 +214,7 @@ function sanitizeGoal(row, index, warnings, assignId) {
   if (!isPlainObject(row)) return null
   const target = toNumber(row.target)
   if (target === null || target <= 0) {
-    warnings.push(`Obiettivo #${index + 1}: importo obiettivo non valido, riga ignorata`)
+    warnings.push(tr('settings.backup.warning.goal', { index: index + 1 }))
     return null
   }
   const saved = toNumber(row.saved)
@@ -230,7 +232,7 @@ function sanitizeCategory(row, index, warnings, assignId) {
   if (!isPlainObject(row)) return null
   const label = typeof row.label === 'string' ? row.label.trim() : ''
   if (!label) {
-    warnings.push(`Categoria #${index + 1}: nome mancante, riga ignorata`)
+    warnings.push(tr('settings.backup.warning.category', { index: index + 1 }))
     return null
   }
   return {
@@ -247,11 +249,11 @@ function sanitizeGoalContribution(row, index, warnings, fallbackDate, assignId) 
   if (!isPlainObject(row)) return null
   const amount = toNumber(row.amount)
   if (amount === null) {
-    warnings.push(`Versamento obiettivo #${index + 1}: importo non valido, riga ignorata`)
+    warnings.push(tr('settings.backup.warning.contribution', { index: index + 1 }))
     return null
   }
   if (typeof row.goalId !== 'string' || !row.goalId) {
-    warnings.push(`Versamento obiettivo #${index + 1}: obiettivo di destinazione mancante, riga ignorata`)
+    warnings.push(tr('settings.backup.warning.contributiongoal', { index: index + 1 }))
     return null
   }
   const date = isDateStr(row.date) ? row.date : fallbackDate
@@ -267,7 +269,7 @@ function sanitizeContribution(row, index, warnings, fallbackDate, assignId) {
   if (!isPlainObject(row)) return null
   const amount = toNumber(row.amount)
   if (amount === null) {
-    warnings.push(`Versamento fondo #${index + 1}: importo non valido, riga ignorata`)
+    warnings.push(tr('settings.backup.warning.fund', { index: index + 1 }))
     return null
   }
   return {
@@ -297,12 +299,12 @@ export function parseBackup(text) {
   try {
     parsed = JSON.parse(text)
   } catch {
-    return { ok: false, error: 'Il file non è un JSON valido.' }
+    return { ok: false, error: tr('settings.backup.error.invalidjson') }
   }
 
   const raw = extractSnapshot(parsed)
   if (!raw) {
-    return { ok: false, error: 'Il file non sembra un backup di Spendy: non contiene nessuna delle sezioni attese.' }
+    return { ok: false, error: tr('settings.backup.error.notbackup') }
   }
 
   const warnings = []
@@ -359,19 +361,21 @@ export function parseBackup(text) {
     .map((goal) => ({ id: `gc-legacy-${goal.id}`, goalId: goal.id, amount: goal.saved, date: fallbackDate }))
   if (legacyGoalContributions.length > 0) {
     snapshot.goalContributions = [...snapshot.goalContributions, ...legacyGoalContributions]
-    warnings.push(`${legacyGoalContributions.length} obiettivo/i senza storico dei versamenti: ricostruita una voce con il totale.`)
+    warnings.push(legacyGoalContributions.length === 1
+      ? tr('settings.backup.warning.legacygoalsone')
+      : tr('settings.backup.warning.legacygoalsmany', { count: legacyGoalContributions.length }))
   }
 
   const legacyTotal = toNumber(raw.emergencyFundSaved)
   if (snapshot.emergencyFundContributions.length === 0 && legacyTotal !== null && legacyTotal > 0) {
     snapshot.emergencyFundContributions = [{ id: 'ef-legacy', amount: legacyTotal, date: fallbackDate }]
-    warnings.push('Fondo emergenza senza storico: ricostruita una voce unica con il totale.')
+    warnings.push(tr('settings.backup.warning.legacyfund'))
   }
 
   const empty =
     COLLECTION_FIELDS.every((field) => snapshot[field].length === 0) && snapshot.monthlyBudget === 0
   if (empty) {
-    return { ok: false, error: 'Il backup è vuoto: non contiene né transazioni né stipendio. Import annullato.' }
+    return { ok: false, error: tr('settings.backup.error.empty') }
   }
 
   return {

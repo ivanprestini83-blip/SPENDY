@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore.js'
 import { formatCurrency } from '../../utils/format.js'
 import { formatCycleLabel, getCycleRange, isWithinRange } from '../../utils/cycle.js'
+import { cycleLabelNames } from '../../i18n/cycleLabelNames.js'
 import { isValidAmount, parseAmountInput } from '../../utils/amounts.js'
 import { isSalary, lastKnownSalary } from '../../utils/salary.js'
 import { AmountLimitHint } from '../AmountLimitHint/AmountLimitHint.jsx'
@@ -24,7 +25,7 @@ export function CurrentSalaryCard() {
   const deleteIncome = useAppStore((state) => state.deleteIncome)
   // La lingua letta qui (non solo dentro formatCurrency): cambiandola con le
   // Impostazioni aperte, la cifra si riscrive subito nel nuovo formato.
-  const { language } = useLanguage()
+  const { t, language } = useLanguage()
 
   // editingId: id dello stipendio in modifica, 'new' per un inserimento.
   const [editingId, setEditingId] = useState(null)
@@ -74,27 +75,27 @@ export function CurrentSalaryCard() {
         <input
           type="number"
           inputMode="decimal"
-          aria-label="Importo dello stipendio di questo ciclo"
+          aria-label={t('settings.salary.amount')}
           placeholder="0"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
         />
         <button type="button" className="settings-screen__save" disabled={!canSave} onClick={save}>
-          Salva
+          {t('common.save')}
         </button>
       </div>
       <AmountLimitHint value={draftValue} />
       <button type="button" className="settings-screen__salary-cancel" onClick={cancel}>
-        Annulla
+        {t('common.cancel')}
       </button>
     </div>
   )
 
   return (
     <div className="settings-screen__card">
-      <p className="settings-screen__label">Stipendio di questo ciclo</p>
+      <p className="settings-screen__label">{t('settings.salary.title')}</p>
       <p className="settings-screen__hint">
-        {`Ciclo ${formatCycleLabel(range, cycleStartDay)}. Modifica ed eliminazione valgono solo per questo ciclo: i cicli precedenti restano come sono in Andamento.`}
+        {t('settings.salary.hint', { period: formatCycleLabel(range, cycleStartDay, cycleLabelNames(language)) })}
       </p>
 
       {salaries.map((salary) => (
@@ -103,14 +104,14 @@ export function CurrentSalaryCard() {
           {editingId === salary.id ? editor : (
             <div className="settings-screen__salary-actions">
               <button type="button" className="settings-screen__salary-edit" onClick={() => startEdit(salary)}>
-                Modifica
+                {t('common.edit')}
               </button>
               <button
                 type="button"
                 className={`settings-screen__delete${confirmingDeleteId === salary.id ? ' settings-screen__delete--confirm' : ''}`}
                 onClick={() => handleDelete(salary.id)}
               >
-                {confirmingDeleteId === salary.id ? 'Tocca di nuovo per confermare' : 'Elimina'}
+                {confirmingDeleteId === salary.id ? t('settings.salary.confirmdelete') : t('common.delete')}
               </button>
             </div>
           )}
@@ -119,10 +120,10 @@ export function CurrentSalaryCard() {
 
       {salaries.length === 0 && (
         <div className="settings-screen__salary">
-          <p className="settings-screen__salary-empty">Nessuno stipendio inserito per questo ciclo</p>
+          <p className="settings-screen__salary-empty">{t('settings.salary.empty')}</p>
           {editingId === 'new' ? editor : (
             <button type="button" className="settings-screen__salary-edit settings-screen__salary-add" onClick={startInsert}>
-              Inserisci stipendio
+              {t('settings.salary.add')}
             </button>
           )}
         </div>

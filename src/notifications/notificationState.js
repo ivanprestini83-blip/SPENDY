@@ -14,6 +14,7 @@
 // resto dei dati, e non viene mai sincronizzato né esportato nei backup.
 
 import { translate } from '../i18n/translate.js'
+import { LEGACY_LANGUAGE, languageInfo } from '../i18n/languages.js'
 
 export const MAX_NOTIFICATIONS = 50
 export const MAX_KEYS = 300
@@ -154,16 +155,19 @@ export function sanitizeNotificationState(rawNotifications, rawKeys) {
 
 // ------------------------------------------------------------- tempo relativo
 
-export function formatRelativeTime(iso, now = new Date()) {
+// Nella lingua `lang` (il centro notifiche passa quella scelta). Senza lingua è
+// l'italiano di sempre, come le altre funzioni pure con un testo (formatCycleLabel).
+export function formatRelativeTime(iso, now = new Date(), lang = LEGACY_LANGUAGE) {
   const then = new Date(iso)
   if (Number.isNaN(then.getTime())) return ''
+  const text = (key, count) => translate(lang, `notificationcenter.time.${key}`, { count })
   const minutes = Math.floor((now - then) / 60000)
-  if (minutes < 1) return 'adesso'
-  if (minutes < 60) return `${minutes} min fa`
+  if (minutes < 1) return text('now')
+  if (minutes < 60) return text('minutes', minutes)
   const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} h fa`
+  if (hours < 24) return text('hours', hours)
   const days = Math.floor(hours / 24)
-  if (days === 1) return 'ieri'
-  if (days < 7) return `${days} giorni fa`
-  return then.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })
+  if (days === 1) return text('yesterday')
+  if (days < 7) return text('days', days)
+  return then.toLocaleDateString(languageInfo(lang).locale, { day: 'numeric', month: 'short' })
 }

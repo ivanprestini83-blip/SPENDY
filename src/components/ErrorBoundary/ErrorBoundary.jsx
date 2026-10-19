@@ -1,5 +1,6 @@
 import { Component } from 'react'
 import { spendyStates } from '../spendy/spendyStates.js'
+import { tr } from '../../i18n/currentLanguage.js'
 import './ErrorBoundary.css'
 
 // Rete di sicurezza globale: se un componente lancia un errore MENTRE VIENE
@@ -15,7 +16,8 @@ import './ErrorBoundary.css'
 // Non tocca lo stato, il localStorage né la sincronizzazione: i dati restano
 // quelli di prima. Il fallback è volutamente autonomo (niente store, niente
 // hook, niente rete), perché deve poter funzionare proprio quando il resto
-// dell'app è rotto.
+// dell'app è rotto. I testi arrivano da tr(): la lingua scelta, letta al
+// momento, senza hook.
 //
 // Due usi (prop `variant`):
 //   - 'app' (default): attorno a tutta l'app, schermata intera, "Riapri SPENDY"
@@ -30,12 +32,10 @@ export function ErrorFallback({ variant = 'app', onReload = reloadApp, onRetry }
     return (
       <section className="error-fallback error-fallback--page" role="alert">
         <img className="error-fallback__mascot" src={spendyStates.concerned} alt="" draggable="false" />
-        <h2 className="error-fallback__title">Ops, qualcosa non è andato come previsto.</h2>
-        <p className="error-fallback__text">
-          Prova a riaprire questa schermata o scegli un&apos;altra sezione dal menu. I tuoi dati non sono stati toccati.
-        </p>
+        <h2 className="error-fallback__title">{tr('crash.title')}</h2>
+        <p className="error-fallback__text">{tr('crash.pagetext')}</p>
         <button type="button" className="error-fallback__button" onClick={onRetry}>
-          Riprova
+          {tr('crash.retry')}
         </button>
       </section>
     )
@@ -44,10 +44,10 @@ export function ErrorFallback({ variant = 'app', onReload = reloadApp, onRetry }
   return (
     <main className="error-fallback" role="alert">
       <img className="error-fallback__mascot" src={spendyStates.concerned} alt="" draggable="false" />
-      <h1 className="error-fallback__title">Ops, qualcosa non è andato come previsto.</h1>
-      <p className="error-fallback__text">Prova a riaprire SPENDY. I tuoi dati non sono stati toccati.</p>
+      <h1 className="error-fallback__title">{tr('crash.title')}</h1>
+      <p className="error-fallback__text">{tr('crash.apptext')}</p>
       <button type="button" className="error-fallback__button" onClick={onReload}>
-        Riapri SPENDY
+        {tr('crash.reopen')}
       </button>
     </main>
   )

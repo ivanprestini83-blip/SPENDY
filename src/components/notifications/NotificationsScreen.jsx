@@ -1,20 +1,23 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore } from '../../store/useAppStore.js'
 import { formatRelativeTime, unreadCount } from '../../notifications/notificationState.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
 import './NotificationsScreen.css'
 
+// Le etichette sono in notificationcenter.types.<tipo>, nella lingua scelta.
 const TYPE_META = {
-  budget: { icon: '💰', label: 'Budget' },
-  goal: { icon: '🎯', label: 'Obiettivo' },
-  radar: { icon: '📡', label: 'Radar' },
-  sync: { icon: '☁️', label: 'Sincronizzazione' },
-  ai: { icon: '😈', label: 'Spendy' },
+  budget: { icon: '💰' },
+  goal: { icon: '🎯' },
+  radar: { icon: '📡' },
+  sync: { icon: '☁️' },
+  ai: { icon: '😈' },
 }
 
 // Il centro notifiche. Non calcola niente: legge la lista dallo store (che è
 // già quella dell'ambito in uso) e ne disegna lo stato. Le azioni usano solo la
 // navigazione che l'app ha già: setActiveTab e openModal.
 export function NotificationsScreen({ onClose }) {
+  const { t, language } = useLanguage()
   const notifications = useAppStore((state) => state.notifications)
   const markRead = useAppStore((state) => state.markNotificationRead)
   const markAllRead = useAppStore((state) => state.markAllNotificationsRead)
@@ -46,24 +49,25 @@ export function NotificationsScreen({ onClose }) {
   }
 
   return (
-    <div className="notifications-screen" role="dialog" aria-modal="true" aria-label="Notifiche">
+    <div className="notifications-screen" role="dialog" aria-modal="true" aria-label={t('notificationcenter.screen.title')}>
       <div className="notifications-screen__header">
-        <button ref={closeButton} type="button" className="notifications-screen__back" onClick={onClose} aria-label="Chiudi">
+        <button ref={closeButton} type="button" className="notifications-screen__back" onClick={onClose} aria-label={t('common.close')}>
           ←
         </button>
-        <h2 className="notifications-screen__title">Notifiche</h2>
+        <h2 className="notifications-screen__title">{t('notificationcenter.screen.title')}</h2>
         <button type="button" className="notifications-screen__mark-all" disabled={unread === 0} onClick={markAllRead}>
-          Segna tutte come lette
+          {t('notificationcenter.screen.markall')}
         </button>
       </div>
 
       <div className="notifications-screen__body">
         {notifications.length === 0 ? (
-          <p className="notifications-screen__empty">Non ci sono nuove notifiche.</p>
+          <p className="notifications-screen__empty">{t('notificationcenter.screen.empty')}</p>
         ) : (
           <ul className="notifications-screen__list">
             {notifications.map((notification) => {
-              const meta = TYPE_META[notification.type] ?? TYPE_META.ai
+              const type = TYPE_META[notification.type] ? notification.type : 'ai'
+              const meta = TYPE_META[type]
               return (
                 <li
                   key={notification.id}
@@ -75,13 +79,13 @@ export function NotificationsScreen({ onClose }) {
                       <span className="notifications-screen__row">
                         {!notification.read && <span className="notifications-screen__dot" aria-hidden="true" />}
                         <span className="notifications-screen__item-title">
-                          {!notification.read && <span className="notifications-screen__sr">Non letta. </span>}
+                          {!notification.read && <span className="notifications-screen__sr">{t('notificationcenter.screen.unread')}</span>}
                           {notification.title}
                         </span>
-                        <span className="notifications-screen__time">{formatRelativeTime(notification.createdAt, now)}</span>
+                        <span className="notifications-screen__time">{formatRelativeTime(notification.createdAt, now, language)}</span>
                       </span>
                       <span className="notifications-screen__message">{notification.message}</span>
-                      <span className="notifications-screen__category">{meta.label}</span>
+                      <span className="notifications-screen__category">{t(`notificationcenter.types.${type}`)}</span>
                       {notification.action && (
                         <span className="notifications-screen__action">{notification.action.label} →</span>
                       )}
@@ -90,7 +94,7 @@ export function NotificationsScreen({ onClose }) {
                   <button
                     type="button"
                     className="notifications-screen__delete"
-                    aria-label={`Elimina la notifica: ${notification.title}`}
+                    aria-label={t('notificationcenter.screen.remove', { title: notification.title })}
                     onClick={() => remove(notification.id)}
                   >
                     ✕

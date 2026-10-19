@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase.js'
 import { deleteAccount, isSupabaseConfigured } from '../../sync/spendySync.js'
+import { useLanguage } from '../../i18n/useLanguage.js'
+import { translate } from '../../i18n/translate.js'
 import './DeleteAccountCard.css'
 
-// La parola da scrivere nella seconda conferma: niente eliminazioni per un
-// tocco sbagliato, nemmeno due tocchi di fila sullo stesso punto.
-export const DELETE_CONFIRM_WORD = 'ELIMINA'
+// La parola da scrivere nella seconda conferma, nella lingua scelta ("ELIMINA",
+// "DELETE"…): niente eliminazioni per un tocco sbagliato, nemmeno due tocchi
+// di fila sullo stesso punto.
+const deleteConfirmWord = (language) => translate(language, 'settings.delete.word')
 
 // "Elimina account" in Impostazioni. Visibile solo con un account attivo.
 // Tre passi: pulsante → prima conferma → seconda conferma con la parola da
@@ -17,6 +20,10 @@ export function DeleteAccountCard() {
   const [typed, setTyped] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const { t, language } = useLanguage()
+  const confirmWord = deleteConfirmWord(language)
+  // Il testo con il segnaposto {word} intatto: la parola va in grassetto.
+  const [finalBefore, finalAfter = ''] = translate(language, 'settings.delete.finaltext').split('{word}')
 
   useEffect(() => {
     if (!supabase) return undefined
@@ -34,7 +41,7 @@ export function DeleteAccountCard() {
   }
 
   const handleDelete = async () => {
-    if (busy || typed.trim() !== DELETE_CONFIRM_WORD) return
+    if (busy || typed.trim() !== confirmWord) return
     setBusy(true)
     setError(null)
     try {
@@ -53,40 +60,33 @@ export function DeleteAccountCard() {
 
   return (
     <div className="settings-screen__card delete-account">
-      <p className="settings-screen__label">🗑️ Elimina account</p>
-      <p className="settings-screen__hint">
-        L&apos;eliminazione dell&apos;account è permanente. I tuoi dati sincronizzati verranno eliminati e non potranno
-        essere recuperati.
-      </p>
+      <p className="settings-screen__label">{t('settings.delete.title')}</p>
+      <p className="settings-screen__hint">{t('settings.delete.hint')}</p>
 
       {step === 'idle' && (
         <button type="button" className="delete-account__start" onClick={() => setStep('confirm')}>
-          Elimina account
+          {t('settings.delete.start')}
         </button>
       )}
 
       {step === 'confirm' && (
         <div className="delete-account__box">
-          <p className="delete-account__question">Vuoi davvero eliminare l&apos;account {session.user?.email}?</p>
-          <p className="delete-account__text">
-            Verranno eliminati dal cloud spese, entrate, obiettivi, categorie, fondo emergenza, impostazioni e
-            utilizzo di Spendy AI, e su questo dispositivo i dati di questo account. Se vuoi tenerne una copia, prima
-            scarica un backup dalla card qui sopra.
-          </p>
+          <p className="delete-account__question">{t('settings.delete.question', { email: session.user?.email ?? '' })}</p>
+          <p className="delete-account__text">{t('settings.delete.text')}</p>
           <button type="button" className="delete-account__danger" onClick={() => setStep('final')}>
-            Sì, continua
+            {t('settings.delete.continue')}
           </button>
           <button type="button" className="delete-account__cancel" onClick={reset}>
-            Annulla
+            {t('common.cancel')}
           </button>
         </div>
       )}
 
       {step === 'final' && (
         <div className="delete-account__box">
-          <p className="delete-account__question">Ultima conferma</p>
+          <p className="delete-account__question">{t('settings.delete.finaltitle')}</p>
           <label className="delete-account__text" htmlFor="delete-account-confirm">
-            Per eliminare definitivamente l&apos;account scrivi <strong>{DELETE_CONFIRM_WORD}</strong>.
+            {finalBefore}<strong>{confirmWord}</strong>{finalAfter}
           </label>
           <input
             id="delete-account-confirm"
@@ -101,13 +101,13 @@ export function DeleteAccountCard() {
           <button
             type="button"
             className="delete-account__danger"
-            disabled={busy || typed.trim() !== DELETE_CONFIRM_WORD}
+            disabled={busy || typed.trim() !== confirmWord}
             onClick={handleDelete}
           >
-            {busy ? 'Eliminazione in corso…' : 'Elimina definitivamente'}
+            {busy ? t('settings.delete.busy') : t('settings.delete.final')}
           </button>
           <button type="button" className="delete-account__cancel" disabled={busy} onClick={reset}>
-            Annulla
+            {t('common.cancel')}
           </button>
         </div>
       )}

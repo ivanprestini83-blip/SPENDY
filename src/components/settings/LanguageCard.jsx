@@ -35,7 +35,6 @@ export function LanguageCard() {
       </div>
 
       <p className="language-card__current" aria-live="polite">{t('settings.language.current', { language: info.name })}</p>
-      {language !== 'it' && <p className="settings-screen__hint">{t('settings.language.partial')}</p>}
     </div>
   )
 }

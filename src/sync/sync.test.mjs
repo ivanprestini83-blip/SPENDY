@@ -10,6 +10,10 @@ import { createSyncEngine, cursorFrom, EPOCH } from './syncEngine.js'
 import { migrationStatus, migrateLocalToCloud, MIGRATION_STAMP } from './migrateLocal.js'
 import { totalForMonth, buildFinancialData } from '../utils/budgetCalculations.js'
 import { scopeFor, stateKey } from '../store/scope.js'
+import { setCurrentLanguageSource } from '../i18n/currentLanguage.js'
+
+// I messaggi del sync seguono la lingua dell'app: qui un dispositivo in italiano.
+setCurrentLanguageSource(() => 'it')
 
 const USER = 'utente-test-0001'
 const ALTRO_USER = 'utente-estraneo-9999'

@@ -9,13 +9,16 @@
 // qualunque altra risposta è un errore, così la UI non può mai dire
 // "eliminato" se l'account è ancora lì.
 
+import { tr } from '../i18n/currentLanguage.js'
+
 export const DELETE_ACCOUNT_FUNCTION = 'delete-account'
 
+// Nella lingua dell'app, letti nel momento in cui servono.
 export const DELETE_ACCOUNT_MESSAGES = {
-  offline: 'Sei offline: per eliminare l’account serve la connessione. Non è stato eliminato niente.',
-  unauthenticated: 'La sessione non è più valida. Esci, rientra e riprova: non è stato eliminato niente.',
-  failed: 'Non è stato possibile eliminare l’account. Non è stato eliminato niente: riprova tra poco.',
-  noSession: 'Nessun account attivo su questo dispositivo.',
+  get offline() { return tr('settings.delete.error.offline') },
+  get unauthenticated() { return tr('settings.delete.error.unauthenticated') },
+  get failed() { return tr('settings.delete.error.failed') },
+  get noSession() { return tr('settings.delete.error.nosession') },
 }
 
 const statusOf = (error) => error?.context?.status ?? error?.status ?? null

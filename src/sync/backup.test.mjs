@@ -10,6 +10,11 @@ import {
   buildBackup, serializeBackup, parseBackup, buildImportPatch, previewImport, getSnapshot,
 } from './backup.js'
 import { check, section, report } from './testkit.mjs'
+import { setCurrentLanguageSource } from '../i18n/currentLanguage.js'
+
+// Gli avvisi e gli errori dell'import seguono la lingua dell'app: qui un
+// dispositivo in italiano (le altre lingue in i18n/settingsScreens.test.mjs).
+setCurrentLanguageSource(() => 'it')
 
 
 

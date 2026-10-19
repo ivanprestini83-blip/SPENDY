@@ -3,6 +3,7 @@ import { totalForMonth } from '../utils/budgetCalculations.js'
 import { formatCurrency } from '../utils/format.js'
 import { getCategory } from '../data/categories.js'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { autoSalaryDescriptionKey } from '../utils/salary.js'
 import './ExpensesPage.css'
 
 // The income twin of ExpensesPage — same layout/CSS, listing every
@@ -63,7 +64,10 @@ export function IncomesPage() {
               >
                 <span className="expenses-page__item-icon" aria-hidden="true">{category.emoji}</span>
                 <div className="expenses-page__item-info">
-                  <p className="expenses-page__item-desc">{income.description}</p>
+                  <p className="expenses-page__item-desc">
+                    {/* La descrizione automatica di uno stipendio nella lingua scelta; quella dell'utente com'è. */}
+                    {autoSalaryDescriptionKey(income) ? t(autoSalaryDescriptionKey(income)) : income.description}
+                  </p>
                   <p className="expenses-page__item-meta">{category.label} · {income.date}</p>
                 </div>
                 <span className="expenses-page__item-amount">{formatCurrency(income.amount)}</span>

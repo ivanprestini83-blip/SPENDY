@@ -6,6 +6,7 @@ import { currentCycleSalary } from '../utils/salary.js'
 import { formatCurrency } from '../utils/format.js'
 import { getCategory } from '../data/categories.js'
 import { useLanguage } from '../i18n/useLanguage.js'
+import { cycleLabelNames } from '../i18n/cycleLabelNames.js'
 import './ExpensesPage.css'
 
 // L'elenco delle spese di UN periodo: oggi, oppure un ciclo (quello in corso
@@ -13,7 +14,7 @@ import './ExpensesPage.css'
 // arriva (useAppStore expensesView); i cicli precedenti restano consultabili
 // e modificabili con le frecce. Filtra soltanto: nessuna spesa viene toccata.
 export function ExpensesPage() {
-  const { t } = useLanguage()
+  const { t, language } = useLanguage()
   const today = useAppStore((state) => state.today)
   const cycleStartDay = useAppStore((state) => state.cycleStartDay) ?? 1
   const expenses = useAppStore((state) => state.expenses)
@@ -34,8 +35,10 @@ export function ExpensesPage() {
   const sorted = [...period.items].sort((a, b) => (a.date < b.date ? 1 : -1))
   const hasOlder = period.range !== null && expenses.some((expense) => expense.date < period.range.start)
 
+  // Le etichette dei cicli nella lingua scelta (solo il testo: date e confini restano quelli di range).
+  const names = cycleLabelNames(language)
   let label = t('expenses.summary.today')
-  if (view === 'cycle') label = cycleOffset === 0 ? t('expenses.summary.cycle') : t('expenses.page.pastcycle', { cycle: formatCycleLabel(period.range, cycleStartDay) })
+  if (view === 'cycle') label = cycleOffset === 0 ? t('expenses.summary.cycle') : t('expenses.page.pastcycle', { cycle: formatCycleLabel(period.range, cycleStartDay, names) })
 
   const choose = (next) => {
     setView(next)
@@ -70,7 +73,7 @@ export function ExpensesPage() {
           >
             ←
           </button>
-          <p className="expenses-page__cycle-label">{formatCycleLabel(period.range, cycleStartDay)}</p>
+          <p className="expenses-page__cycle-label">{formatCycleLabel(period.range, cycleStartDay, names)}</p>
           <button
             type="button"
             className="expenses-page__cycle-arrow"
