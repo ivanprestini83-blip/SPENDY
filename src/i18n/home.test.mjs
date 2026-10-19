@@ -75,7 +75,8 @@ section('2. Nessun testo statico rimasto nei componenti della Home')
   for (const path of COMPONENTS) {
     const source = code(path)
     const jsxText = [...source.matchAll(/>([^<>{}]*)</g)].map((m) => m[1].trim()).filter((text) => /[A-Za-zÀ-ÿ]/.test(text) && !ALLOWED_TEXT.has(text) && !/[=;()]/.test(text))
-    const attrs = [...source.matchAll(/(?:aria-label|title|placeholder|alt)="([^"]*)"/g)].map((m) => m[1])
+    // Un alt vuoto (immagine decorativa) non è testo.
+    const attrs = [...source.matchAll(/(?:aria-label|title|placeholder|alt)="([^"]*)"/g)].map((m) => m[1]).filter(Boolean)
     check(`${path.split('/').pop()}: nessun testo fisso`, jsxText.length === 0 && attrs.length === 0, [...jsxText, ...attrs].join(' | '))
   }
   // Nessuna frase italiana della Home è rimasta scritta nei componenti.

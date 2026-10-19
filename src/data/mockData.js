@@ -15,5 +15,6 @@ export const mockNavItems = [
   { id: 'analytics', emoji: '📊', label: 'Analisi', labelKey: 'home.nav.analytics' },
   { id: 'addTransaction', emoji: '➕', label: 'Aggiungi', labelKey: 'home.nav.add', isAction: true, isPrimary: true },
   { id: 'goals', emoji: '🎯', label: 'Obiettivi', labelKey: 'home.nav.goals' },
-  { id: 'spendy', emoji: '😈', label: 'Spendy' },
+  // `image`: al posto dell'emoji, la faccia della volpe (l'icona dell'app).
+  { id: 'spendy', emoji: '😈', image: '/icons/icon-192.png', label: 'Spendy' },
 ]

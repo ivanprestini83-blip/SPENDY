@@ -1,8 +1,8 @@
 import { useLanguage } from '../../i18n/useLanguage.js'
 import './BottomNavigation.css'
 
-// `items` mirrors mockNavItems' shape: { id, emoji, label, isAction?,
-// isPrimary? }. Every item — including the "+" — sits inline in the
+// `items` mirrors mockNavItems' shape: { id, emoji, image?, label, isAction?,
+// isPrimary? }. Con `image` l'icona è quell'immagine invece dell'emoji. Every item — including the "+" — sits inline in the
 // SAME row as Home/Analisi/Obiettivi/Spendy; `isPrimary` only changes
 // its visual weight (bigger green circle, no label, see
 // BottomNavigation.css), not its position in the flex flow. It's a
@@ -34,7 +34,9 @@ export function BottomNavigation({ items, activeId, onSelect = () => {}, onActio
               <span className="bottom-nav__plus" aria-hidden="true">+</span>
             ) : (
               <>
-                <span className="bottom-nav__icon" aria-hidden="true">{item.emoji}</span>
+                <span className="bottom-nav__icon" aria-hidden="true">
+                  {item.image ? <img className="bottom-nav__icon-image" src={item.image} alt="" draggable="false" /> : item.emoji}
+                </span>
                 <span className="bottom-nav__label">{labelOf(item)}</span>
               </>
             )}
