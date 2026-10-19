@@ -220,6 +220,17 @@ export function logErrorCodes(errors) {
   return [...new Set((Array.isArray(errors) ? errors : []).map((error) => String(error).split(':')[0]))]
 }
 
+// Perché la registrazione dei token non è riuscita, come codice tecnico: lo
+// stato HTTP della chiamata al database (quota.js: `quota_rpc_<status>`), un
+// errore di rete o "unknown". Mai il corpo della risposta, chiavi o dati.
+export function usageErrorCode(error) {
+  const status = /^quota_rpc_(\d{3})$/.exec(String(error?.message ?? ''))?.[1]
+  if (status) return `rpc_${status}`
+  if (error?.name === 'TypeError') return 'network'
+  if (error?.name === 'AbortError' || error?.name === 'TimeoutError') return 'timeout'
+  return 'unknown'
+}
+
 // `usage` come lo restituisce l'adattatore del provider: due interi non
 // negativi, oppure niente. Qualunque altra forma vale "senza usage": meglio
 // non registrare che registrare un numero inventato.
@@ -393,14 +404,24 @@ export function createSpendyAIHandler({
     // cambia, e la chiamata resta comunque nel conteggio della quota.
     const usage = normalizeUsage(result.usage)
     let usageRecorded = false
+    let usageError = null
     if (usage && typeof quota.recordUsage === 'function') {
       usageRecorded = await quota
         .recordUsage({ userId: user.id, day, model: result.model ?? config.model ?? null, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens })
-        .then(() => true, () => false)
+        .then(() => true, (error) => {
+          usageError = usageErrorCode(error)
+          return false
+        })
     }
-    const usageLog = usage
-      ? { tokensIn: usage.inputTokens, tokensOut: usage.outputTokens, usageRecorded }
-      : { usageRecorded: false, noUsage: true }
+    // L'id della richiesta di Anthropic (anthropicModel.js), solo nei log: per
+    // ritrovare la chiamata nella Console. Mai inviato all'app.
+    const requestId = typeof result.requestId === 'string' && result.requestId ? result.requestId : null
+    const usageLog = {
+      ...(usage
+        ? { tokensIn: usage.inputTokens, tokensOut: usage.outputTokens, usageRecorded, ...(usageError ? { usageError } : {}) }
+        : { usageRecorded: false, noUsage: true }),
+      ...(requestId ? { requestId } : {}),
+    }
 
     if (result.stopReason === 'refusal') {
       log({ outcome: 'refusal', event: eventId, ms: Date.now() - started, model: result.model ?? config.model, ...usageLog })

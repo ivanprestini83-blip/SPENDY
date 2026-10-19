@@ -3,8 +3,9 @@
 // Riceve la classe dell'SDK ufficiale da fuori (index.ts la importa da
 // npm), così i test possono passarne una finta. Restituisce la funzione
 // `callModel` che handler.js si aspetta:
-//   ({ system, input, schema }) → { text, stopReason, model, usage }
-// (`usage` = i token fatturati, per misurare il consumo) e traduce gli
+//   ({ system, input, schema }) → { text, stopReason, model, usage, requestId }
+// (`usage` = i token fatturati, per misurare il consumo; `requestId` = l'id
+// della richiesta di Anthropic, per ritrovarla nella Console) e traduce gli
 // errori dell'SDK nei codici di handler.js, dicendo anche se la chiamata
 // prenotata sulla quota va restituita (`refund`, vedi quota.js).
 //
@@ -122,6 +123,12 @@ export function createAnthropicCaller({ Anthropic, apiKey, config }) {
     const usage = Number.isInteger(reported?.input_tokens) && Number.isInteger(reported?.output_tokens)
       ? { inputTokens: reported.input_tokens, outputTokens: reported.output_tokens }
       : null
-    return { text, stopReason: response.stop_reason, model: response.model, usage }
+    // L'id della richiesta: l'SDK (0.128.0, internal/parse.ts addResponseIDs) lo
+    // aggiunge alla risposta come `_request_id` (non enumerabile), dall'header
+    // `request-id`. Solo se ha la forma di un id; altrimenti null, mai inventato.
+    const requestId = typeof response._request_id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(response._request_id)
+      ? response._request_id
+      : null
+    return { text, stopReason: response.stop_reason, model: response.model, usage, requestId }
   }
 }

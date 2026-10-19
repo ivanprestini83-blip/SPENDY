@@ -755,6 +755,46 @@ section('Token usage: registrati, con il modello che ha risposto')
   const noRecorder = createSpendyAIHandler({ aiPreference: AI_ENABLED, config: readConfig((n) => ENV[n]), verifyUser: async () => ({ id: 'utente-a', emailConfirmed: true }), callModel: async () => ({ text: JSON.stringify(okAnswer), stopReason: 'end_turn', model: 'm', usage: { inputTokens: 1, outputTokens: 1 } }), quota: { reserve: async () => ({ allowed: true, reason: null }), release: async () => {} }, now: () => DAY1 })
   check('una quota senza recordUsage (versione vecchia dell\'adattatore) non rompe niente', (await noRecorder(post({ context }))).status === 200)
 
+  // Intervento A: il motivo tecnico di una registrazione fallita, solo come codice.
+  check('registrazione riuscita: nessun usageError nel log', !('usageError' in okLog))
+  check('registrazione fallita (errore generico) → usageError "unknown"', broken.logs.find((e) => e.outcome === 'ok').usageError === 'unknown')
+  for (const [label, error, code] of [
+    ['HTTP 503 dal database', new Error('quota_rpc_503'), 'rpc_503'],
+    ['HTTP 404 (funzione SQL assente)', new Error('quota_rpc_404'), 'rpc_404'],
+    ['rete', Object.assign(new TypeError('fetch failed: dettagli interni'), {}), 'network'],
+  ]) {
+    const failed = build(() => answer())
+    failed.quota.recordUsage = async () => { throw error }
+    const fres = await run(failed)
+    const flog = failed.logs.find((e) => e.outcome === 'ok')
+    check(`registrazione fallita (${label}) → 200, usageRecorded false, usageError "${code}"`, fres.status === 200 && flog.usageRecorded === false && flog.usageError === code)
+    check('   nel log nessun messaggio d\'errore, solo il codice', !JSON.stringify(flog).includes('dettagli interni') && !JSON.stringify(flog).includes('quota_rpc_'))
+    check('   prenotazione invariata (call_count 1, nessun rimborso)', failed.quota.count('utente-a', day1) === 1 && failed.quota.usageRows.length === 0)
+  }
+
+  // Intervento B: l'id della richiesta di Anthropic, come lo espone l'SDK 0.128.0
+  // (proprietà `_request_id` non enumerabile sulla risposta), solo nei log.
+  const withRequestId = (id, extra = {}) => Object.defineProperty(answer(extra), '_request_id', { value: id, enumerable: false })
+  const tracked = build(() => withRequestId('req_011CTestSpendy01'))
+  const tres = await tracked.handler(post({ context }))
+  const tbody = await tres.text()
+  const tlog = tracked.logs.find((e) => e.outcome === 'ok')
+  check('risposta riuscita: requestId nel log', tres.status === 200 && tlog.requestId === 'req_011CTestSpendy01' && tlog.usageRecorded === true)
+  check('   mai inviato all\'app: la risposta al client non contiene l\'id', !tbody.includes('req_011CTestSpendy01') && !tbody.includes('requestId'))
+  check('   prenotazione invariata (call_count 1)', tracked.quota.count('utente-a', day1) === 1)
+  const trackedRefusal = build(() => withRequestId('req_011CTestRefusal', { stop_reason: 'refusal', content: [] }))
+  await run(trackedRefusal)
+  check('rifiuto del modello: requestId nel log anche qui', trackedRefusal.logs.find((e) => e.outcome === 'refusal').requestId === 'req_011CTestRefusal')
+  const trackedNoUsage = build(() => withRequestId('req_011CTestNoUsage', { usage: undefined }))
+  await run(trackedNoUsage)
+  check('risposta senza usage: requestId nel log, nessun token inventato', trackedNoUsage.logs.find((e) => e.outcome === 'ok').requestId === 'req_011CTestNoUsage' && trackedNoUsage.quota.usageRows.length === 0)
+  check('id assente → nessun requestId nel log, nessun errore', !('requestId' in okLog) && okLog.usageRecorded === true)
+  for (const [label, id] of [['vuoto', ''], ['con spazi', 'req 011 x'], ['troppo lungo', 'r'.repeat(200)], ['non testo', 12345], ['null', null]]) {
+    const odd = build(() => withRequestId(id))
+    const ores = await run(odd)
+    check(`id non valido (${label}) → 200 e nessun requestId inventato`, ores.status === 200 && !('requestId' in odd.logs.find((e) => e.outcome === 'ok')))
+  }
+
   // Il modello ha risposto ma la risposta non serve: i token sono stati fatturati.
   const refusal = build(() => answer({ stop_reason: 'refusal', content: [] }))
   await run(refusal)
