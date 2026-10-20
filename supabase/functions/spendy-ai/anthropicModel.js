@@ -19,12 +19,12 @@
 //   configurazione sbagliata lato nostro, non colpa dell'utente). Timeout,
 //   errori di rete, 5xx e ogni altro errore dopo l'invio restano consumati. Si guarda il CODICE HTTP, non la
 //   classe dell'eccezione (che può cambiare tra versioni dell'SDK o runtime).
-// - Sui modelli che li supportano (Claude Opus 5, Claude Fable 5.1), i
-//   fallback lato server (`fallbacks: "default"`) fanno rispondere un
-//   altro modello se il primo rifiuta per i suoi filtri di sicurezza.
+// - Sui modelli che li supportano (Claude Opus 5, Claude Sonnet 5.5,
+//   Claude Fable 5.1), i fallback lato server (`fallbacks: "default"`) fanno
+//   rispondere un altro modello se il primo rifiuta per i suoi filtri di sicurezza.
 import { ModelError, sanitizeDiagnostic } from './handler.js'
 
-const SERVER_FALLBACK_MODELS = new Set(['claude-opus-5', 'claude-fable-5-1'])
+const SERVER_FALLBACK_MODELS = new Set(['claude-opus-5', 'claude-sonnet-5-5', 'claude-fable-5-1'])
 const SERVER_FALLBACK_BETA = 'server-side-fallback-2026-07-01'
 
 // Rifiuti espliciti del provider: rispondono subito e non fatturano.

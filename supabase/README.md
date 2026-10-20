@@ -101,7 +101,7 @@ variabile `VITE_*`.
 | Nome | Obbligatorio | Valore |
 |---|---|---|
 | `AI_PROVIDER` | sì | `anthropic` (l'unico supportato per ora) |
-| `AI_MODEL` | sì | l'id del modello; consigliato `claude-opus-5` |
+| `AI_MODEL` | sì | l'id del modello; consigliato `claude-sonnet-5-5` (stessa qualità di `claude-opus-5` nel benchmark del 20/10/2026, circa il 60% in meno di costo). Anche `claude-opus-5` resta supportato, con gli stessi fallback lato server |
 | `AI_API_KEY` | sì | la chiave dell'API Anthropic, creata **dentro un workspace** (es. *Default*): la funzione non invia l'header `anthropic-workspace-id` |
 | `AI_EFFORT` | no | `low` consigliato: frasi brevi, più rapide ed economiche |
 | `AI_TIMEOUT_MS` | no | default `12000` |
@@ -122,13 +122,17 @@ Serve Node (già installato). Il progetto è `riflsimbbajfvxublovr`.
 
 ```bash
 npx supabase login
-npx supabase secrets set --project-ref riflsimbbajfvxublovr AI_PROVIDER=anthropic AI_MODEL=claude-opus-5 AI_EFFORT=low
+npx supabase secrets set --project-ref riflsimbbajfvxublovr AI_PROVIDER=anthropic AI_MODEL=claude-sonnet-5-5 AI_EFFORT=low
 npx supabase secrets set --project-ref riflsimbbajfvxublovr AI_API_KEY=la-tua-chiave
 npx supabase functions deploy spendy-ai --project-ref riflsimbbajfvxublovr
 ```
 
 La chiave va digitata solo nel terzo comando, nel tuo terminale: non
 salvarla in nessun file del progetto.
+
+Per cambiare solo il modello basta il secret, senza un nuovo deploy; per
+tornare a Opus 5:
+`npx supabase secrets set --project-ref riflsimbbajfvxublovr AI_MODEL=claude-opus-5`.
 
 > Se il deploy chiede Docker, aggiungere `--use-api`. Se la funzione
 > rispondesse 401 anche con la sessione valida (progetti con le nuove

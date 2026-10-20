@@ -305,6 +305,16 @@ section('Adattatore Anthropic (SDK finto)')
   check('Claude Opus 5: fallback lato server attivi', req.path === 'beta' && req.params.fallbacks === 'default' && req.params.betas.includes('server-side-fallback-2026-07-01'))
   check('testo e stop_reason restituiti', out.text === '{"ok":true}' && out.stopReason === 'end_turn')
 
+  // Fase 2: Claude Sonnet 5.5 ha gli stessi fallback lato server di Opus 5 e la stessa richiesta.
+  const sonnet = readConfig((n) => ({ ...ENV, AI_MODEL: 'claude-sonnet-5-5', AI_EFFORT: 'low' })[n])
+  created.length = 0
+  await createAnthropicCaller({ Anthropic: FakeAnthropic, apiKey: sonnet.apiKey, config: sonnet })({ system: 'S', input: { context: baseContext }, schema: { type: 'object' } })
+  const sonnetReq = created.find((c) => c.path)
+  check('Claude Sonnet 5.5: modello da AI_MODEL, fallback lato server attivi', sonnetReq.params.model === 'claude-sonnet-5-5'
+    && sonnetReq.path === 'beta' && sonnetReq.params.fallbacks === 'default' && sonnetReq.params.betas.includes('server-side-fallback-2026-07-01'))
+  check('   stessa richiesta di Opus 5 salvo il modello (json_schema, effort, max_tokens, messaggi)',
+    JSON.stringify({ ...sonnetReq.params, model: null }) === JSON.stringify({ ...req.params, model: null }))
+
   const other = readConfig((n) => ({ ...ENV, AI_MODEL: 'un-altro-modello' })[n])
   created.length = 0
   await createAnthropicCaller({ Anthropic: FakeAnthropic, apiKey: 'k', config: other })({ system: 'S', input: {}, schema: {} })
