@@ -263,6 +263,9 @@ function bearerToken(request) {
 //   dailyLimit, monthlyLimit, globalDailyLimit
 //               (facoltativi) sostituiscono i limiti letti da config: giornaliero
 //               e mensile per utente, e totale giornaliero di tutti gli utenti
+//   userTag     async (userId) => string | null (quota.js createUserTagger):
+//               identificativo non reversibile dell'utente, SOLO nel log di
+//               una quota rifiutata; mai nella risposta, mai l'id grezzo
 export function createSpendyAIHandler({
   config,
   verifyUser,
@@ -274,6 +277,7 @@ export function createSpendyAIHandler({
   monthlyLimit,
   globalDailyLimit,
   log = () => {},
+  userTag = null,
 }) {
   const limits = {
     daily: dailyLimit ?? config.dailyLimit ?? AI_DAILY_LIMIT,
@@ -367,7 +371,22 @@ export function createSpendyAIHandler({
       // Quale limite è scattato: giornaliero (utente), mensile (utente) o
       // globale (tutti). Il modello non viene raggiunto in nessuno dei tre casi.
       const reached = QUOTA_REASONS[reservation.reason] ?? QUOTA_REASONS.daily
-      log({ outcome: reached.outcome, event: eventId })
+      // Diagnostica (solo nel log, la risposta resta quella di sempre): chi
+      // (identificativo HMAC, mai l'UUID), quanto aveva già usato e con quali
+      // limiti. Se l'identificativo non si calcola, il rifiuto non cambia.
+      // Promise.resolve().then(...): copre anche un userTag sincrono, che
+      // restituisca un valore o lanci un errore.
+      const userLabel = typeof userTag === 'function' ? await Promise.resolve().then(() => userTag(user.id)).catch(() => null) : null
+      const count = (value) => (Number.isFinite(value) ? value : null)
+      log({
+        outcome: reached.outcome,
+        event: eventId,
+        ...(typeof userLabel === 'string' && userLabel ? { user: userLabel } : {}),
+        dailyUsed: count(reservation.used),
+        monthlyUsed: count(reservation.monthlyUsed),
+        globalUsed: count(reservation.globalUsed),
+        limits: { daily: limits.daily, monthly: limits.monthly, global: limits.global },
+      })
       return json(429, { error: reached.error ?? AI_DAILY_LIMIT_REACHED })
     }
 

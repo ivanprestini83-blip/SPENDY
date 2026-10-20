@@ -15,7 +15,7 @@ import Anthropic from 'npm:@anthropic-ai/sdk@0.128.0'
 import { createSpendyAIHandler, readConfig, supabasePublicKey } from './handler.js'
 import { createAnthropicCaller } from './anthropicModel.js'
 import { createSupabaseUserVerifier } from './auth.js'
-import { createSupabaseQuota, supabaseServiceKey } from './quota.js'
+import { createSupabaseQuota, createUserTagger, supabaseServiceKey } from './quota.js'
 import { createSupabaseAIPreference } from './preference.js'
 
 const getEnv = (name: string) => Deno.env.get(name) ?? undefined
@@ -39,6 +39,9 @@ const handler = createSpendyAIHandler({
   // chiamata passa (fail closed).
   aiPreference: supabaseUrl && serviceKey ? createSupabaseAIPreference({ supabaseUrl, serviceKey }) : null,
   log: (entry: Record<string, unknown>) => console.log(JSON.stringify({ fn: 'spendy-ai', ...entry })),
+  // Identificativo dell'utente nei log di una quota rifiutata: HMAC con la
+  // service_role come chiave (resta sul server), mai l'UUID.
+  userTag: createUserTagger(serviceKey ?? ''),
 })
 
 Deno.serve(handler)

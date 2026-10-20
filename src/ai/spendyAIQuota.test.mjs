@@ -20,7 +20,7 @@ import { createSpendyAIHandler, readConfig, ModelError } from '../../supabase/fu
 import { createAnthropicCaller } from '../../supabase/functions/spendy-ai/anthropicModel.js'
 import {
   AI_DAILY_LIMIT, AI_MONTHLY_LIMIT, AI_GLOBAL_DAILY_LIMIT, AI_DAILY_LIMIT_REACHED, AI_MONTHLY_LIMIT_REACHED,
-  AI_GLOBAL_LIMIT_REACHED, QUOTA_REASONS, usageDay, createSupabaseQuota, supabaseServiceKey,
+  AI_GLOBAL_LIMIT_REACHED, QUOTA_REASONS, usageDay, createSupabaseQuota, supabaseServiceKey, createUserTagger, USER_TAG_CONTEXT,
 } from '../../supabase/functions/spendy-ai/quota.js'
 import { createRemoteProvider, functionsUrl, DAILY_LIMIT_ERROR, MONTHLY_LIMIT_ERROR, GLOBAL_LIMIT_ERROR } from './providers/remoteProvider.js'
 import { createSpendyAI } from './spendyAI.js'
@@ -140,7 +140,7 @@ function fakeModel(behavior = null) {
   return { callModel, calls }
 }
 
-function makeServer({ quota = memoryQuota(), model = fakeModel(), clock = { now: DAY1 }, env = {}, tokens = TOKENS } = {}) {
+function makeServer({ quota = memoryQuota(), model = fakeModel(), clock = { now: DAY1 }, env = {}, tokens = TOKENS, userTag = null } = {}) {
   const logs = []
   const handler = createSpendyAIHandler({ aiPreference: AI_ENABLED,
     config: readConfig((name) => ({ ...ENV, ...env })[name]),
@@ -149,6 +149,7 @@ function makeServer({ quota = memoryQuota(), model = fakeModel(), clock = { now:
     quota,
     now: () => clock.now,
     log: (entry) => logs.push(entry),
+    userTag,
   })
   return { handler, quota, model, clock, logs }
 }
@@ -195,8 +196,11 @@ section('Quota: 3 chiamate al giorno per utente')
   check('   anche la quinta: 429, nessuna chiamata al modello', fifth.status === 429 && server.model.calls.length === 3)
 
   const limitLog = server.logs.find((entry) => entry.outcome === 'daily_limit')
-  check('   nei log solo esito ed evento (niente importi, frasi, utente)',
-    limitLog && JSON.stringify(Object.keys(limitLog).sort()) === '["event","outcome"]')
+  // Diagnostica della quota rifiutata: esito, evento, contatori e limiti; senza
+  // userTag nessun identificativo dell'utente.
+  check('   nei log esito, evento, contatori e limiti (niente importi, frasi, utente)',
+    limitLog && JSON.stringify(Object.keys(limitLog).sort()) === '["dailyUsed","event","globalUsed","limits","monthlyUsed","outcome"]'
+    && limitLog.dailyUsed === 3 && JSON.stringify(limitLog.limits) === '{"daily":3,"monthly":30,"global":300}')
   check('   nessun importo o testo nei log della quota', !/160|1840|Ristorante|utente-a/.test(JSON.stringify(server.logs.filter((e) => e.outcome === 'daily_limit'))))
 }
 
@@ -468,6 +472,7 @@ section('Quota: adattatore Supabase (RPC con service_role)')
   check('prenotazione → /rest/v1/rpc/spendy_ai_reserve_v2 (la funzione vecchia non viene più chiamata)', sent[0].url === 'https://progetto.supabase.co/rest/v1/rpc/spendy_ai_reserve_v2')
   check('   argomenti: utente verificato, giorno, i tre limiti', JSON.stringify(sent[0].body) === '{"p_user_id":"utente-a","p_usage_date":"2026-09-29","p_daily_limit":3,"p_monthly_limit":30,"p_global_daily_limit":300}')
   check('   esito e motivo del rifiuto letti dalla risposta', r1.allowed === true && r1.reason === null && r1.used === 1 && r2.allowed === false && r2.reason === 'monthly')
+  check('   rifiuto: anche i contatori mensile e globale (solo per i log)', r2.used === 1 && r2.monthlyUsed === 30 && r2.globalUsed === 40)
   check('rilascio → /rest/v1/rpc/spendy_ai_release', sent[2].url.endsWith('/rest/v1/rpc/spendy_ai_release'))
   check('si presenta con la service_role, non con il token dell\'utente',
     sent.every((s) => s.headers.apikey === 'eyJservice.role.jwt' && s.headers.Authorization === 'Bearer eyJservice.role.jwt'))
@@ -489,6 +494,79 @@ section('Quota: adattatore Supabase (RPC con service_role)')
   check('service key: legacy SUPABASE_SERVICE_ROLE_KEY', supabaseServiceKey((n) => ({ SUPABASE_SERVICE_ROLE_KEY: 'legacy' })[n]) === 'legacy')
   check('service key: nuove SUPABASE_SECRET_KEYS (JSON)', supabaseServiceKey((n) => ({ SUPABASE_SECRET_KEYS: '{"default":"sb_secret_x"}' })[n]) === 'sb_secret_x')
   check('service key assente → null', supabaseServiceKey(() => undefined) === null)
+
+  const partial = createSupabaseQuota({ supabaseUrl: 'https://x.supabase.co', serviceKey: 'k', fetchImpl: async () => new Response('[{"allowed":false,"reason":"monthly","daily_used":0}]', { status: 200 }) })
+  const noCounters = await partial.reserve({ userId: 'u', day: 'd', limits: limitsArg })
+  check('rifiuto senza contatori mensile e globale → null, il rifiuto resta', noCounters.allowed === false && noCounters.reason === 'monthly' && noCounters.monthlyUsed === null && noCounters.globalUsed === null)
+}
+
+// =====================================================================
+section('Quota rifiutata: diagnostica nei log (identificativo HMAC, contatori)')
+// =====================================================================
+{
+  const UUID_A = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
+  const UUID_B = '1b4e28ba-2fa1-41d2-883f-0016d3cca427'
+  const SERVER_KEY = 'chiave-del-server-di-test'
+  const tag = createUserTagger(SERVER_KEY)
+  const a1 = await tag(UUID_A), a2 = await tag(UUID_A), b1 = await tag(UUID_B)
+  const otherKey = await createUserTagger('un-altra-chiave')(UUID_A)
+  check('identificativo: 16 cifre esadecimali, stabile per lo stesso utente', /^[0-9a-f]{16}$/.test(a1) && a1 === a2)
+  check('   diverso tra utenti e tra chiavi del server', a1 !== b1 && a1 !== otherKey)
+  check('   non contiene l\'UUID né sue parti', ![UUID_A, ...UUID_A.split('-')].some((part) => a1.includes(part)))
+  check('   è un HMAC-SHA-256 con contesto dedicato (non un semplice hash dell\'UUID)', await (async () => {
+    const { createHmac, createHash } = await import('node:crypto')
+    const expected = createHmac('sha256', SERVER_KEY).update(USER_TAG_CONTEXT + UUID_A).digest('hex').slice(0, 16)
+    return a1 === expected && a1 !== createHash('sha256').update(UUID_A).digest('hex').slice(0, 16)
+  })())
+  check('   senza chiave o senza id → null, nessuna eccezione', (await createUserTagger('')(UUID_A)) === null && (await createUserTagger(undefined)(UUID_A)) === null
+    && (await tag('')) === null && (await tag(null)) === null)
+
+  const refusing = (monthly, global) => ({
+    async reserve() { return { allowed: false, reason: 'monthly', used: 0, monthlyUsed: monthly, globalUsed: global } },
+    async release() {},
+  })
+  const tokens = { 'token-a': UUID_A, 'token-b': UUID_B }
+  const server = makeServer({ quota: refusing(30, 5), tokens, userTag: tag })
+  const res = await call(server, { token: 'token-a' })
+  const entry = server.logs.find((e) => e.outcome === 'monthly_limit')
+  check('mensile esaurito: la risposta resta 429 { error: AI_MONTHLY_LIMIT_REACHED }, nient\'altro', res.status === 429
+    && JSON.stringify(res.body) === JSON.stringify({ error: AI_MONTHLY_LIMIT_REACHED }))
+  check('   il modello non è chiamato', server.model.calls.length === 0)
+  check('   nel log: motivo, evento, identificativo, contatori e limiti applicati', entry && entry.event === context.primaryEvent.id && entry.user === a1
+    && entry.dailyUsed === 0 && entry.monthlyUsed === 30 && entry.globalUsed === 5 && JSON.stringify(entry.limits) === '{"daily":3,"monthly":30,"global":300}')
+  const logText = JSON.stringify(server.logs)
+  check('   nel log nessun UUID, token, chiave del server, email, importo o testo della spesa',
+    ![UUID_A, 'token-a', SERVER_KEY, '@', '160', '1840', 'Ristorante'].some((s) => logText.includes(s)))
+
+  const other = makeServer({ quota: refusing(2, 5), tokens, userTag: tag })
+  await call(other, { token: 'token-b' })
+  const entryB = other.logs.find((e) => e.outcome === 'monthly_limit')
+  check('altro account: identificativo diverso e i suoi contatori', entryB.user === b1 && entryB.user !== entry.user && entryB.monthlyUsed === 2)
+
+  const custom = makeServer({ quota: refusing(30, 5), tokens, userTag: tag, env: { AI_MONTHLY_LIMIT: '40' } })
+  await call(custom, { token: 'token-a' })
+  check('limiti nel log = quelli applicati davvero (qui AI_MONTHLY_LIMIT=40)', custom.logs.find((e) => e.outcome === 'monthly_limit').limits.monthly === 40)
+
+  const broken = makeServer({ quota: refusing(30, 5), tokens, userTag: async () => { throw new Error('crypto non disponibile') } })
+  const brokenRes = await call(broken, { token: 'token-a' })
+  const brokenEntry = broken.logs.find((e) => e.outcome === 'monthly_limit')
+  check('identificativo in errore: stesso rifiuto 429, log senza "user"', brokenRes.status === 429 && brokenRes.body.error === AI_MONTHLY_LIMIT_REACHED
+    && brokenEntry && !('user' in brokenEntry) && brokenEntry.monthlyUsed === 30)
+
+  // Tagger SINCRONO che lancia: senza Promise.resolve().then(...) sarebbe un 500.
+  const syncThrow = makeServer({ quota: refusing(30, 5), tokens, userTag: () => { throw new Error('errore sincrono') } })
+  const syncThrowRes = await call(syncThrow, { token: 'token-a' })
+  const syncThrowEntry = syncThrow.logs.find((e) => e.outcome === 'monthly_limit')
+  check('tagger sincrono che lancia: resta 429 AI_MONTHLY_LIMIT_REACHED, mai 500; log senza "user"', syncThrowRes.status === 429
+    && JSON.stringify(syncThrowRes.body) === JSON.stringify({ error: AI_MONTHLY_LIMIT_REACHED }) && syncThrowEntry && !('user' in syncThrowEntry))
+  const syncValue = makeServer({ quota: refusing(30, 5), tokens, userTag: () => 'abcdef0123456789' })
+  const syncValueRes = await call(syncValue, { token: 'token-a' })
+  check('tagger sincrono che restituisce un valore: 429 e identificativo nel log', syncValueRes.status === 429
+    && syncValue.logs.find((e) => e.outcome === 'monthly_limit').user === 'abcdef0123456789')
+
+  const allowedServer = makeServer({ tokens, userTag: tag })
+  await call(allowedServer, { token: 'token-a' })
+  check('chiamata consentita: l\'identificativo non compare nei log', !JSON.stringify(allowedServer.logs).includes(a1))
 }
 
 // =====================================================================
@@ -582,8 +660,9 @@ section('Quota mensile: 30 chiamate per mese di calendario UTC')
   const over = await call(server)
   check('la 31ª chiamata del mese → 429 AI_MONTHLY_LIMIT_REACHED', over.status === 429 && over.body.error === AI_MONTHLY_LIMIT_REACHED && AI_MONTHLY_LIMIT_REACHED === 'AI_MONTHLY_LIMIT_REACHED')
   check('   il modello NON viene chiamato e il contatore non sale', server.model.calls.length === 30 && server.quota.count('utente-a', '2026-09-11') === 0)
-  check('   risposta senza dettagli interni; nei log solo esito ed evento', JSON.stringify(Object.keys(over.body)) === '["error"]'
-    && JSON.stringify(Object.keys(server.logs.find((e) => e.outcome === 'monthly_limit')).sort()) === '["event","outcome"]')
+  check('   risposta senza dettagli interni; nei log esito, evento, contatori e limiti, senza utente', JSON.stringify(Object.keys(over.body)) === '["error"]'
+    && JSON.stringify(Object.keys(server.logs.find((e) => e.outcome === 'monthly_limit')).sort()) === '["dailyUsed","event","globalUsed","limits","monthlyUsed","outcome"]'
+    && !JSON.stringify(server.logs.find((e) => e.outcome === 'monthly_limit')).includes('utente-a'))
   const other = await call(server, { token: 'token-b' })
   check('un altro utente non è toccato dal mensile di A', other.status === 200)
 
@@ -622,8 +701,9 @@ section('Tetto globale giornaliero (tutti gli utenti)')
   check('5 chiamate di utenti diversi: tutte consentite (nessun utente oltre il suo limite)', outcomes.every((s) => s === 200) && server.quota.globalCount(day1) === 5)
   const blocked = await call(server, { token: 'token-d' })
   check('la 6ª della giornata, di un utente che non ha usato niente → 429 AI_GLOBAL_LIMIT_REACHED', blocked.status === 429 && blocked.body.error === AI_GLOBAL_LIMIT_REACHED && AI_GLOBAL_LIMIT_REACHED === 'AI_GLOBAL_LIMIT_REACHED')
-  check('   il modello NON viene chiamato; nei log solo esito ed evento', server.model.calls.length === 5
-    && JSON.stringify(Object.keys(server.logs.find((e) => e.outcome === 'global_limit')).sort()) === '["event","outcome"]')
+  check('   il modello NON viene chiamato; nei log esito, evento, contatori e limiti, senza utente', server.model.calls.length === 5
+    && JSON.stringify(Object.keys(server.logs.find((e) => e.outcome === 'global_limit')).sort()) === '["dailyUsed","event","globalUsed","limits","monthlyUsed","outcome"]'
+    && !JSON.stringify(server.logs.find((e) => e.outcome === 'global_limit')).includes('utente-d'))
   server.clock.now = DAY2
   check('giorno nuovo → il tetto globale riparte', (await call(server, { token: 'token-d' })).status === 200)
 

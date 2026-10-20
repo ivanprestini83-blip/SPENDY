@@ -67,6 +67,27 @@ export function supabaseServiceKey(getEnv) {
   }
 }
 
+const countOrNull = (value) => (value === null || value === undefined || !Number.isFinite(Number(value)) ? null : Number(value))
+
+// Un identificativo dell'utente per i log diagnostici: HMAC-SHA-256 dell'id,
+// con una chiave che esiste solo sul server (la service_role), troncato a 16
+// cifre esadecimali. Stabile tra le richieste dello stesso utente, diverso tra
+// utenti, e da solo non riporta né all'UUID né all'email. Senza chiave o senza
+// Web Crypto restituisce null: il log resta senza identificativo, la
+// richiesta non cambia.
+export const USER_TAG_CONTEXT = 'spendy-ai/log-user/v1:'
+export function createUserTagger(secret, subtle = globalThis.crypto?.subtle) {
+  if (typeof secret !== 'string' || !secret || !subtle) return async () => null
+  const encoder = new TextEncoder()
+  let key = null
+  return async function userTag(userId) {
+    if (typeof userId !== 'string' || !userId) return null
+    key ??= subtle.importKey('raw', encoder.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+    const mac = await subtle.sign('HMAC', await key, encoder.encode(USER_TAG_CONTEXT + userId))
+    return [...new Uint8Array(mac).slice(0, 8)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
+  }
+}
+
 // → { reserve({ userId, day, limits }) → { allowed, reason, ... },
 //     release({ userId, day }),
 //     recordUsage({ userId, day, model, inputTokens, outputTokens }) }
@@ -109,7 +130,15 @@ export function createSupabaseQuota({ supabaseUrl, serviceKey, fetchImpl = fetch
       if (!row || typeof row.allowed !== 'boolean') throw new Error('quota_bad_response')
       if (row.allowed) return { allowed: true, reason: null, used: Number(row.daily_used ?? 0) }
       // Un rifiuto resta un rifiuto anche se il motivo non è riconosciuto.
-      return { allowed: false, reason: Object.hasOwn(QUOTA_REASONS, row.reason) ? row.reason : 'daily', used: Number(row.daily_used ?? 0) }
+      // monthlyUsed e globalUsed servono solo alla diagnostica nei log
+      // (handler.js): null se la risposta non li porta.
+      return {
+        allowed: false,
+        reason: Object.hasOwn(QUOTA_REASONS, row.reason) ? row.reason : 'daily',
+        used: Number(row.daily_used ?? 0),
+        monthlyUsed: countOrNull(row.monthly_used),
+        globalUsed: countOrNull(row.global_used),
+      }
     },
     async release({ userId, day }) {
       await rpc('spendy_ai_release', { p_user_id: userId, p_usage_date: day })
