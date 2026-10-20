@@ -838,6 +838,27 @@ export function structureProblems(text, { previous = null, history = [] } = {}) 
   return [...new Set(problems)]
 }
 
+// Fase 5B: gli schemi che structureProblems rifiuterebbe, detti al modello
+// PRIMA della risposta (input.avoidStructures). Stessa logica e stessa
+// finestra del controllo (narrativeFrames sulla frase precedente, gli schemi
+// "una volta ogni tanto" sulle recenti): nessuna regola nuova, il validatore
+// resta com'è.
+//   opening  le prime due parole della frase precedente (ogni numero vale "#")
+//   frames   gli altri schemi della precedente (question, labelColon, …) più
+//            comeback / novelty se già usati nelle frasi recenti
+// null se non c'è niente da evitare.
+export function structuresToAvoid({ previous = null, history = [] } = {}) {
+  const before = previous ? narrativeFrames(previous) : new Set()
+  const recent = [...history.slice(-RECENT_WINDOW), ...(previous ? [previous] : [])]
+  const opening = [...before].find((frame) => frame.startsWith('open:'))?.slice('open:'.length) ?? null
+  const frames = new Set([...before].filter((frame) => !frame.startsWith('open:')))
+  for (const frame of ONCE_IN_A_WHILE) {
+    if (recent.some((line) => narrativeFrames(line).has(frame))) frames.add(frame)
+  }
+  if (!opening && frames.size === 0) return null
+  return { opening, frames: [...frames] }
+}
+
 // --- Validazione della risposta ---------------------------------------
 //
 // → { valid: true, response } | { valid: false, errors: [...] }
@@ -1055,6 +1076,7 @@ TEMPO
 
 VARIETÀ
 - In "previous" trovi l'ultima frase che l'utente ha letto, in "recentMessages" le ultime dette: non ripeterne né le parole né la struttura (stessa apertura, stesso schema, stessa domanda finale). Se la situazione è simile, cerca un'angolazione diversa.
+- Se c'è "avoidStructures", la risposta NON deve ripetere quegli schemi. "opening": non iniziare con quelle due parole; "#" è un numero qualsiasi, quindi "180 € di…" e "45 € di…" sono la stessa apertura. "frames": question = non chiudere con una domanda; labelColon = non aprire con "Parola: "; spotlight = niente "ecco…"; inference = niente "si vede che", "sembra che"; surprise = non aprire con "wow", "ops", "ehi" e simili; comeback = niente ritorni; novelty = niente "novità", "mai visto".
 - Mai raccontare una categoria come "tornata": vietati "Ecco X che torna", "Guarda chi è tornato", "X è tornato", "Si vede che X è tornato", "Non si vedeva da un po'" e simili.
 - "styleExamples" mostra il tono di Spendy: non copiarli.
 
@@ -1352,6 +1374,9 @@ export function buildSpendyPrompt(context, { previous = null, history = [], styl
   const locale = normalizeSpendyLocale(context?.locale)
   const currency = normalizeSpendyCurrency(context?.currency)
   const examples = styleExamples ?? pickStyleExamples(STYLE_EXAMPLES_BY_LOCALE[locale], context).map((example) => withCurrencySymbol(example, currency))
+  // Gli schemi da non ripetere, con la stessa logica del validatore: assente
+  // se non c'è una frase precedente né schemi recenti da evitare.
+  const avoidStructures = structuresToAvoid({ previous, history })
   return {
     system: `${withCurrencySymbol(SPENDY_PERSONALITY, currency)}\n\n${spendyLanguageInstructions(locale)}\n\n${spendyCurrencyInstructions(currency)}`,
     input: {
@@ -1359,6 +1384,7 @@ export function buildSpendyPrompt(context, { previous = null, history = [], styl
       previous,
       recentMessages: history.slice(-RECENT_WINDOW),
       styleExamples: examples.slice(0, 12),
+      ...(avoidStructures ? { avoidStructures } : {}),
     },
   }
 }

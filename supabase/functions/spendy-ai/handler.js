@@ -220,6 +220,23 @@ export function logErrorCodes(errors) {
   return [...new Set((Array.isArray(errors) ? errors : []).map((error) => String(error).split(':')[0]))]
 }
 
+// Quali schemi hanno fatto scattare repeated_structure / overused_structure,
+// solo per NOME: "repeated_structure:open:shopping galore,question" →
+// ["open", "question"]. L'apertura resta "open", senza le sue parole; un nome
+// che non sia una sola parola di lettere non entra nel log.
+export function structureFrameKinds(errors) {
+  const kinds = new Set()
+  for (const error of Array.isArray(errors) ? errors : []) {
+    const [code, ...rest] = String(error).split(':')
+    if (code !== 'repeated_structure' && code !== 'overused_structure') continue
+    for (const frame of rest.join(':').split(',')) {
+      const kind = frame.split(':')[0].trim()
+      if (/^[A-Za-z]+$/.test(kind)) kinds.add(kind)
+    }
+  }
+  return [...kinds]
+}
+
 // Perché la registrazione dei token non è riuscita, come codice tecnico: lo
 // stato HTTP della chiamata al database (quota.js: `quota_rpc_<status>`), un
 // errore di rete o "unknown". Mai il corpo della risposta, chiavi o dati.
@@ -455,7 +472,16 @@ export function createSpendyAIHandler({
     }
     const checked = validateSpendyResponse(parsed, context, { history, previous })
     if (!checked.valid) {
-      log({ outcome: 'invalid', event: eventId, errors: logErrorCodes(checked.errors), model: result.model ?? config.model, ...usageLog })
+      // Per gli errori di struttura anche QUALI schemi (solo i nomi), mai il testo.
+      const structureFrames = structureFrameKinds(checked.errors)
+      log({
+        outcome: 'invalid',
+        event: eventId,
+        errors: logErrorCodes(checked.errors),
+        ...(structureFrames.length > 0 ? { structureFrames } : {}),
+        model: result.model ?? config.model,
+        ...usageLog,
+      })
       return json(422, INVALID_RESPONSE)
     }
 

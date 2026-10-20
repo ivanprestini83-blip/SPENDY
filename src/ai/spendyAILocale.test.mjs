@@ -21,7 +21,7 @@
 //     aggiornate qui sotto, ognuna con il perché.
 
 import { check, section, report } from '../sync/testkit.mjs'
-import { createSpendyAIHandler, readConfig, logErrorCodes } from '../../supabase/functions/spendy-ai/handler.js'
+import { createSpendyAIHandler, readConfig, logErrorCodes, structureFrameKinds } from '../../supabase/functions/spendy-ai/handler.js'
 import { AI_DAILY_LIMIT } from '../../supabase/functions/spendy-ai/quota.js'
 import {
   SPENDY_LOCALES, DEFAULT_SPENDY_LOCALE, normalizeSpendyLocale, sanitizeSpendyContext, buildSpendyPrompt,
@@ -29,6 +29,7 @@ import {
   extractNumbers, allowedNumbers, authorizedNumbers, numberProblems,
   pickStyleExamples, STYLE_EXAMPLES_PER_REQUEST, STYLE_EXAMPLE_GROUPS, hasStaleStructure, numberWordProblems,
   STYLE_EXAMPLE_FIT, NEUTRAL_STYLE_EXAMPLES, styleSituation, styleExampleFits,
+  structuresToAvoid, structureProblems, narrativeFrames,
 } from '../../supabase/functions/_shared/spendyAIRules.js'
 import { validateAIResponse } from './spendyAIGuard.js'
 import { createSpendyAI } from './spendyAI.js'
@@ -585,6 +586,81 @@ section('Log del server: mai importi né parole della risposta del modello')
   check('logErrorCodes: solo i codici, senza doppioni', same(logErrorCodes(['invented_numbers:1,2', 'repeated_structure:open:shopping galore', 'markdown', 'invented_numbers:3']), ['invented_numbers', 'repeated_structure', 'markdown']))
   const ok = await run('Shopping at €1,794.')
   check('risposta valida: nel log nessun importo né testo', ok.status === 200 && !/1,?794|Shopping/.test(ok.logText))
+
+  // Fase 5B: per gli errori di struttura il log dice QUALI schemi, solo per nome.
+  const repeatedEntry = repeated.logs.find((e) => e.outcome === 'invalid')
+  check('struttura ripetuta: nel log anche i nomi degli schemi ("open", "labelColon"), senza parole', same([...(repeatedEntry?.structureFrames ?? [])].sort(), ['labelColon', 'open'])
+    && !/galore/i.test(JSON.stringify(repeatedEntry)), JSON.stringify(repeatedEntry?.structureFrames))
+  const twoQuestions = await run('Big day at the shops?', { previous: 'New routine?' })
+  const questionEntry = twoQuestions.logs.find((e) => e.outcome === 'invalid')
+  check('due domande di fila: 422 generico, nel log "question" e nessuna parola della risposta', twoQuestions.status === 422
+    && same(twoQuestions.body, { error: 'invalid', message: 'response_rejected' }) && questionEntry?.structureFrames?.includes('question') && !/shops|routine/i.test(twoQuestions.logText))
+  check('errore non di struttura: nessun campo structureFrames', !('structureFrames' in (invented.logs.find((e) => e.outcome === 'invalid') ?? {})))
+  check('structureFrameKinds: solo nomi di una parola, senza doppioni né testo', same(structureFrameKinds(['repeated_structure:open:shopping galore,question', 'overused_structure:comeback', 'repeated_structure:question', 'markdown', 'invented_numbers:12']), ['open', 'question', 'comeback'])
+    && same(structureFrameKinds(['repeated_structure:open:# di']), ['open']) && same(structureFrameKinds(null), []))
+}
+
+section('Fase 5B — schemi da evitare passati al modello (stessa logica del validatore)')
+{
+  // Una risposta rispetta avoidStructures se non ne ripete nessuno schema.
+  const violates = (text, avoid) => {
+    if (!avoid) return false
+    const frames = narrativeFrames(text)
+    return (avoid.opening !== null && frames.has(`open:${avoid.opening}`)) || avoid.frames.some((frame) => frames.has(frame))
+  }
+  const rejectedForStructure = (text, opts) => structureProblems(text, opts).some((p) => p.startsWith('repeated_structure') || p.startsWith('overused_structure'))
+
+  // 1. Aperture numeriche: ogni numero vale "#".
+  const numeric = structuresToAvoid({ previous: '180 € di shopping oggi: si fa notare.' })
+  check('apertura numerica: opening "# di", nessun altro schema', numeric?.opening === '# di' && same(numeric.frames, []), JSON.stringify(numeric))
+  check('   "45 € di caffè…" ripete l\'apertura: avvisata e rifiutata dal validatore', violates('45 € di caffè al bar oggi.', numeric)
+    && rejectedForStructure('45 € di caffè al bar oggi.', { previous: '180 € di shopping oggi: si fa notare.' }))
+  check('   "Elettronica a 160 €…" apre diversamente: né avvisata né rifiutata', !violates('Elettronica a 160 € oggi.', numeric)
+    && !rejectedForStructure('Elettronica a 160 € oggi.', { previous: '180 € di shopping oggi: si fa notare.' }))
+
+  // 2. Domande consecutive.
+  const question = structuresToAvoid({ previous: 'Cena speciale o nuova abitudine?' })
+  check('frase precedente con domanda finale: frames contiene "question"', question?.frames.includes('question') && question.opening === 'cena speciale', JSON.stringify(question))
+  check('   un\'altra domanda finale è avvisata e rifiutata; una chiusura senza domanda passa', violates('Ristorante sopra il solito: pianificato?', question)
+    && rejectedForStructure('Ristorante sopra il solito: pianificato?', { previous: 'Cena speciale o nuova abitudine?' })
+    && !violates('Ristorante sopra il solito, il budget regge.', question)
+    && !rejectedForStructure('Ristorante sopra il solito, il budget regge.', { previous: 'Cena speciale o nuova abitudine?' }))
+
+  // 3. Nessuna frase precedente.
+  check('senza frase precedente né recenti: niente da evitare (null)', structuresToAvoid({}) === null && structuresToAvoid({ previous: null, history: [] }) === null && structuresToAvoid() === null)
+  const noPrevious = buildSpendyPrompt(sanitizeSpendyContext(withLocale('it')))
+  check('   e il prompt non ha il campo avoidStructures', !('avoidStructures' in noPrevious.input))
+  const onlyHistory = structuresToAvoid({ history: ['Bentornato, ristorante.'] })
+  check('senza precedente ma con un "ritorno" recente: solo "comeback", nessuna apertura', onlyHistory?.opening === null && same(onlyHistory.frames, ['comeback']))
+
+  // 4. Stessa logica del validatore: avvisata ⇔ rifiutata, su tutte le coppie.
+  const previousLines = [null, '180 € di shopping oggi: si fa notare.', 'Cena speciale o nuova abitudine?', 'Shopping: 180 € in un colpo.', 'Si vede che il budget sta bene.', 'Ecco il ristorante.', 'Wow, che giornata.', 'Bentornato, ristorante.']
+  const candidates = ['45 € di caffè al bar oggi.', 'Elettronica a 160 € oggi.', 'Pianificata o d\'impulso?', 'Elettronica: 160 € in un colpo.', 'Si vede che ti piace cucinare.', 'Ecco una spesa importante.', 'Wow, spesa grande.', 'Torna il ristorante.', 'Novità nel ciclo: una categoria mai vista.', 'Spesa grande oggi, il budget regge.']
+  const histories = [[], ['Bentornato, ristorante.'], ['Una novità nel ciclo.']]
+  const mismatches = []
+  for (const previous of previousLines) for (const history of histories) for (const text of candidates) {
+    const avoid = structuresToAvoid({ previous, history })
+    if (violates(text, avoid) !== rejectedForStructure(text, { previous, history })) mismatches.push(`${previous} | ${history.join('/')} | ${text}`)
+  }
+  check(`${previousLines.length * histories.length * candidates.length} combinazioni: avvisata ⇔ rifiutata dal validatore`, mismatches.length === 0, mismatches.slice(0, 3).join(' || '))
+
+  // 5. Il prompt reale porta gli schemi; il validatore non cambia.
+  const context = sanitizeSpendyContext(withLocale('it'))
+  const prompt = buildSpendyPrompt(context, { previous: '180 € di shopping oggi: si fa notare.', history: ['Cena speciale o nuova abitudine?'] })
+  check('prompt: input.avoidStructures = structuresToAvoid della stessa frase precedente', same(prompt.input.avoidStructures, structuresToAvoid({ previous: '180 € di shopping oggi: si fa notare.', history: ['Cena speciale o nuova abitudine?'] })))
+  check('   le istruzioni spiegano avoidStructures e i nomi degli schemi', prompt.system.includes('"avoidStructures"') && ['question', 'labelColon', 'comeback', 'novelty'].every((name) => prompt.system.includes(name)))
+  check('   validatore invariato: la stessa risposta è rifiutata con o senza avoidStructures nel prompt', !validateSpendyResponse(answer('45 € di caffè al bar oggi.'), context, { previous: '180 € di shopping oggi: si fa notare.' }).valid)
+
+  // 6. La funzione passa gli schemi al modello.
+  let received = null
+  const handler = createSpendyAIHandler({
+    aiPreference: async () => true, config: readConfig((name) => ENV[name]),
+    verifyUser: async () => ({ id: 'utente-a', emailConfirmed: true }),
+    callModel: async (args) => { received = args; return { text: JSON.stringify(answer(ANSWERS.it)), stopReason: 'end_turn', model: 'm' } },
+    quota: memoryQuota(), now: () => DAY1,
+  })
+  await handler(post({ context: withLocale('it'), previous: 'Cena speciale o nuova abitudine?' }))
+  check('server: il modello riceve avoidStructures calcolato dalla frase precedente', received?.input?.avoidStructures?.frames?.includes('question') && received.input.avoidStructures.opening === 'cena speciale')
 }
 
 section('Fase 2B — prompt: esempi inglesi con il simbolo davanti')
