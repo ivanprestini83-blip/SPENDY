@@ -16,7 +16,7 @@ import { check, section, report } from '../sync/testkit.mjs'
 import { createSpendyAIHandler, readConfig } from '../../supabase/functions/spendy-ai/handler.js'
 import {
   SPENDY_CURRENCIES, DEFAULT_SPENDY_CURRENCY, normalizeSpendyCurrency, sanitizeSpendyContext, buildSpendyPrompt,
-  validateSpendyResponse, currencyProblems, STYLE_EXAMPLES_BY_LOCALE, SPENDY_LOCALES,
+  validateSpendyResponse, currencyProblems, STYLE_EXAMPLES_BY_LOCALE, SPENDY_LOCALES, pickStyleExamples,
 } from '../../supabase/functions/_shared/spendyAIRules.js'
 import { validateAIResponse } from './spendyAIGuard.js'
 import { createRemoteProvider, functionsUrl } from './providers/remoteProvider.js'
@@ -121,8 +121,11 @@ for (const [locale, currency, symbol] of [['it', 'USD', '$'], ['en', 'EUR', '€
   check(`${locale} + ${currency}: sezione VALUTA con "${currency}" e simbolo ${symbol}`, prompt.system.includes(`context.currency = "${currency}"`) && prompt.system.includes(`simbolo ${symbol}`))
   check(`   ${locale} + ${currency}: lingua della risposta invariata (context.locale = "${locale}")`, prompt.system.includes(`context.locale = "${locale}"`))
   check(`   ${locale} + ${currency}: nessun altro simbolo in personalità ed esempi`, !others.some((s) => [prompt.system.split('VALUTA')[0], ...prompt.input.styleExamples].some((text) => text.includes(s))))
-  check(`   ${locale} + ${currency}: gli esempi sono quelli della lingua, con il simbolo nella stessa posizione`, prompt.input.styleExamples.length === STYLE_EXAMPLES_BY_LOCALE[locale].length
-    && prompt.input.styleExamples.every((example, i) => example === STYLE_EXAMPLES_BY_LOCALE[locale][i].replaceAll('€', symbol)))
+  // Fase 5A: gli esempi sono i 4 scelti a rotazione dalla raccolta della lingua.
+  const expected = pickStyleExamples(STYLE_EXAMPLES_BY_LOCALE[locale], prompt.input.context)
+  check(`   ${locale} + ${currency}: gli esempi sono quelli della lingua, con il simbolo nella stessa posizione`, prompt.input.styleExamples.length === expected.length && expected.length === 4
+    && prompt.input.styleExamples.every((example, i) => example === expected[i].replaceAll('€', symbol)))
+  check(`   ${locale} + ${currency}: tutta la raccolta, con il simbolo riscritto, non contiene altre valute`, STYLE_EXAMPLES_BY_LOCALE[locale].every((example) => !others.some((s) => example.replaceAll('€', symbol).includes(s))))
 }
 {
   const system = buildSpendyPrompt(sanitizeSpendyContext(context('it', 'USD'))).system

@@ -1066,7 +1066,9 @@ animation: gentle | playful | celebrate | concerned
 priority: 0-100, quanto è importante che l'utente legga questa frase.`
 
 // Pochi esempi di voce, non la libreria intera (HumorLibrary e reaction
-// library restano nell'app come fallback locale).
+// library restano nell'app come fallback locale). Ogni lingua ne ha 26;
+// in una richiesta ne vanno 4 (pickStyleExamples), a rotazione, solo tra
+// quelli adatti alla situazione (STYLE_EXAMPLE_FIT, stesso ordine).
 export const STYLE_EXAMPLES = [
   '150 € di shopping oggi: si fa notare. Il budget regge… ma quanto entusiasmo avevi?',
   'Il Giappone si avvicina. E questa volta non è merito dello shopping.',
@@ -1076,6 +1078,28 @@ export const STYLE_EXAMPLES = [
   'Le piccole spese non si notano una per una: si notano a fine ciclo.',
   'Hai speso meno del previsto. Mi sto emozionando.',
   'Oggi il portafoglio può dormire tranquillo.',
+  // Dal nono in poi (Fase 5A): senza numeri né simboli di valuta, per variare il
+  // tono senza toccare le regole sui numeri. Ne vanno 4 per richiesta, a rotazione.
+  'Il caffè al bar è diventato un rito, vedo. Bello, finché il rito non diventa un abbonamento.',
+  'Spesa al supermercato sotto controllo: qualcuno ha fatto la lista e l’ha pure rispettata.',
+  'Una categoria nuova nel ciclo: curiosità mia, è un regalo o un nuovo hobby?',
+  'Il ciclo è appena iniziato e il budget è ancora intatto. Godiamoci il momento.',
+  'Qualche piccola spesa di fila non fa una tempesta. Ma io l’ho vista. 👀',
+  'Ristoranti in calo rispetto al solito: la cucina di casa sta vincendo ai punti.',
+  'Ultimi giorni del ciclo: un po’ di calma adesso vale più di qualsiasi rinuncia dopo.',
+  'Il tuo obiettivo fa un passo avanti. Piccolo, ma è quello che conta.',
+  'Oggi niente spese. Il portafoglio ringrazia e io prendo appunti.',
+  'Trasporti più alti del solito: settimana movimentata o è solo una mia impressione?',
+  'Lo shopping si è preso una pausa. Non dirlo troppo forte, potrebbe sentirti.',
+  'Il budget regge bene: è il momento giusto per pensare all’obiettivo, non alle vetrine.',
+  'Le uscite di questi giorni si sentono, ma il ciclo è lungo: c’è spazio per riequilibrare.',
+  'Spesa sopra la tua media, budget ancora sereno. Diciamo che te la sei concessa.',
+  'Hai rallentato senza che te lo chiedessi. Mi piace questo ritmo.',
+  'Una spesa così fuori dal solito merita una domanda: era prevista o è stata un colpo di testa?',
+  // Due neutri in più (Fase 5A-ter): vanno bene anche a budget superato,
+  // senza approvare, giudicare o raccontare cose che i dati non dicono.
+  'Ogni spesa racconta qualcosa: io ascolto, senza giudicare.',
+  'Passo dopo passo: tu decidi le mosse, io tengo il conto.',
 ]
 
 // Gli stessi esempi di voce nelle altre lingue: il modello prende il tono
@@ -1091,6 +1115,24 @@ export const STYLE_EXAMPLES_BY_LOCALE = {
     'Small expenses don’t show one by one: they show at the end of the cycle.',
     'You spent less than expected. I’m getting emotional.',
     'Your wallet can sleep soundly today.',
+    'Coffee at the bar has become a ritual, I see. Lovely, as long as the ritual doesn’t turn into a subscription.',
+    'Groceries under control: someone made a list and actually stuck to it.',
+    'A new category this cycle: just curious, is it a gift or a new hobby?',
+    'The cycle has just started and the budget is still untouched. Let’s enjoy the moment.',
+    'A few small expenses in a row don’t make a storm. But I noticed them. 👀',
+    'Restaurants down compared to usual: home cooking is winning on points.',
+    'Last days of the cycle: a bit of calm now is worth more than any sacrifice later.',
+    'Your goal takes a step forward. Small, but that’s what counts.',
+    'No spending today. Your wallet says thanks and I’m taking notes.',
+    'Transport higher than usual: a busy week, or is it just me?',
+    'Shopping has taken a break. Don’t say it too loud, it might hear you.',
+    'The budget is holding up well: a good moment to think about your goal, not the shop windows.',
+    'These days’ outings show, but the cycle is long: there’s room to rebalance.',
+    'Above your average, budget still relaxed. Let’s call it a little treat.',
+    'You slowed down without me asking. I like this pace.',
+    'An expense this far from your usual deserves a question: was it planned or a spur-of-the-moment thing?',
+    'Every expense tells a story: I listen, without judging.',
+    'Step by step: you make the moves, I keep count.',
   ],
   es: [
     '150 € de compras hoy: se nota. El presupuesto aguanta… pero ¿cuánta ilusión tenías?',
@@ -1101,6 +1143,24 @@ export const STYLE_EXAMPLES_BY_LOCALE = {
     'Los gastos pequeños no se notan uno a uno: se notan al final del ciclo.',
     'Has gastado menos de lo previsto. Me estoy emocionando.',
     'Hoy la cartera puede dormir tranquila.',
+    'El café en el bar se ha vuelto un ritual, veo. Genial, mientras el ritual no se convierta en una suscripción.',
+    'Compra del súper bajo control: alguien hizo la lista y encima la respetó.',
+    'Una categoría nueva en el ciclo: por curiosidad, ¿es un regalo o una nueva afición?',
+    'El ciclo acaba de empezar y el presupuesto sigue intacto. Disfrutemos el momento.',
+    'Unos cuantos gastos pequeños seguidos no hacen una tormenta. Pero yo los he visto. 👀',
+    'Restaurantes a la baja respecto a lo habitual: la cocina de casa gana por puntos.',
+    'Últimos días del ciclo: un poco de calma ahora vale más que cualquier renuncia después.',
+    'Tu objetivo da un paso adelante. Pequeño, pero es lo que cuenta.',
+    'Hoy nada de gastos. La cartera lo agradece y yo tomo nota.',
+    'Transporte más alto de lo habitual: ¿semana movida o es solo impresión mía?',
+    'Las compras se han tomado un descanso. No lo digas muy alto, que te pueden oír.',
+    'El presupuesto aguanta bien: buen momento para pensar en tu objetivo, no en los escaparates.',
+    'Las salidas de estos días se notan, pero el ciclo es largo: hay margen para reequilibrar.',
+    'Por encima de tu media, presupuesto todavía tranquilo. Digamos que te lo has permitido.',
+    'Has frenado sin que te lo pidiera. Me gusta este ritmo.',
+    'Un gasto tan fuera de lo habitual merece una pregunta: ¿estaba previsto o fue un impulso?',
+    'Cada gasto cuenta algo: yo escucho, sin juzgar.',
+    'Paso a paso: tú decides los movimientos, yo llevo la cuenta.',
   ],
   fr: [
     '150 € de shopping aujourd’hui\u00a0: ça se remarque. Le budget tient bon… mais quel enthousiasme\u00a0!',
@@ -1111,6 +1171,24 @@ export const STYLE_EXAMPLES_BY_LOCALE = {
     'Les petites dépenses ne se voient pas une par une\u00a0: elles se voient en fin de cycle.',
     'Vous avez dépensé moins que prévu. Ça m’émeut.',
     'Aujourd’hui, le portefeuille peut dormir tranquille.',
+    'Le café au bar est devenu un rituel, je vois. Très bien, tant que le rituel ne devient pas un abonnement.',
+    'Courses sous contrôle\u00a0: quelqu’un a fait une liste et l’a même respectée.',
+    'Une nouvelle catégorie ce cycle\u00a0: simple curiosité, c’est un cadeau ou un nouveau passe-temps\u00a0?',
+    'Le cycle vient de commencer et le budget est encore intact. Profitons du moment.',
+    'Quelques petites dépenses d’affilée ne font pas une tempête. Mais je les ai vues. 👀',
+    'Restaurants en baisse par rapport à d’habitude\u00a0: la cuisine maison gagne aux points.',
+    'Derniers jours du cycle\u00a0: un peu de calme maintenant vaut mieux que n’importe quel sacrifice plus tard.',
+    'Votre objectif fait un pas en avant. Petit, mais c’est ce qui compte.',
+    'Aucune dépense aujourd’hui. Le portefeuille vous remercie et je prends des notes.',
+    'Transports plus élevés que d’habitude\u00a0: semaine chargée, ou c’est juste une impression\u00a0?',
+    'Le shopping fait une pause. Ne le dites pas trop fort, il pourrait vous entendre.',
+    'Le budget tient bien\u00a0: c’est le bon moment pour penser à votre objectif, pas aux vitrines.',
+    'Les sorties de ces derniers jours se sentent, mais le cycle est long\u00a0: il y a de la marge pour rééquilibrer.',
+    'Au-dessus de votre moyenne, budget encore serein. Disons que vous vous l’êtes accordé.',
+    'Vous avez ralenti sans que je vous le demande. J’aime ce rythme.',
+    'Une dépense aussi inhabituelle mérite une question\u00a0: c’était prévu ou un coup de tête\u00a0?',
+    'Chaque dépense raconte quelque chose\u00a0: j’écoute, sans juger.',
+    'Pas à pas\u00a0: vous décidez, je tiens les comptes.',
   ],
 }
 
@@ -1153,6 +1231,107 @@ export function spendyCurrencyInstructions(currency) {
 // "150 €" → "150 £"), così il modello vede esempi nella valuta giusta.
 const withCurrencySymbol = (text, currency) => text.replaceAll('€', SPENDY_CURRENCIES[normalizeSpendyCurrency(currency)])
 
+// Quanti esempi di stile vanno in una richiesta, e in quanti gruppi è divisa
+// la raccolta intera di ogni lingua (26 → 7 gruppi: gli esempi i, i+7, i+14, i+21).
+export const STYLE_EXAMPLES_PER_REQUEST = 4
+export const STYLE_EXAMPLE_GROUPS = Math.ceil(STYLE_EXAMPLES.length / STYLE_EXAMPLES_PER_REQUEST)
+
+const dayNumber = (dateStr) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(typeof dateStr === 'string' ? dateStr : '')
+  return match ? Math.floor(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])) / 86400000) : 0
+}
+const textSeed = (text) => [...(typeof text === 'string' ? text : '')].reduce((sum, char) => sum + char.codePointAt(0), 0)
+
+// Fase 5A-bis: in quali situazioni ogni esempio non contraddice i dati. Una
+// voce per posizione, valida per tutte e quattro le lingue (le raccolte sono
+// traduzioni nello stesso ordine). Campi assenti = va bene sempre.
+//   budget    calm (fascia ok) | tight (warning o high) | over (sforato o a zero)
+//   phase     early (EARLY_PHASES) | middle | late (LATE_PHASES)
+//   quietDay  true = dice che oggi non si è speso: escluso se spending.today > 0
+const CALM = 'calm', TIGHT = 'tight', OVER = 'over'
+export const STYLE_EXAMPLE_FIT = Object.freeze([
+  { budget: [CALM] }, //                                0 shopping, "il budget regge"
+  { budget: [CALM] }, //                                1 obiettivo più vicino
+  { budget: [CALM] }, //                                2 battuta sulla cena
+  { budget: [CALM, TIGHT] }, //                         3 forno di casa
+  { budget: [TIGHT], phase: ['middle'] }, //            4 "mancano 9 giorni… con calma"
+  {}, //                                                5 piccole spese
+  { budget: [CALM] }, //                                6 "meno del previsto"
+  { budget: [CALM], quietDay: true }, //                7 portafoglio tranquillo oggi
+  { budget: [CALM, TIGHT] }, //                         8 caffè al bar
+  { budget: [CALM, TIGHT] }, //                         9 spesa sotto controllo
+  {}, //                                               10 categoria nuova
+  { budget: [CALM], phase: ['early'] }, //             11 ciclo appena iniziato, budget intatto
+  { budget: [CALM, TIGHT] }, //                        12 piccole spese di fila
+  { budget: [CALM, TIGHT] }, //                        13 ristoranti in calo
+  { budget: [TIGHT, OVER], phase: ['late'] }, //       14 ultimi giorni, calma
+  { budget: [CALM, TIGHT] }, //                        15 obiettivo fa un passo avanti
+  { quietDay: true }, //                               16 oggi niente spese
+  {}, //                                               17 trasporti più alti
+  { budget: [CALM, TIGHT] }, //                        18 shopping in pausa
+  { budget: [CALM] }, //                               19 "il budget regge bene"
+  // 20 "il ciclo è lungo": non a fine ciclo; e non all'inizio, perché in francese
+  // "ces derniers jours" suona come "ultimi giorni" (contradictsCyclePhase).
+  { budget: [CALM, TIGHT], phase: ['middle'] },
+  { budget: [CALM] }, //                               21 "budget ancora sereno"
+  // 22 "hai rallentato… mi piace questo ritmo": approva, quindi mai a budget superato.
+  { budget: [CALM, TIGHT] },
+  {}, //                                               23 spesa fuori dal solito
+  {}, //                                               24 ogni spesa racconta qualcosa
+  {}, //                                               25 passo dopo passo
+])
+// Gli esempi neutri: adatti a qualunque budget, fase e giornata.
+export const NEUTRAL_STYLE_EXAMPLES = Object.freeze(STYLE_EXAMPLE_FIT.flatMap((fit, i) => (Object.keys(fit).length === 0 ? [i] : [])))
+
+// La situazione che conta per gli esempi, dai dati del contesto e dalle fasce
+// già esistenti (budgetCondition, fasi del ciclo). null = dato assente: su
+// quel punto non si esclude nulla.
+export function styleSituation(context) {
+  const budget = context?.budget && typeof context.budget === 'object' ? context.budget : null
+  const condition = budget ? budgetCondition(context) : null
+  const phase = budget?.cyclePhase
+  const today = context?.spending?.today
+  return {
+    budget: !budget ? null
+      : condition === 'over' || condition === 'exhausted' ? OVER
+        : budget.band === 'warning' || budget.band === 'high' ? TIGHT
+          : budget.band === 'ok' ? CALM : null,
+    phase: EARLY_PHASES.includes(phase) ? 'early' : LATE_PHASES.includes(phase) ? 'late' : CYCLE_PHASES.includes(phase) ? 'middle' : null,
+    spentToday: typeof today === 'number' && Number.isFinite(today) ? today : null,
+  }
+}
+
+export function styleExampleFits(fit, situation) {
+  return (!fit?.budget || !situation?.budget || fit.budget.includes(situation.budget))
+    && (!fit?.phase || !situation?.phase || fit.phase.includes(situation.phase))
+    && (!fit?.quietDay || !(situation?.spentToday > 0))
+}
+
+// Gli esempi di stile di UNA richiesta. Prima si tengono solo quelli che non
+// contraddicono budget, fase del ciclo e spese di oggi (STYLE_EXAMPLE_FIT);
+// se fossero meno di 4 si completano con quelli neutri. Poi la rotazione:
+// la raccolta adatta è messa in un ordine a gruppi (gli esempi i, i+G, i+2G…)
+// e ogni giorno si prendono i 4 successivi a quelli del giorno prima; il punto
+// di partenza lo scelgono il giorno (context.today) e l'evento principale.
+// Deterministico (stesso contesto → stessi esempi), mai casuale; con almeno 8
+// esempi adatti due giorni di fila non condividono esempi, e in
+// ceil(adatti / 4) giorni si usa tutta la raccolta adatta (26 → 7 giorni).
+// Con 24 esempi la scelta è identica a quella della Fase 5A. Usa solo campi
+// che il contesto ha già.
+export function pickStyleExamples(pool, context) {
+  if (!Array.isArray(pool) || pool.length === 0) return []
+  const tagged = pool.length === STYLE_EXAMPLE_FIT.length
+  const situation = styleSituation(context)
+  const usable = pool.map((_, i) => i).filter((i) => !tagged || styleExampleFits(STYLE_EXAMPLE_FIT[i], situation))
+  if (tagged && usable.length < STYLE_EXAMPLES_PER_REQUEST) usable.push(...NEUTRAL_STYLE_EXAMPLES.filter((i) => !usable.includes(i)))
+  const groups = Math.max(1, Math.ceil(usable.length / STYLE_EXAMPLES_PER_REQUEST))
+  const order = []
+  for (let g = 0; g < groups; g += 1) for (let i = g; i < usable.length; i += groups) order.push(usable[i])
+  const start = ((dayNumber(context?.today) + textSeed(context?.primaryEvent?.id)) * STYLE_EXAMPLES_PER_REQUEST) % order.length
+  const count = Math.min(STYLE_EXAMPLES_PER_REQUEST, order.length)
+  return Array.from({ length: count }, (_, k) => pool[order[(start + k) % order.length]])
+}
+
 // JSON Schema della risposta (per gli output strutturati del modello).
 export const SPENDY_RESPONSE_SCHEMA = {
   type: 'object',
@@ -1172,7 +1351,7 @@ export const SPENDY_RESPONSE_SCHEMA = {
 export function buildSpendyPrompt(context, { previous = null, history = [], styleExamples } = {}) {
   const locale = normalizeSpendyLocale(context?.locale)
   const currency = normalizeSpendyCurrency(context?.currency)
-  const examples = styleExamples ?? STYLE_EXAMPLES_BY_LOCALE[locale].map((example) => withCurrencySymbol(example, currency))
+  const examples = styleExamples ?? pickStyleExamples(STYLE_EXAMPLES_BY_LOCALE[locale], context).map((example) => withCurrencySymbol(example, currency))
   return {
     system: `${withCurrencySymbol(SPENDY_PERSONALITY, currency)}\n\n${spendyLanguageInstructions(locale)}\n\n${spendyCurrencyInstructions(currency)}`,
     input: {

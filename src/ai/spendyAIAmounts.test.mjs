@@ -19,7 +19,7 @@
 import { check, section, report } from '../sync/testkit.mjs'
 import {
   validateSpendyResponse, sanitizeSpendyContext, buildSpendyPrompt, extractNumbers, allowedNumbers, authorizedNumbers,
-  readNumbers, numberWordProblems, numberProblems, currencyProblems, SPENDY_LOCALES,
+  readNumbers, numberWordProblems, numberProblems, currencyProblems, SPENDY_LOCALES, STYLE_EXAMPLES_BY_LOCALE,
 } from '../../supabase/functions/_shared/spendyAIRules.js'
 import { createSpendyAIHandler, readConfig, logErrorCodes, INVALID_RESPONSE } from '../../supabase/functions/spendy-ai/handler.js'
 import { validateAIResponse } from './spendyAIGuard.js'
@@ -327,7 +327,8 @@ section('Ingressi vuoti, nulli e malformati: mai un\'eccezione, sempre un rifiut
   check('contesto nullo: qualunque importo è inventato', errorsOf('Hai speso 150 €.', null).includes('invented_numbers:150'))
   check('numberProblems e readNumbers tollerano testo nullo', same(numberProblems(null, okContext()), []) && same(readNumbers(undefined, 'it'), []))
   check('numeri enormi: rifiutati come inventati', errorsOf(`Hai speso ${'9'.repeat(30)} € oggi.`, okContext()).some((e) => e.startsWith('invented_numbers')))
-  check('tutti gli esempi di stile del prompt: nessun numero in lettere, nessun numero fuori grammatica', SPENDY_LOCALES.every((locale) => buildSpendyPrompt(okContext(locale)).input.styleExamples.every((example) => numberWordProblems(example).length === 0 && !extractNumbers(example, locale).some(Number.isNaN))))
+  // Fase 5A: il prompt ne porta 4 a rotazione; il controllo copre tutta la raccolta di ogni lingua.
+  check('tutti gli esempi di stile (raccolta intera e quelli del prompt): nessun numero in lettere, nessun numero fuori grammatica', SPENDY_LOCALES.every((locale) => [...STYLE_EXAMPLES_BY_LOCALE[locale], ...buildSpendyPrompt(okContext(locale)).input.styleExamples].every((example) => numberWordProblems(example).length === 0 && !extractNumbers(example, locale).some(Number.isNaN))))
 }
 
 report('Spendy AI — importi e guard (Fase 2B.1)')

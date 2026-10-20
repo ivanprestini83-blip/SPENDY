@@ -27,6 +27,8 @@ import {
   SPENDY_LOCALES, DEFAULT_SPENDY_LOCALE, normalizeSpendyLocale, sanitizeSpendyContext, buildSpendyPrompt,
   STYLE_EXAMPLES, STYLE_EXAMPLES_BY_LOCALE, SPENDY_PERSONALITY, validateSpendyResponse, passesToneRules, contradictsCyclePhase,
   extractNumbers, allowedNumbers, authorizedNumbers, numberProblems,
+  pickStyleExamples, STYLE_EXAMPLES_PER_REQUEST, STYLE_EXAMPLE_GROUPS, hasStaleStructure, numberWordProblems,
+  STYLE_EXAMPLE_FIT, NEUTRAL_STYLE_EXAMPLES, styleSituation, styleExampleFits,
 } from '../../supabase/functions/_shared/spendyAIRules.js'
 import { validateAIResponse } from './spendyAIGuard.js'
 import { createSpendyAI } from './spendyAI.js'
@@ -142,7 +144,10 @@ for (const locale of SPENDY_LOCALES) {
   check(`${locale}: il prompt chiede di rispondere esclusivamente in ${LANGUAGE_WORD[locale]}`,
     prompt.system.includes(`Rispondi esclusivamente in ${LANGUAGE_WORD[locale]}`) && localeOfPrompt(prompt.system) === locale)
   check(`${locale}: personalità e regole di sempre (stesso testo di base)`, prompt.system.startsWith(SPENDY_PERSONALITY))
-  check(`${locale}: esempi di stile nella stessa lingua`, JSON.stringify(prompt.input.styleExamples) === JSON.stringify(STYLE_EXAMPLES_BY_LOCALE[locale]))
+  // Fase 5A: non più tutti gli esempi, ma i 4 scelti a rotazione dalla raccolta della lingua.
+  check(`${locale}: esempi di stile nella stessa lingua (4 a rotazione dalla raccolta)`, prompt.input.styleExamples.length === STYLE_EXAMPLES_PER_REQUEST
+    && JSON.stringify(prompt.input.styleExamples) === JSON.stringify(pickStyleExamples(STYLE_EXAMPLES_BY_LOCALE[locale], prompt.input.context))
+    && prompt.input.styleExamples.every((example) => STYLE_EXAMPLES_BY_LOCALE[locale].includes(example)))
   check(`${locale}: il contesto passato al modello dice la lingua`, prompt.input.context.locale === locale)
 }
 check('esempi: stesse dimensioni in ogni lingua, nessuna lingua con gli esempi italiani', SPENDY_LOCALES.every((l) => STYLE_EXAMPLES_BY_LOCALE[l].length === STYLE_EXAMPLES.length)
@@ -590,5 +595,119 @@ check('   nessun esempio inglese con "€" dopo il numero', STYLE_EXAMPLES_BY_LO
 check('italiano, spagnolo e francese: "150 €" davanti; nessun esempio dice con un importo quanto resta', ['it', 'es', 'fr'].every((locale) => STYLE_EXAMPLES_BY_LOCALE[locale][0].startsWith('150 €') && !STYLE_EXAMPLES_BY_LOCALE[locale].some((example) => example.includes('120 €'))))
 check('   ogni esempio di stile passa il guard come risposta (contesto con 150 € di spesa oggi)', SPENDY_LOCALES.every((locale) => STYLE_EXAMPLES_BY_LOCALE[locale].every((example) => numberProblems(example, { ...amountsContext(locale), spending: { today: 150 } }).length === 0)))
 check('gli esempi passano il proprio guard di lingua (numeri ben scritti)', SPENDY_LOCALES.every((locale) => STYLE_EXAMPLES_BY_LOCALE[locale].every((example) => !extractNumbers(example, locale).some(Number.isNaN))))
+
+section('Fase 5A — esempi di stile a rotazione')
+{
+  const ctx = (today, eventId = 'big_expense', locale = 'it') => ({ locale, today, primaryEvent: eventId ? { id: eventId } : undefined })
+  const nextDay = (day, n) => new Date(Date.UTC(2026, 9, day + n)).toISOString().slice(0, 10)
+  check('ogni lingua: 26 esempi, tutti diversi', SPENDY_LOCALES.every((l) => STYLE_EXAMPLES_BY_LOCALE[l].length === 26 && new Set(STYLE_EXAMPLES_BY_LOCALE[l]).size === 26))
+  check('   gli 8 esempi di sempre restano i primi, nello stesso ordine', STYLE_EXAMPLES.slice(0, 8)[0].startsWith('150 €') && STYLE_EXAMPLES[7] === 'Oggi il portafoglio può dormire tranquillo.')
+  check('   tutti rispettano tono e lunghezza (anche l\'italiano)', SPENDY_LOCALES.every((l) => STYLE_EXAMPLES_BY_LOCALE[l].every((e) => passesToneRules(e) && e.length <= 220)))
+  check('   nessuno racconta una categoria "tornata" e nessuno ha numeri in lettere', SPENDY_LOCALES.every((l) => STYLE_EXAMPLES_BY_LOCALE[l].every((e) => !hasStaleStructure(e) && numberWordProblems(e).length === 0)))
+  check('   i 18 nuovi: nessun numero e nessun simbolo di valuta', SPENDY_LOCALES.every((l) => STYLE_EXAMPLES_BY_LOCALE[l].slice(8).every((e) => extractNumbers(e, l).length === 0 && !/[€$£]/.test(e))))
+  check('   nessuna lingua usa gli esempi italiani', ['en', 'es', 'fr'].every((l) => STYLE_EXAMPLES_BY_LOCALE[l].every((e) => !STYLE_EXAMPLES.includes(e))))
+  for (const locale of SPENDY_LOCALES) {
+    const pool = STYLE_EXAMPLES_BY_LOCALE[locale]
+    const a = pickStyleExamples(pool, ctx('2026-10-20', 'big_expense', locale))
+    check(`${locale}: 4 esempi per richiesta, sempre gli stessi per lo stesso giorno ed evento`, a.length === STYLE_EXAMPLES_PER_REQUEST && JSON.stringify(a) === JSON.stringify(pickStyleExamples(pool, ctx('2026-10-20', 'big_expense', locale))))
+    const week = Array.from({ length: STYLE_EXAMPLE_GROUPS }, (_, n) => pickStyleExamples(pool, ctx(nextDay(20, n), 'big_expense', locale)))
+    check(`   ${locale}: due giorni di fila non condividono esempi`, week.every((set, n) => n === 0 || set.every((e) => !week[n - 1].includes(e))))
+    // 7 giorni × 4 = 28 posti per 26 esempi: tutti usati, solo 2 tornano una seconda volta.
+    check(`   ${locale}: in ${STYLE_EXAMPLE_GROUPS} giorni lo stesso evento usa tutta la raccolta`, new Set(week.flat()).size === pool.length && week.flat().length - pool.length === STYLE_EXAMPLE_GROUPS * STYLE_EXAMPLES_PER_REQUEST - pool.length)
+  }
+  const events = ['big_expense', 'goal_reached', 'budget_near_limit', 'category_above_usual', 'savings_above_usual', 'small_expenses_add_up']
+  const sameDay = events.map((id) => pickStyleExamples(STYLE_EXAMPLES, ctx('2026-10-20', id)).join('|'))
+  check('stesso giorno, eventi diversi: esempi che variano (più gruppi diversi)', new Set(sameDay).size >= 3, new Set(sameDay).size)
+  check('senza data o senza evento: comunque 4 esempi validi, nessun errore', pickStyleExamples(STYLE_EXAMPLES, {}).length === 4 && pickStyleExamples(STYLE_EXAMPLES, null).length === 4
+    && pickStyleExamples(STYLE_EXAMPLES, { today: 'non-una-data' }).every((e) => STYLE_EXAMPLES.includes(e)))
+  check('raccolta vuota o assente → nessun esempio, nessun errore', pickStyleExamples([], ctx('2026-10-20')).length === 0 && pickStyleExamples(undefined, ctx('2026-10-20')).length === 0)
+  check('esempi passati esplicitamente: hanno ancora la precedenza sulla rotazione', buildSpendyPrompt(ctx('2026-10-20'), { styleExamples: ['x', 'y'] }).input.styleExamples.join() === 'x,y')
+  // Meno testo nel prompt: 4 esempi invece di 8 (misura in caratteri, non in token).
+  const before8 = STYLE_EXAMPLES.slice(0, 8).join('').length
+  const picked = Math.max(...Array.from({ length: STYLE_EXAMPLE_GROUPS }, (_, n) => pickStyleExamples(STYLE_EXAMPLES, ctx(nextDay(20, n))).join('').length))
+  check(`esempi nel prompt più corti di prima (massimo ${picked} caratteri contro ${before8})`, picked < before8)
+}
+
+section('Fase 5A-bis — esempi coerenti con budget e fase del ciclo')
+{
+  const BUDGETS = { tranquillo: { band: 'ok', available: 900 }, 'in avviso': { band: 'warning', available: 300 }, superato: { band: 'exceeded', available: -50 } }
+  const PHASES = { inizio: 'start', metà: 'mid', fine: 'final_days' }
+  const days = Array.from({ length: 6 }, (_, n) => new Date(Date.UTC(2026, 9, 20 + n)).toISOString().slice(0, 10))
+  const situationCtx = (budget, cyclePhase, { today = days[0], eventId = 'big_expense', locale = 'it', spentToday = 0 } = {}) =>
+    ({ locale, today, primaryEvent: { id: eventId }, budget: { ...budget, cyclePhase }, spending: { today: spentToday } })
+  const indexOf = (locale, example) => STYLE_EXAMPLES_BY_LOCALE[locale].indexOf(example)
+  const pickedIndexes = (budget, phase, opts = {}) => {
+    const locale = opts.locale ?? 'it'
+    return days.flatMap((today) => pickStyleExamples(STYLE_EXAMPLES_BY_LOCALE[locale], situationCtx(budget, phase, { ...opts, today })).map((e) => indexOf(locale, e)))
+  }
+
+  check('una classificazione per ognuno dei 26 esempi, valida per le quattro lingue', STYLE_EXAMPLE_FIT.length === 26 && SPENDY_LOCALES.every((l) => STYLE_EXAMPLES_BY_LOCALE[l].length === STYLE_EXAMPLE_FIT.length))
+  check(`esempi neutri (${NEUTRAL_STYLE_EXAMPLES.join(', ')}): almeno 4, senza numeri né valuta`, NEUTRAL_STYLE_EXAMPLES.length >= STYLE_EXAMPLES_PER_REQUEST
+    && SPENDY_LOCALES.every((l) => NEUTRAL_STYLE_EXAMPLES.every((i) => extractNumbers(STYLE_EXAMPLES_BY_LOCALE[l][i], l).length === 0 && !/[€$£]/.test(STYLE_EXAMPLES_BY_LOCALE[l][i]))))
+  check('situazione letta dal contesto: fascia ok → tranquillo, warning/high → in avviso, sforato o a zero → superato',
+    styleSituation(situationCtx(BUDGETS.tranquillo, 'mid')).budget === 'calm' && styleSituation(situationCtx(BUDGETS['in avviso'], 'mid')).budget === 'tight'
+    && styleSituation(situationCtx({ band: 'high', available: 100 }, 'mid')).budget === 'tight' && styleSituation(situationCtx(BUDGETS.superato, 'mid')).budget === 'over'
+    && styleSituation(situationCtx({ band: 'ok', available: -1 }, 'mid')).budget === 'over' && styleSituation(situationCtx({ band: 'warning', available: 0 }, 'mid')).budget === 'over')
+  check('   fasi: inizio → early, metà → middle, fine → late; dati assenti → nessun filtro',
+    styleSituation(situationCtx(BUDGETS.tranquillo, 'start')).phase === 'early' && styleSituation(situationCtx(BUDGETS.tranquillo, 'mid')).phase === 'middle'
+    && styleSituation(situationCtx(BUDGETS.tranquillo, 'final_days')).phase === 'late' && JSON.stringify(styleSituation({})) === JSON.stringify({ budget: null, phase: null, spentToday: null }))
+
+  for (const [budgetName, budget] of Object.entries(BUDGETS)) {
+    for (const [phaseName, phase] of Object.entries(PHASES)) {
+      for (const locale of SPENDY_LOCALES) {
+        const sets = days.map((today) => pickStyleExamples(STYLE_EXAMPLES_BY_LOCALE[locale], situationCtx(budget, phase, { today, locale, spentToday: 20 })))
+        const situation = styleSituation(situationCtx(budget, phase, { spentToday: 20 }))
+        const all = sets.flat()
+        check(`budget ${budgetName}, ${phaseName} ciclo, ${locale}: 4 esempi diversi, tutti adatti, nessuno contraddice la fase`,
+          sets.every((set) => set.length === STYLE_EXAMPLES_PER_REQUEST && new Set(set).size === set.length)
+          && all.every((e) => styleExampleFits(STYLE_EXAMPLE_FIT[indexOf(locale, e)], situation) && !contradictsCyclePhase(e, phase)),
+          all.filter((e) => !styleExampleFits(STYLE_EXAMPLE_FIT[indexOf(locale, e)], situation) || contradictsCyclePhase(e, phase)).join(' | '))
+      }
+      const week = pickedIndexes(budget, phase, { spentToday: 20 })
+      const usable = STYLE_EXAMPLE_FIT.map((_, i) => i).filter((i) => styleExampleFits(STYLE_EXAMPLE_FIT[i], styleSituation(situationCtx(budget, phase, { spentToday: 20 }))))
+      check(`   budget ${budgetName}, ${phaseName} ciclo: la rotazione continua (${usable.length} adatti, tutti usati in 6 giorni), stesso contesto → stessi esempi`,
+        new Set(week).size === usable.length && JSON.stringify(pickedIndexes(budget, phase, { spentToday: 20 })) === JSON.stringify(week)
+        && new Set(days.map((today) => pickStyleExamples(STYLE_EXAMPLES, situationCtx(budget, phase, { today, spentToday: 20 })).join('|'))).size > 1)
+    }
+  }
+
+  // I dati che gli esempi non devono contraddire.
+  const REASSURING = [0, 6, 7, 19, 21] // "il budget regge", "meno del previsto", "sereno"…
+  const overWeek = Object.values(PHASES).flatMap((phase) => pickedIndexes(BUDGETS.superato, phase))
+  check('budget superato: mai "Hai rallentato… mi piace questo ritmo" (approva), in nessuna lingua né fase',
+    SPENDY_LOCALES.every((l) => Object.values(PHASES).every((p) => [0, 20].every((spentToday) => !pickedIndexes(BUDGETS.superato, p, { locale: l, spentToday }).includes(22)))))
+  check('   con budget tranquillo o in avviso può ancora esserci', [BUDGETS.tranquillo, BUDGETS['in avviso']].every((b) => Object.values(PHASES).some((p) => pickedIndexes(b, p).includes(22))))
+  check('budget superato: usati anche i due neutri nuovi ("ogni spesa racconta qualcosa", "passo dopo passo")', [24, 25].every((i) => overWeek.includes(i))
+    && [24, 25].every((i) => NEUTRAL_STYLE_EXAMPLES.includes(i)) && !NEUTRAL_STYLE_EXAMPLES.includes(22))
+  check('budget superato: nessun esempio rassicurante, nessuna battuta sulla spesa, nessun importo o simbolo di valuta',
+    overWeek.every((i) => !REASSURING.includes(i) && i !== 2 && i !== 22)
+    && SPENDY_LOCALES.every((l) => Object.values(PHASES).every((phase) => days.every((today) => pickStyleExamples(STYLE_EXAMPLES_BY_LOCALE[l], situationCtx(BUDGETS.superato, phase, { today, locale: l }))
+      .every((e) => extractNumbers(e, l).length === 0 && !/[€$£]/.test(e))))))
+  const tightWeek = Object.values(PHASES).flatMap((phase) => pickedIndexes(BUDGETS['in avviso'], phase))
+  check('budget in avviso: niente "budget sereno" o "regge bene", niente battute sulla spesa', tightWeek.every((i) => !REASSURING.includes(i) && i !== 2))
+  const calmWeek = Object.values(PHASES).flatMap((phase) => pickedIndexes(BUDGETS.tranquillo, phase))
+  check('budget tranquillo: niente inviti alla calma da fine budget ("ultimi giorni… calma", "mancano 9 giorni")', calmWeek.every((i) => i !== 14 && i !== 4))
+  check('   ma con il budget tranquillo restano anche gli esempi ironici e rassicuranti', calmWeek.some((i) => REASSURING.includes(i)) && calmWeek.includes(2))
+  check('inizio ciclo: niente "ultimi giorni" né "mancano 9 giorni"; c\'è "il ciclo è appena iniziato"',
+    Object.values(BUDGETS).flatMap((b) => pickedIndexes(b, 'start')).every((i) => i !== 14 && i !== 4 && i !== 20) && pickedIndexes(BUDGETS.tranquillo, 'start').includes(11))
+  check('metà ciclo: niente "appena iniziato" né "ultimi giorni"', Object.values(BUDGETS).flatMap((b) => pickedIndexes(b, 'mid')).every((i) => i !== 11 && i !== 14))
+  check('fine ciclo: niente "appena iniziato" né "il ciclo è lungo"; con il budget superato c\'è "ultimi giorni… calma"',
+    Object.values(BUDGETS).flatMap((b) => pickedIndexes(b, 'final_days')).every((i) => i !== 11 && i !== 20 && i !== 4) && pickedIndexes(BUDGETS.superato, 'final_days').includes(14))
+  check('spese oggi: niente "oggi niente spese" né "portafoglio tranquillo oggi"; senza spese oggi possono esserci',
+    Object.values(BUDGETS).flatMap((b) => Object.values(PHASES).flatMap((p) => pickedIndexes(b, p, { spentToday: 35 }))).every((i) => i !== 7 && i !== 16)
+    && pickedIndexes(BUDGETS.tranquillo, 'mid', { spentToday: 0 }).some((i) => i === 7 || i === 16))
+  check('budget superato a inizio ciclo con spese oggi: nessun esempio specifico adatto → solo esempi neutri',
+    new Set(pickedIndexes(BUDGETS.superato, 'start', { spentToday: 20 })).size === NEUTRAL_STYLE_EXAMPLES.length
+    && pickedIndexes(BUDGETS.superato, 'start', { spentToday: 20 }).every((i) => NEUTRAL_STYLE_EXAMPLES.includes(i)))
+  check('stessa situazione (in avviso, metà ciclo), eventi diversi: esempi che variano', new Set(['big_expense', 'budget_near_limit', 'category_above_usual', 'small_expenses_add_up', 'goal_at_risk']
+    .map((eventId) => pickStyleExamples(STYLE_EXAMPLES, situationCtx(BUDGETS['in avviso'], 'mid', { eventId })).join('|'))).size > 1)
+  {
+    const over = sanitizeSpendyContext({ ...baseContext, currency: 'USD', budget: { ...baseContext.budget, band: 'exceeded', available: -50, cyclePhase: 'final_days', dayOfCycle: 29, cycleDays: 30 } })
+    const sent = buildSpendyPrompt(over).input.styleExamples
+    const situation = styleSituation(over)
+    check('prompt vero (contesto ripulito, budget superato, dollari): gli esempi inviati sono tutti adatti', situation.budget === 'over' && situation.phase === 'late'
+      && sent.length === STYLE_EXAMPLES_PER_REQUEST && sent.every((e) => styleExampleFits(STYLE_EXAMPLE_FIT[indexOf('it', e)], situation) && !contradictsCyclePhase(e, 'final_days')), sent.join(' | '))
+  }
+}
 
 report('Spendy AI multilingua — Fase 4B-3')
