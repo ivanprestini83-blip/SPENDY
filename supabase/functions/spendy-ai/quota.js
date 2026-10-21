@@ -1,6 +1,6 @@
-// Quota giornaliera di Spendy AI, lato server.
+// Quota di Spendy AI, lato server.
 //
-// Il limite dell'app (3 al giorno in localStorage) è solo un primo filtro:
+// Il limite dell'app (1 al giorno in localStorage) è solo un primo filtro:
 // chiunque abbia un account potrebbe chiamare la funzione direttamente.
 // Questo è il limite che protegge davvero il costo del modello.
 //
@@ -24,30 +24,36 @@
 // sempre quello verificato dal token, mai un valore del corpo.
 
 // Limiti predefiniti. Non sono scolpiti nella funzione: readConfig (handler.js)
-// li legge dai secret AI_DAILY_LIMIT, AI_MONTHLY_LIMIT e AI_GLOBAL_DAILY_LIMIT
+// li legge dai secret AI_DAILY_LIMIT, AI_CYCLE_LIMIT e AI_GLOBAL_DAILY_LIMIT
 // e usa questi valori solo se mancano o non sono numeri positivi.
 //   daily    chiamate al giorno per utente (giornata UTC)
-//   monthly  chiamate al mese per utente (mese di calendario UTC)
+//   cycle    chiamate per ciclo di budget personale (profiles.cycle_start_day,
+//            periodo ancorato sul server: vedi spendy_ai_reserve_v3 in
+//            supabase/ai_usage.sql — cambiare il giorno di inizio non rinnova
+//            il plafond del ciclo in corso)
 //   global   chiamate al giorno di TUTTI gli utenti insieme: una valvola di
 //            sicurezza contro costi imprevisti, NON un budget. Il valore
 //            predefinito è volutamente basso e prudente (circa 100 utenti al
 //            massimo giornaliero): chi gestisce il progetto lo alza o lo
 //            abbassa con il secret quando conosce il costo reale per chiamata.
-export const AI_DAILY_LIMIT = 3
-export const AI_MONTHLY_LIMIT = 30
+export const AI_DAILY_LIMIT = 1
+export const AI_CYCLE_LIMIT = 30
 export const AI_GLOBAL_DAILY_LIMIT = 300
 
 // Il codice che l'app riceve (HTTP 429) per ciascun limite.
 export const AI_DAILY_LIMIT_REACHED = 'AI_DAILY_LIMIT_REACHED'
-export const AI_MONTHLY_LIMIT_REACHED = 'AI_MONTHLY_LIMIT_REACHED'
+export const AI_CYCLE_LIMIT_REACHED = 'AI_CYCLE_LIMIT_REACHED'
 export const AI_GLOBAL_LIMIT_REACHED = 'AI_GLOBAL_LIMIT_REACHED'
 
-// Il motivo del rifiuto, com'è restituito da spendy_ai_reserve_v2, e come lo
-// raccontano risposta e log.
+// Il motivo del rifiuto, com'è restituito da spendy_ai_reserve_v3, e come lo
+// raccontano risposta e log. 'cycle_unavailable': il ciclo dell'utente non si
+// può verificare (nessuna riga in profiles) → 503, nessun limite di riserva
+// più permissivo, nessuna chiamata al modello.
 export const QUOTA_REASONS = {
-  daily: { error: AI_DAILY_LIMIT_REACHED, outcome: 'daily_limit' },
-  monthly: { error: AI_MONTHLY_LIMIT_REACHED, outcome: 'monthly_limit' },
-  global: { error: AI_GLOBAL_LIMIT_REACHED, outcome: 'global_limit' },
+  daily: { error: AI_DAILY_LIMIT_REACHED, outcome: 'daily_limit', status: 429 },
+  cycle: { error: AI_CYCLE_LIMIT_REACHED, outcome: 'cycle_limit', status: 429 },
+  global: { error: AI_GLOBAL_LIMIT_REACHED, outcome: 'global_limit', status: 429 },
+  cycle_unavailable: { error: 'cycle_unavailable', outcome: 'cycle_unavailable', status: 503 },
 }
 
 // Giornata = data UTC ("2026-09-29"). Vedi supabase/ai_usage.sql.
@@ -91,7 +97,7 @@ export function createUserTagger(secret, subtle = globalThis.crypto?.subtle) {
 // → { reserve({ userId, day, limits }) → { allowed, reason, ... },
 //     release({ userId, day }),
 //     recordUsage({ userId, day, model, inputTokens, outputTokens }) }
-//   limits = { daily, monthly, global }
+//   limits = { daily, cycle, global }
 // reserve e release lanciano se il database non risponde: chi chiama deve
 // rifiutare la richiesta AI (fail closed), non lasciarla passare senza quota.
 // recordUsage invece è solo misura: chi chiama non deve mai farne dipendere
@@ -119,24 +125,24 @@ export function createSupabaseQuota({ supabaseUrl, serviceKey, fetchImpl = fetch
 
   return {
     async reserve({ userId, day, limits }) {
-      const rows = await rpc('spendy_ai_reserve_v2', {
+      const rows = await rpc('spendy_ai_reserve_v3', {
         p_user_id: userId,
         p_usage_date: day,
         p_daily_limit: limits.daily,
-        p_monthly_limit: limits.monthly,
+        p_cycle_limit: limits.cycle,
         p_global_daily_limit: limits.global,
       })
       const row = Array.isArray(rows) ? rows[0] : rows
       if (!row || typeof row.allowed !== 'boolean') throw new Error('quota_bad_response')
       if (row.allowed) return { allowed: true, reason: null, used: Number(row.daily_used ?? 0) }
       // Un rifiuto resta un rifiuto anche se il motivo non è riconosciuto.
-      // monthlyUsed e globalUsed servono solo alla diagnostica nei log
+      // cycleUsed e globalUsed servono solo alla diagnostica nei log
       // (handler.js): null se la risposta non li porta.
       return {
         allowed: false,
         reason: Object.hasOwn(QUOTA_REASONS, row.reason) ? row.reason : 'daily',
         used: Number(row.daily_used ?? 0),
-        monthlyUsed: countOrNull(row.monthly_used),
+        cycleUsed: countOrNull(row.cycle_used),
         globalUsed: countOrNull(row.global_used),
       }
     },

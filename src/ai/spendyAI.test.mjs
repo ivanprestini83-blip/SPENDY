@@ -362,9 +362,14 @@ section('15. Cache')
   check('un caffè: stessa impronta', coffee.meta.fingerprint === first.meta.fingerprint)
   check('   nessuna frase AI nuova (nessuna chiamata)', coffee.first.reason === 'stale_facts' && calls() === 1, coffee.first.reason)
   check('   e niente frase AI con i numeri di prima: frase locale', coffee.voice.source === 'local')
-  // ...una spesa grossa sì.
-  const big = await runHome({
+  // ...una spesa grossa sì, ma con 1 chiamata al giorno solo se quella di
+  // oggi non è già stata usata (qui: la chiamata in cache è di ieri).
+  const bigSameDay = await runHome({
     ai, monthlyBudget: 2000, cache: first.cache, expenses: [expense(TODAY, 700, 'shopping'), ...categoryRise()],
+  })
+  check('una spesa grossa lo stesso giorno della chiamata: limite di 1 al giorno', bigSameDay.first.reason === 'daily_limit' && calls() === 1, bigSameDay.first.reason)
+  const big = await runHome({
+    ai, monthlyBudget: 2000, cache: { ...first.cache, calls: { ...first.cache.calls, day: '2026-09-19' } }, expenses: [expense(TODAY, 700, 'shopping'), ...categoryRise()],
   })
   check('una spesa grossa sì', big.first.action === 'ai' && big.events[0].id === SPENDY_EVENTS.BIG_EXPENSE)
 
@@ -431,9 +436,11 @@ section('Cache: mai una frase AI con numeri non aggiornati')
   const otherSituation = { ...base.cache, current: { ...base.cache.current, fingerprint: 'situazione-precedente' } }
   const cooldown = await runHome({ ai, monthlyBudget: 2000, cache: otherSituation, expenses: [...categoryRise(), expense('2026-09-14', 3, 'bar')] })
   check('cooldown dello stesso evento: ancora attivo', cooldown.first.reason === 'event_recently_shown' && calls() === 1, cooldown.first.reason)
-  const capped = { ...emptyVoiceCache(), calls: { day: TODAY, count: 3, lastAt: NOW - 3 * 3600000 } }
-  check('limite di 3 al giorno: ancora attivo', (await runHome({ ai, monthlyBudget: 2000, expenses: categoryRise(), cache: capped })).first.reason === 'daily_limit')
-  const soon = { ...emptyVoiceCache(), calls: { day: TODAY, count: 1, lastAt: NOW - 5 * 60000 } }
+  const capped = { ...emptyVoiceCache(), calls: { day: TODAY, count: 1, lastAt: NOW - 3 * 3600000 } }
+  check('limite di 1 al giorno: ancora attivo', (await runHome({ ai, monthlyBudget: 2000, expenses: categoryRise(), cache: capped })).first.reason === 'daily_limit')
+  // Con 1 chiamata al giorno la pausa di 30 minuti conta solo a cavallo della
+  // mezzanotte: l'ultima chiamata è di "ieri", 5 minuti fa.
+  const soon = { ...emptyVoiceCache(), calls: { day: '2026-09-19', count: 1, lastAt: NOW - 5 * 60000 } }
   check('30 minuti tra le chiamate: ancora attivo', (await runHome({ ai, monthlyBudget: 2000, expenses: categoryRise(), cache: soon })).first.reason === 'too_soon')
   check('   e nessuna di queste ha chiamato l\'AI', calls() === 1)
 
@@ -453,11 +460,14 @@ section('Cache: mai una frase AI con numeri non aggiornati')
 section('Frequenza: non parlare sempre')
 // =====================================================================
 {
-  const busy = { ...emptyVoiceCache(), calls: { day: TODAY, count: 3, lastAt: NOW - 3 * 3600000 } }
+  const busy = { ...emptyVoiceCache(), calls: { day: TODAY, count: 1, lastAt: NOW - 3 * 3600000 } }
   const capped = await runHome({ monthlyBudget: 2000, expenses: categoryRise(), cache: busy })
-  check('dopo 3 chiamate oggi: locale', capped.first.reason === 'daily_limit')
+  check('dopo 1 chiamata oggi: locale', capped.first.reason === 'daily_limit')
+  const cappedUrgent = await runHome({ expenses: [expense('2026-09-10', 1200, 'spesa')], cache: busy })
+  check('   anche con il budget sforato: il limite di 1 al giorno vale per tutti', cappedUrgent.first.reason === 'daily_limit')
 
-  const recent = { ...emptyVoiceCache(), calls: { day: TODAY, count: 1, lastAt: NOW - 5 * 60000 } }
+  // Pausa tra le chiamate: a cavallo della mezzanotte (ultima chiamata "ieri").
+  const recent = { ...emptyVoiceCache(), calls: { day: '2026-09-19', count: 1, lastAt: NOW - 5 * 60000 } }
   const tooSoon = await runHome({ monthlyBudget: 2000, expenses: categoryRise(), cache: recent })
   check('chiamata 5 minuti fa: locale', tooSoon.first.reason === 'too_soon')
   const urgent = await runHome({ expenses: [expense('2026-09-10', 1200, 'spesa')], cache: recent })

@@ -300,7 +300,7 @@ section('6. Consenso e quota: come prima, in ogni valuta')
   const server = makeServer()
   const statuses = []
   for (let i = 0; i < 5; i += 1) statuses.push((await send(server, { context: context('it', ['EUR', 'USD', 'GBP'][i % 3]) })).status)
-  check('limite giornaliero invariato: cambiare valuta non dà chiamate in più (3 × 200, poi 429)', JSON.stringify(statuses) === JSON.stringify([200, 200, 200, 429, 429]) && server.calls.length === 3, statuses.join(','))
+  check('limite giornaliero invariato: cambiare valuta non dà chiamate in più (1 × 200, poi 429)', JSON.stringify(statuses) === JSON.stringify([200, 429, 429, 429, 429]) && server.calls.length === 1, statuses.join(','))
 }
 
 // =====================================================================

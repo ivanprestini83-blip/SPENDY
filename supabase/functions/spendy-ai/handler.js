@@ -22,7 +22,7 @@ import {
   validateSpendyResponse,
   SPENDY_RESPONSE_SCHEMA,
 } from '../_shared/spendyAIRules.js'
-import { AI_DAILY_LIMIT, AI_MONTHLY_LIMIT, AI_GLOBAL_DAILY_LIMIT, AI_DAILY_LIMIT_REACHED, QUOTA_REASONS, usageDay } from './quota.js'
+import { AI_DAILY_LIMIT, AI_CYCLE_LIMIT, AI_GLOBAL_DAILY_LIMIT, AI_DAILY_LIMIT_REACHED, QUOTA_REASONS, usageDay } from './quota.js'
 
 export const MAX_BODY_BYTES = 8 * 1024
 export const SUPPORTED_PROVIDERS = ['anthropic']
@@ -143,11 +143,11 @@ export function readConfig(getEnv) {
     maxTokens: positive(getEnv('AI_MAX_TOKENS'), DEFAULT_MAX_TOKENS),
     allowedOrigins: (getEnv('ALLOWED_ORIGINS') ?? '*').split(',').map((o) => o.trim()).filter(Boolean),
     // Limiti della quota (vedi quota.js): secret AI_DAILY_LIMIT,
-    // AI_MONTHLY_LIMIT, AI_GLOBAL_DAILY_LIMIT. Un valore mancante o non
+    // AI_CYCLE_LIMIT, AI_GLOBAL_DAILY_LIMIT. Un valore mancante o non
     // valido (non un intero positivo) ripiega sul predefinito prudente, mai
     // su "nessun limite".
     dailyLimit: positive(getEnv('AI_DAILY_LIMIT'), AI_DAILY_LIMIT),
-    monthlyLimit: positive(getEnv('AI_MONTHLY_LIMIT'), AI_MONTHLY_LIMIT),
+    cycleLimit: positive(getEnv('AI_CYCLE_LIMIT'), AI_CYCLE_LIMIT),
     globalDailyLimit: positive(getEnv('AI_GLOBAL_DAILY_LIMIT'), AI_GLOBAL_DAILY_LIMIT),
     missing,
   }
@@ -277,9 +277,9 @@ function bearerToken(request) {
 //               attivato Spendy AI? Letta dal database; senza, o se non è
 //               esattamente true, nessuna chiamata AI passa (fail closed)
 //   now         () => ms, l'orologio che decide la giornata UTC della quota
-//   dailyLimit, monthlyLimit, globalDailyLimit
+//   dailyLimit, cycleLimit, globalDailyLimit
 //               (facoltativi) sostituiscono i limiti letti da config: giornaliero
-//               e mensile per utente, e totale giornaliero di tutti gli utenti
+//               e per ciclo di budget per utente, e totale giornaliero di tutti
 //   userTag     async (userId) => string | null (quota.js createUserTagger):
 //               identificativo non reversibile dell'utente, SOLO nel log di
 //               una quota rifiutata; mai nella risposta, mai l'id grezzo
@@ -291,14 +291,14 @@ export function createSpendyAIHandler({
   aiPreference = null,
   now = () => Date.now(),
   dailyLimit,
-  monthlyLimit,
+  cycleLimit,
   globalDailyLimit,
   log = () => {},
   userTag = null,
 }) {
   const limits = {
     daily: dailyLimit ?? config.dailyLimit ?? AI_DAILY_LIMIT,
-    monthly: monthlyLimit ?? config.monthlyLimit ?? AI_MONTHLY_LIMIT,
+    cycle: cycleLimit ?? config.cycleLimit ?? AI_CYCLE_LIMIT,
     global: globalDailyLimit ?? config.globalDailyLimit ?? AI_GLOBAL_DAILY_LIMIT,
   }
 
@@ -385,8 +385,9 @@ export function createSpendyAIHandler({
       return json(503, { error: 'quota_unavailable' })
     }
     if (!reservation.allowed) {
-      // Quale limite è scattato: giornaliero (utente), mensile (utente) o
-      // globale (tutti). Il modello non viene raggiunto in nessuno dei tre casi.
+      // Quale limite è scattato: giornaliero (utente), ciclo (utente) o
+      // globale (tutti), oppure ciclo non verificabile (503). Il modello non
+      // viene raggiunto in nessuno dei casi.
       const reached = QUOTA_REASONS[reservation.reason] ?? QUOTA_REASONS.daily
       // Diagnostica (solo nel log, la risposta resta quella di sempre): chi
       // (identificativo HMAC, mai l'UUID), quanto aveva già usato e con quali
@@ -400,11 +401,11 @@ export function createSpendyAIHandler({
         event: eventId,
         ...(typeof userLabel === 'string' && userLabel ? { user: userLabel } : {}),
         dailyUsed: count(reservation.used),
-        monthlyUsed: count(reservation.monthlyUsed),
+        cycleUsed: count(reservation.cycleUsed),
         globalUsed: count(reservation.globalUsed),
-        limits: { daily: limits.daily, monthly: limits.monthly, global: limits.global },
+        limits: { daily: limits.daily, cycle: limits.cycle, global: limits.global },
       })
-      return json(429, { error: reached.error ?? AI_DAILY_LIMIT_REACHED })
+      return json(reached.status ?? 429, { error: reached.error ?? AI_DAILY_LIMIT_REACHED })
     }
 
     // 5. Il modello riceve SOLO il contesto ripulito + le frasi precedenti.

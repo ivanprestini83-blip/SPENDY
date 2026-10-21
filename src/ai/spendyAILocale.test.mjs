@@ -189,12 +189,12 @@ for (const locale of [...SPENDY_LOCALES, 'de', undefined]) {
 section('8. Quota giornaliera invariata: la lingua non dà chiamate in più')
 {
   const server = makeServer()
-  check('limite giornaliero: sempre 3', AI_DAILY_LIMIT === 3)
+  check('limite giornaliero: sempre 1', AI_DAILY_LIMIT === 1)
   const results = []
   for (const locale of ['it', 'en', 'es', 'fr', 'de', undefined]) results.push(await send(server, { context: withLocale(locale) }))
-  check('3 chiamate servite (it, en, es), poi 429 per fr, "de" e senza lingua', results.slice(0, 3).every((r) => r.status === 200) && results.slice(3).every((r) => r.status === 429), results.map((r) => r.status).join())
-  check('il modello è stato chiamato solo 3 volte', server.model.calls.length === 3)
-  check('ogni prenotazione usa il limite giornaliero di 3, qualunque sia la lingua', server.quota.ops.filter((o) => o.op === 'reserve').every((o) => o.limits.daily === 3) && server.quota.count('utente-a', '2026-09-29') === 3)
+  check('1 chiamata servita (it), poi 429 per en, es, fr, "de" e senza lingua', results.slice(0, 1).every((r) => r.status === 200) && results.slice(1).every((r) => r.status === 429), results.map((r) => r.status).join())
+  check('il modello è stato chiamato solo 1 volta', server.model.calls.length === 1)
+  check('ogni prenotazione usa il limite giornaliero di 1, qualunque sia la lingua', server.quota.ops.filter((o) => o.op === 'reserve').every((o) => o.limits.daily === 1) && server.quota.count('utente-a', '2026-09-29') === 1)
 }
 
 // ---------------------------------------------------------------------------

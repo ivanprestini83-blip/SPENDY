@@ -28,7 +28,7 @@ import { formatCurrency, formatCurrencyWhole, maskedCurrency } from '../utils/fo
 export const VOICE_LIMITS = {
   minImportance: 40, // stessa scala 0-100 di importantEventSelector
   eventCooldownDays: 3, // lo stesso evento non torna dall'AI prima di N giorni
-  maxCallsPerDay: 3,
+  maxCallsPerDay: 1,
   minMinutesBetweenCalls: 30,
   urgentImportance: 85, // budget sforato, spesa enorme, obiettivo raggiunto
 }
@@ -91,10 +91,10 @@ export function decideSpendyVoiceFor({ aiEnabled, ...input }) {
   return decideSpendyVoice(input)
 }
 
-// 'daily_limit' / 'monthly_limit' / 'global_limit': il server ha rifiutato
+// 'daily_limit' / 'cycle_limit' / 'monthly_limit' / 'global_limit': il server ha rifiutato
 // PRIMA del modello (quota esaurita), quindi nessun costo e nessuna chiamata
 // da contare qui.
-const NOT_REACHED = new Set(['unavailable', 'unauthenticated', 'network', 'daily_limit', 'monthly_limit', 'global_limit'])
+const NOT_REACHED = new Set(['unavailable', 'unauthenticated', 'network', 'daily_limit', 'cycle_limit', 'monthly_limit', 'global_limit'])
 
 // Una chiamata all'AI e il suo effetto sulla memoria. Non tocca lo
 // storage: restituisce la cache nuova e il risultato, chi chiama salva.
@@ -105,7 +105,7 @@ export async function requestSpendyVoice({ ai, context, meta, cache, today, now 
   const previous = cache.lastShown?.message ?? history[history.length - 1] ?? null
   const result = await ai.generate(context, { history, previous })
   // Conta solo le chiamate che possono aver raggiunto il modello: senza
-  // sessione o senza rete non si spende niente, e il limite di 3 al
+  // sessione o senza rete non si spende niente, e il limite di 1 al
   // giorno non va consumato.
   const reachedModel = result.ok || !NOT_REACHED.has(result.error)
   let next = reachedModel ? recordAICall(cache, { day: today, now }) : cache

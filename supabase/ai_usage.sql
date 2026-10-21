@@ -8,7 +8,7 @@
 -- tabelle di schema.sql.
 --
 -- Cosa protegge: il costo delle chiamate al modello. Il limite nell'app
--- (3 al giorno in localStorage) resta, ma è solo un primo filtro: questo
+-- (1 al giorno in localStorage) resta, ma è solo un primo filtro: questo
 -- è quello che il client non può aggirare.
 --
 -- Chi scrive: SOLO la Edge Function, con la chiave service_role che vive
@@ -314,3 +314,190 @@ grant execute on function public.spendy_ai_record_usage(uuid, date, text, bigint
 --   where table_name = 'ai_usage' and grantee in ('anon', 'authenticated');       -- solo SELECT (o niente)
 --   select grantee from information_schema.routine_privileges
 --   where routine_name like 'spendy_ai_%';                                         -- service_role (+ owner)
+
+-- ============================================================================
+-- VERSIONE 3 — plafond per CICLO DI BUDGET personale (al posto del mese UTC)
+-- ============================================================================
+-- Tutto AGGIUNTO, come la versione 2: spendy_ai_reserve_v2 resta com'era, la
+-- funzione già pubblicata continua a usarla finché non viene ridistribuita, e
+-- tornare indietro = ridistribuire la versione precedente. Nessuna riga di
+-- ai_usage viene toccata. Idempotente. Eseguire PRIMA del deploy di spendy-ai.
+--
+-- Il ciclo di un utente si ricava da profiles.cycle_start_day (1-31), lo
+-- stesso valore che l'app salva in Impostazioni, con le stesse regole di
+-- src/utils/cycle.js getCycleRange: [inizio, fine) con fine = stesso giorno
+-- del mese dopo, riportato all'ultimo giorno nei mesi più corti; NULL = 1
+-- (mese di calendario), come fa l'app. Le date sono giornate UTC, le stesse
+-- della quota giornaliera: decide l'orologio del server, mai il dispositivo.
+--
+-- Perché una tabella di periodi: cycle_start_day lo scrive l'utente (RLS di
+-- profiles). Se il plafond seguisse sempre il valore attuale, spostare il
+-- giorno di inizio farebbe "ricominciare" il ciclo e regalerebbe chiamate.
+-- Qui invece, alla prima prenotazione di un ciclo, il periodo viene FISSATO
+-- (ancorato) in ai_quota_periods e resta quello fino alla sua fine, qualunque
+-- modifica arrivi nel frattempo. Il periodo seguente parte esattamente dove
+-- finisce il precedente (mai prima: niente sovrapposizioni né buchi) e
+-- finisce dove finisce il ciclo che contiene quel giorno con il giorno di
+-- inizio IN VIGORE in quel momento. Il nuovo giorno di inizio vale quindi per
+-- l'AI dal ciclo successivo; il budget dell'app non è toccato da niente di
+-- tutto questo.
+--
+-- Il conteggio del periodo è SEMPRE derivato dalle righe di ai_usage (come il
+-- mese della versione 2): un rimborso (spendy_ai_release) lo corregge da solo,
+-- e le chiamate fatte prima di questa migrazione nel ciclo in corso contano.
+
+create table if not exists public.ai_quota_periods (
+  user_id         uuid        not null references auth.users(id) on delete cascade,
+  period_start    date        not null,
+  period_end      date        not null,   -- esclusa
+  cycle_start_day smallint    not null check (cycle_start_day between 1 and 31),
+  created_at      timestamptz not null default now(),
+  primary key (user_id, period_start),
+  check (period_end > period_start)
+);
+
+alter table public.ai_quota_periods enable row level security;
+drop policy if exists ai_quota_periods_select_own on public.ai_quota_periods;
+create policy ai_quota_periods_select_own on public.ai_quota_periods
+  for select to authenticated using (auth.uid() = user_id);
+revoke insert, update, delete, truncate on public.ai_quota_periods from anon, authenticated;
+
+-- Il ciclo [inizio, fine) che contiene p_day: getCycleRange in SQL.
+create or replace function public.spendy_ai_cycle_range(p_day date, p_cycle_start_day integer)
+returns table (period_start date, period_end date)
+language plpgsql
+immutable
+set search_path = ''
+as $$
+declare
+  v_sd    integer := coalesce(p_cycle_start_day, 1);
+  v_this  date;
+  v_start date;
+  v_next  date;
+  v_dim   integer;
+begin
+  if p_day is null or v_sd < 1 or v_sd > 31 then
+    raise exception 'spendy_ai_cycle_range: argomenti non validi';
+  end if;
+  -- Primo giorno del mese in aritmetica di date (nessun fuso orario).
+  v_this := p_day - (extract(day from p_day)::integer - 1);
+  v_dim := extract(day from (v_this + interval '1 month' - interval '1 day'))::integer;
+  v_start := case when extract(day from p_day)::integer >= least(v_sd, v_dim) then v_this else (v_this - interval '1 month')::date end;
+  v_next := (v_start + interval '1 month')::date;
+  return query select
+    v_start + (least(v_sd, extract(day from (v_start + interval '1 month' - interval '1 day'))::integer) - 1),
+    v_next + (least(v_sd, extract(day from (v_next + interval '1 month' - interval '1 day'))::integer) - 1);
+end;
+$$;
+
+-- Prenota UNA chiamata se TUTTI e tre i limiti lo consentono:
+--   daily    chiamate di questo utente in questa giornata (UTC)
+--   cycle    chiamate di questo utente nel periodo ancorato del suo ciclo
+--   global   chiamate di TUTTI gli utenti in questa giornata
+-- Motivi del rifiuto, in quest'ordine: 'daily' | 'cycle' | 'global'.
+-- 'cycle_unavailable': l'utente non ha una riga in profiles, quindi il ciclo
+-- non si può verificare. Nessuna prenotazione, nessun limite "di riserva".
+-- Concorrenza: stesso lock di transazione della versione 2 (stessa chiave),
+-- quindi v2 e v3 si serializzano anche tra loro durante il passaggio.
+create or replace function public.spendy_ai_reserve_v3(
+  p_user_id uuid,
+  p_usage_date date,
+  p_daily_limit integer,
+  p_cycle_limit integer,
+  p_global_daily_limit integer
+)
+returns table (allowed boolean, reason text, daily_used integer, cycle_used integer, global_used integer, period_start date, period_end date)
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_sd         integer;
+  v_has_prof   boolean;
+  v_start      date;
+  v_end        date;
+  v_prev_end   date;
+  v_next_start date;
+  v_daily      integer;
+  v_cycle      integer;
+  v_global     integer;
+begin
+  if p_user_id is null or p_usage_date is null
+     or p_daily_limit is null or p_daily_limit < 1
+     or p_cycle_limit is null or p_cycle_limit < 1
+     or p_global_daily_limit is null or p_global_daily_limit < 1 then
+    raise exception 'spendy_ai_reserve_v3: argomenti non validi';
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended('spendy_ai_reserve', 0));
+
+  select true, pr.cycle_start_day into v_has_prof, v_sd
+  from public.profiles pr where pr.id = p_user_id;
+  if v_has_prof is null then
+    return query select false, 'cycle_unavailable'::text, null::integer, null::integer, null::integer, null::date, null::date;
+    return;
+  end if;
+
+  -- Il periodo ancorato che contiene la giornata, se c'è già.
+  select q.period_start, q.period_end into v_start, v_end
+  from public.ai_quota_periods q
+  where q.user_id = p_user_id and q.period_start <= p_usage_date and p_usage_date < q.period_end
+  order by q.period_start desc limit 1;
+
+  if v_start is null then
+    select r.period_start, r.period_end into v_start, v_end
+    from public.spendy_ai_cycle_range(p_usage_date, v_sd) r;
+    -- Mai prima della fine del periodo precedente, mai oltre l'inizio di uno
+    -- successivo (solo se l'orologio tornasse indietro): periodi disgiunti.
+    select max(q.period_end) into v_prev_end
+    from public.ai_quota_periods q where q.user_id = p_user_id and q.period_end <= p_usage_date;
+    select min(q.period_start) into v_next_start
+    from public.ai_quota_periods q where q.user_id = p_user_id and q.period_start > p_usage_date;
+    v_start := greatest(v_start, coalesce(v_prev_end, v_start));
+    v_end := least(v_end, coalesce(v_next_start, v_end));
+    insert into public.ai_quota_periods (user_id, period_start, period_end, cycle_start_day)
+    values (p_user_id, v_start, v_end, coalesce(v_sd, 1));
+  end if;
+
+  select coalesce(sum(u.call_count), 0)::integer into v_global
+  from public.ai_usage u where u.usage_date = p_usage_date;
+
+  select coalesce(sum(u.call_count), 0)::integer into v_cycle
+  from public.ai_usage u
+  where u.user_id = p_user_id and u.usage_date >= v_start and u.usage_date < v_end;
+
+  select coalesce(max(u.call_count), 0)::integer into v_daily
+  from public.ai_usage u where u.user_id = p_user_id and u.usage_date = p_usage_date;
+
+  if v_daily >= p_daily_limit then
+    return query select false, 'daily'::text, v_daily, v_cycle, v_global, v_start, v_end;
+    return;
+  end if;
+  if v_cycle >= p_cycle_limit then
+    return query select false, 'cycle'::text, v_daily, v_cycle, v_global, v_start, v_end;
+    return;
+  end if;
+  if v_global >= p_global_daily_limit then
+    return query select false, 'global'::text, v_daily, v_cycle, v_global, v_start, v_end;
+    return;
+  end if;
+
+  insert into public.ai_usage as u (user_id, usage_date, call_count)
+  values (p_user_id, p_usage_date, 1)
+  on conflict (user_id, usage_date) do update
+    set call_count = u.call_count + 1,
+        updated_at = now();
+
+  return query select true, null::text, v_daily + 1, v_cycle + 1, v_global + 1, v_start, v_end;
+end;
+$$;
+
+revoke all on function public.spendy_ai_cycle_range(date, integer) from public, anon, authenticated;
+revoke all on function public.spendy_ai_reserve_v3(uuid, date, integer, integer, integer) from public, anon, authenticated;
+grant execute on function public.spendy_ai_cycle_range(date, integer) to service_role;
+grant execute on function public.spendy_ai_reserve_v3(uuid, date, integer, integer, integer) to service_role;
+
+-- Verifica (dopo l'esecuzione):
+--   select relrowsecurity from pg_class where oid = 'public.ai_quota_periods'::regclass;  -- true
+--   select grantee from information_schema.routine_privileges
+--   where routine_name in ('spendy_ai_reserve_v3', 'spendy_ai_cycle_range');           -- service_role (+ owner)
+--   select count(*) from public.ai_usage;   -- invariato rispetto a prima della migrazione

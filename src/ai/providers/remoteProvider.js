@@ -43,11 +43,15 @@ const STATUS_TO_CODE = {
 // Le quote del SERVER (supabase/functions/spendy-ai/quota.js): stesso 429 del
 // limite del provider, ma con uno di questi codici nel corpo.
 export const DAILY_LIMIT_ERROR = 'AI_DAILY_LIMIT_REACHED'
-// Gli altri due limiti del server: mensile per utente e globale giornaliero.
+// Gli altri limiti del server: per ciclo di budget (per utente) e globale
+// giornaliero. MONTHLY resta riconosciuto: è il codice della funzione
+// precedente (mese di calendario), ancora in produzione fino al deploy.
+export const CYCLE_LIMIT_ERROR = 'AI_CYCLE_LIMIT_REACHED'
 export const MONTHLY_LIMIT_ERROR = 'AI_MONTHLY_LIMIT_REACHED'
 export const GLOBAL_LIMIT_ERROR = 'AI_GLOBAL_LIMIT_REACHED'
 const QUOTA_ERROR_CODES = {
   [DAILY_LIMIT_ERROR]: 'daily_limit',
+  [CYCLE_LIMIT_ERROR]: 'cycle_limit',
   [MONTHLY_LIMIT_ERROR]: 'monthly_limit',
   [GLOBAL_LIMIT_ERROR]: 'global_limit',
 }

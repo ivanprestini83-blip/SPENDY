@@ -428,12 +428,13 @@ section('Cache e limiti con la vera AI')
   check('stessa impronta: nessuna seconda richiesta', sent.length === 1 && second.first.action === 'cache')
   check('stessa frase dalla cache', second.voice.message === first.voice.message && second.voice.source === 'ai')
 
-  const busy = { ...emptyVoiceCache(), calls: { day: TODAY, count: 3, lastAt: NOW - 3 * 3600000 } }
+  const busy = { ...emptyVoiceCache(), calls: { day: TODAY, count: 1, lastAt: NOW - 3 * 3600000 } }
   const capped = remoteAI()
   const c = await runHome({ ai: capped.ai, monthlyBudget: 2000, expenses: categoryRise(), cache: busy })
-  check('3 chiamate oggi: niente rete, frase locale', capped.sent.length === 0 && c.first.reason === 'daily_limit' && c.voice.source === 'local')
+  check('1 chiamata oggi: niente rete, frase locale', capped.sent.length === 0 && c.first.reason === 'daily_limit' && c.voice.source === 'local')
 
-  const recent = { ...emptyVoiceCache(), calls: { day: TODAY, count: 1, lastAt: NOW - 5 * 60000 } }
+  // Con 1 al giorno la pausa conta a cavallo della mezzanotte: ultima chiamata "ieri".
+  const recent = { ...emptyVoiceCache(), calls: { day: '2026-09-19', count: 1, lastAt: NOW - 5 * 60000 } }
   const soon = remoteAI()
   await runHome({ ai: soon.ai, monthlyBudget: 2000, expenses: categoryRise(), cache: recent })
   check('meno di 30 minuti dall\'ultima: niente rete', soon.sent.length === 0)

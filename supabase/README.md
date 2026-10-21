@@ -107,8 +107,8 @@ variabile `VITE_*`.
 | `AI_TIMEOUT_MS` | no | default `12000` |
 | `AI_MAX_TOKENS` | no | default `2048` |
 | `ALLOWED_ORIGINS` | no | es. `https://spendy.vercel.app` (default: tutti, l'accesso è comunque solo con sessione) |
-| `AI_DAILY_LIMIT` | no | chiamate AI al giorno per utente (giornata UTC). Default `3` |
-| `AI_MONTHLY_LIMIT` | no | chiamate AI al mese per utente (mese di calendario UTC). Default `30` |
+| `AI_DAILY_LIMIT` | no | chiamate AI al giorno per utente (giornata UTC). Default `1` |
+| `AI_CYCLE_LIMIT` | no | chiamate AI per ciclo di budget personale (`profiles.cycle_start_day`, periodo ancorato sul server: cambiare il giorno di inizio vale per l'AI dal ciclo successivo). Default `30`. Sostituisce `AI_MONTHLY_LIMIT` (mese UTC), non più letto |
 | `AI_GLOBAL_DAILY_LIMIT` | no | chiamate AI al giorno di TUTTI gli utenti: una valvola di sicurezza, non un budget. Default `300`, volutamente prudente: va regolato quando si conosce il costo reale per chiamata |
 
 `SUPABASE_URL` e la chiave pubblica li fornisce Supabase da solo.
@@ -167,11 +167,14 @@ curl -i -X POST https://riflsimbbajfvxublovr.supabase.co/functions/v1/spendy-ai 
   **Se sul progetto la registrazione è aperta, chiunque crei un account
   può usarla**: dopo aver creato il proprio account, disattivare
   *Authentication → Sign In / Providers → Allow new users to sign up*.
-- **Quota sul server (la vera protezione)**: massimo 3 chiamate al modello
-  al giorno (giornata UTC) per utente, contate nella tabella `ai_usage`
+- **Quota sul server (la vera protezione)**: massimo 1 chiamata al modello
+  al giorno (giornata UTC) e 30 per ciclo di budget per utente, 300 al giorno
+  in tutto, contate nella tabella `ai_usage`
   da [`ai_usage.sql`](./ai_usage.sql). Il limite dell'app resta, ma è solo
   un primo filtro. Oltre la quota la funzione risponde `429` con
-  `{"error":"AI_DAILY_LIMIT_REACHED"}` senza chiamare il modello. La
+  `{"error":"AI_DAILY_LIMIT_REACHED"}` (o `AI_CYCLE_LIMIT_REACHED`,
+  `AI_GLOBAL_LIMIT_REACHED`) senza chiamare il modello; se il ciclo non si può
+  verificare (nessuna riga in `profiles`) risponde `503 cycle_unavailable`. La
   chiamata prenotata torna all'utente solo se è certo che nulla è stato
   fatturato: errore prima dell'invio, oppure rifiuto esplicito del provider
   con HTTP 400, 401, 403, 404, 429 o 529. Timeout, errori di rete, 5xx e ogni altro
