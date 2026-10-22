@@ -16,6 +16,16 @@
 // frase ("100 €", "$100", "100 £"); `{gender:spariti|sparite}` sceglie la
 // parola che si accorda al nome della valuta (le sterline sono femminili in
 // italiano, spagnolo e francese). Li risolve expenseReactionEngine.js.
+//
+// Che cosa dice il numero:
+//   {amount:100}           una SOGLIA ("più di 100 €", "100 € superati"):
+//                          vera per ogni spesa del gruppo.
+//   {expense:500}          L'IMPORTO della spesa appena registrata ("500 €?!"):
+//                          si legge come {amount:500}, ma la frase compare
+//                          solo se la spesa è esattamente 500.
+//   {if-expense:1000:EUR}  non si legge: la frase scrive l'importo a parole
+//                          ("Mille euro?!"), quindi vale solo per 1000 in euro.
+// Una frase che afferma quanto hai speso non deve mai usare {amount:…}.
 
 // 🛍️ 1. SPESA >100 € — SORPRESA IMMEDIATA
 export const SPESA_100 = [
@@ -80,19 +90,19 @@ export const BUDGET_SUPERATO = [
 
 // 🔥 5. SPESA ENORME — €500–999
 export const SPESA_ENORME_500 = [
-  '{amount:500}?! Aspetta, mi devo sedere.',
+  '{expense:500}?! Aspetta, mi devo sedere.',
   'Questa non è una spesa. È un evento.',
   'Il conto corrente ha appena chiesto una pausa.',
-  '{amount:500} {gender:evaporati|evaporate}. Almeno {gender:salutali|salutale}.',
+  '{expense:500} {gender:evaporati|evaporate}. Almeno {gender:salutali|salutale}.',
   'Ok. Questa la voglio proprio capire.',
   'Per questa cifra pretendo almeno una bella storia.',
 ]
 
 // 🔥 5. SPESA ENORME — €1.000+
 export const SPESA_ENORME_1000 = [
-  '{amount:1000}?! Io sono una volpe, non un investigatore.',
+  '{expense:1000}?! Io sono una volpe, non un investigatore.',
   'FERMO. Qui dobbiamo parlarne.',
-  'Mille euro?! Il tuo conto ha appena visto la luce.',
+  '{if-expense:1000:EUR}Mille euro?! Il tuo conto ha appena visto la luce.',
   'Questa spesa ha bisogno di una conferenza stampa.',
   'Io non giudico. Ma questa cifra si giudica da sola.',
   'Dimmi che è una spesa importante. Ti prego.',
@@ -251,17 +261,17 @@ const EN = {
     'The budget’s gone. The spending, on the other hand, seems to be doing great.',
   ],
   SPESA_ENORME_500: [
-    '{amount:500}?! Hang on, I need to sit down.',
+    '{expense:500}?! Hang on, I need to sit down.',
     'This isn’t a purchase. It’s an event.',
     'Your bank account just asked for a break.',
-    '{amount:500} evaporated. At least wave goodbye.',
+    '{expense:500} evaporated. At least wave goodbye.',
     'Okay. This one I really want to understand.',
     'For that amount, I expect at least a good story.',
   ],
   SPESA_ENORME_1000: [
-    '{amount:1000}?! I’m a fox, not a detective.',
+    '{expense:1000}?! I’m a fox, not a detective.',
     'STOP. We need to talk about this.',
-    'A thousand euros?! Your account just saw its life flash before its eyes.',
+    '{if-expense:1000:EUR}A thousand euros?! Your account just saw its life flash before its eyes.',
     'This purchase needs a press conference.',
     'I’m not judging. But this amount speaks for itself.',
     'Tell me it’s something important. Please.',
@@ -381,17 +391,17 @@ const ES = {
     'El presupuesto se ha acabado. Los gastos, en cambio, están estupendamente.',
   ],
   SPESA_ENORME_500: [
-    '¡¿{amount:500}?! Espera, que me tengo que sentar.',
+    '¡¿{expense:500}?! Espera, que me tengo que sentar.',
     'Esto no es un gasto. Es un acontecimiento.',
     'La cuenta corriente acaba de pedir un descanso.',
-    '{amount:500} {gender:evaporados|evaporadas}. Al menos diles adiós.',
+    '{expense:500} {gender:evaporados|evaporadas}. Al menos diles adiós.',
     'Vale. Este sí que lo quiero entender.',
     'Por esta cifra exijo al menos una buena historia.',
   ],
   SPESA_ENORME_1000: [
-    '¡¿{amount:1000}?! Soy una raposa, no una detective.',
+    '¡¿{expense:1000}?! Soy una raposa, no una detective.',
     'ALTO. Aquí tenemos que hablar.',
-    '¡¿Mil euros?! Tu cuenta acaba de ver la luz al final del túnel.',
+    '{if-expense:1000:EUR}¡¿Mil euros?! Tu cuenta acaba de ver la luz al final del túnel.',
     'Este gasto necesita una rueda de prensa.',
     'No juzgo. Pero esta cifra se juzga sola.',
     'Dime que es un gasto importante. Te lo ruego.',
@@ -511,17 +521,17 @@ const FR = {
     'Le budget est épuisé. Les dépenses, elles, ont l’air de très bien se porter.',
   ],
   SPESA_ENORME_500: [
-    '{amount:500} ?! Attendez, il faut que je m’assoie.',
+    '{expense:500} ?! Attendez, il faut que je m’assoie.',
     'Ce n’est pas une dépense. C’est un événement.',
     'Le compte courant vient de demander une pause.',
-    '{amount:500} {gender:envolés|envolées}. Faites-leur au moins un signe de la main.',
+    '{expense:500} {gender:envolés|envolées}. Faites-leur au moins un signe de la main.',
     'D’accord. Celle-là, je veux vraiment la comprendre.',
     'Pour ce montant, j’exige au moins une belle histoire.',
   ],
   SPESA_ENORME_1000: [
-    '{amount:1000} ?! Je suis une renarde, pas une détective.',
+    '{expense:1000} ?! Je suis une renarde, pas une détective.',
     'STOP. Là, il faut qu’on en parle.',
-    'Mille euros ?! Votre compte vient de voir sa vie défiler.',
+    '{if-expense:1000:EUR}Mille euros ?! Votre compte vient de voir sa vie défiler.',
     'Cette dépense mérite une conférence de presse.',
     'Je ne juge pas. Mais ce montant se juge tout seul.',
     'Dites-moi que c’est une dépense importante. Je vous en prie.',

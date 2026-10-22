@@ -75,11 +75,32 @@ const POOLS = Object.fromEntries(Object.entries(REACTION_LIBRARY).map(([lang, L]
 // accordata al nome della valuta. Le frasi si risolvono UNA volta per lingua
 // e valuta, prima della scelta: così il testo scelto, quello mostrato e
 // quello registrato nella cronologia (anti-ripetizione) sono lo stesso.
+//
+// `{expense:500}` si legge come `{amount:500}`, ma la frase dice che la spesa
+// appena registrata È di 500 ("500 €?! Aspetta, mi devo sedere."): vale solo
+// se l'importo coincide (phraseFitsExpense). `{if-expense:1000:EUR}` non si
+// legge: marca una frase che scrive l'importo a parole ("Mille euro?!").
 export function resolveReactionText(text, lang, currency = currentCurrency()) {
   const gender = currencyGender(currency, lang)
   return text
-    .replace(/\{amount:(\d+)\}/g, (_, amount) => formatCurrencyWhole(Number(amount), lang, currency))
+    .replace(/\{if-expense:\d+(?::[A-Z]{3})?\}/g, '')
+    .replace(/\{(?:amount|expense):(\d+)\}/g, (_, amount) => formatCurrencyWhole(Number(amount), lang, currency))
     .replace(/\{gender:([^|}]*)\|([^}]*)\}/g, (_, masculine, feminine) => (gender === 'f' ? feminine : masculine))
+}
+
+// La frase può accompagnare QUESTA spesa? Una soglia (`{amount:N}`, "più di
+// 100 €") sì: il gruppo della frase è scelto proprio perché la spesa la
+// supera. Una frase che afferma l'importo (`{expense:N}`, `{if-expense:N:CUR}`)
+// solo se la spesa è esattamente N (al centesimo) e, se indicata, nella valuta
+// dell'account. Senza spesa (budget superato), solo le frasi senza importo.
+const EXPENSE_CLAIM = /\{(?:if-)?expense:(\d+)(?::([A-Z]{3}))?\}/
+export function phraseFitsExpense(template, expense, currency = currentCurrency()) {
+  const claim = EXPENSE_CLAIM.exec(template)
+  if (!claim) return true
+  if (!expense || !Number.isFinite(expense.amount)) return false
+  const [, amount, claimCurrency] = claim
+  return Math.round(expense.amount * 100) === Number(amount) * 100
+    && (!claimCurrency || claimCurrency === normalizeCurrency(currency))
 }
 const RESOLVED_POOLS = new Map()
 const poolsFor = (lang, currency = currentCurrency()) => {
@@ -112,8 +133,16 @@ function shiftDate(dateStr, days) {
 // The single most recently registered expense dated today — `expenses`
 // is newest-first (see useAppStore's addExpense), so this is exactly
 // "the transaction the user just entered", the same pattern every prior
-// "react to what just happened" tier in this codebase has used.
-function findTriggerExpense(expenses, today) {
+// "react to what just happened" tier in this codebase has used. Editing an
+// expense (editExpense) keeps its place, so an edit never makes an older
+// expense "the one just entered". Shared with ai/spendyEvents.js, which must
+// talk about the same expense.
+//
+// Known limit: rows pulled by sync are sorted by date alone
+// (mergeRemoteRows), so after a full pull two expenses of the same day can
+// come back oldest first. Without a creation time on expenses there is no
+// reliable way to tell; `updatedAt` is not one (edits change it).
+export function findTriggerExpense(expenses, today) {
   return expenses.find((expense) => expense.date === today) ?? null
 }
 
@@ -176,15 +205,23 @@ function pickFromPool(pool, jokeHistory, key, rng) {
 // another language without drawing a new one.
 const REACTION_REF = new WeakMap()
 
-function pickInto({ state, ...rest }, pools, poolName, jokeHistory, key, rng) {
+// `fit` = { templates, expense, currency }: only the phrases that fit the
+// expense just registered (phraseFitsExpense) take part in the draw — a
+// phrase stating "500 €?!" is left out for a 700 € expense, the others in
+// the same pool stay. Nothing fits → null (the caller has no reaction for
+// this step, and getSpendyCoach falls back to its own tiers).
+function pickInto({ state, ...rest }, pools, poolName, jokeHistory, key, rng, fit) {
   const pool = pools[poolName]
-  const message = pickFromPool(pool, jokeHistory, key, rng)
+  const templates = fit.templates[poolName]
+  const fitting = pool.filter((_, index) => phraseFitsExpense(templates[index], fit.expense, fit.currency))
+  if (fitting.length === 0) return null
+  const message = pickFromPool(fitting, jokeHistory, key, rng)
   const reaction = { state, message, ...rest }
-  REACTION_REF.set(reaction, { poolName, index: pool.indexOf(message) })
+  REACTION_REF.set(reaction, { poolName, index: pool.indexOf(message), expense: fit.expense })
   return reaction
 }
 
-function buildResult({ bucket, pools, state, reason, insightCategoryId = null, rare = false, jokeHistory, rng }) {
+function buildResult({ bucket, pools, state, reason, insightCategoryId = null, rare = false, jokeHistory, rng, fit }) {
   if (rare && rng() < RARE_SUBSTITUTION_PROBABILITY) {
     const rareKey = topicKeyFor(null, 'rare_special')
     return pickInto({
@@ -193,7 +230,7 @@ function buildResult({ bucket, pools, state, reason, insightCategoryId = null, r
       insight: { type: 'rare_special', categoryId: null, category: null },
       messageScore: 100,
       secondaryInsightText: null,
-    }, pools, 'RARE_SPECIALI', jokeHistory, rareKey, rng)
+    }, pools, 'RARE_SPECIALI', jokeHistory, rareKey, rng, fit)
   }
 
   const key = topicKeyFor(insightCategoryId, reason)
@@ -203,14 +240,19 @@ function buildResult({ bucket, pools, state, reason, insightCategoryId = null, r
     insight: { type: reason, categoryId: insightCategoryId, category: null },
     messageScore: 100,
     secondaryInsightText: null,
-  }, pools, bucket, jokeHistory, key, rng)
+  }, pools, bucket, jokeHistory, key, rng, fit)
 }
 
 // The same reaction (same pool, same position) in another language — or in
-// another currency (same phrase, amounts rewritten).
+// another currency (same phrase, amounts rewritten). If the phrase no longer
+// fits in the new currency ("Mille euro?!" after switching to dollars), null:
+// the caller draws a new one.
 function inLanguage(reaction, lang, currency) {
   const ref = REACTION_REF.get(reaction)
-  const text = ref ? poolsFor(lang, currency)[ref.poolName]?.[ref.index] : null
+  if (!ref) return reaction
+  const code = POOLS[lang] ? lang : 'it'
+  if (!phraseFitsExpense(POOLS[code][ref.poolName]?.[ref.index] ?? '', ref.expense, currency ?? currentCurrency())) return null
+  const text = poolsFor(lang, currency)[ref.poolName]?.[ref.index]
   if (!text || text === reaction.message) return reaction
   const translated = { ...reaction, message: text }
   REACTION_REF.set(translated, ref)
@@ -228,10 +270,12 @@ function inLanguage(reaction, lang, currency) {
 // pulling the expense back from Supabase, a toggle...) re-rolled it too.
 //
 // So the reaction chosen for one event is remembered and reused: same
-// event (the trigger expense's id, or the day for the standing
+// event (the trigger expense, or the day for the standing
 // "budget_exceeded" reaction with no new expense) + same cascade step →
 // same result, however many times the coach re-runs. A new expense is a
 // new event and still gets a fresh, non-repeating pick exactly as before.
+// The event includes amount and category: an edited expense (same id, now
+// 700 € instead of 500 €) is a new event, never the old phrase.
 // Only in-memory for this session; jokeHistory recording is unchanged.
 const shownReactionByEvent = new Map()
 const SHOWN_REACTION_MEMORY = 50
@@ -239,7 +283,7 @@ const SHOWN_REACTION_MEMORY = 50
 function reactionEventKey(expenses, today, reason) {
   const trigger = findTriggerExpense(expenses, today)
   const event = trigger
-    ? `expense:${trigger.id ?? `${trigger.date}|${trigger.amount}|${trigger.categoryId}`}`
+    ? `expense:${trigger.id ?? trigger.date}|${trigger.amount}|${trigger.categoryId}`
     : `standing:${today}`
   return `${event}|${reason}`
 }
@@ -254,8 +298,10 @@ export function evaluateExpenseReaction(args) {
 
   const key = reactionEventKey(args.expenses ?? [], args.today, result.reason)
   const alreadyShown = shownReactionByEvent.get(key)
-  // Same event after a language (or currency) change: the same reaction, rewritten.
-  if (alreadyShown) return inLanguage(alreadyShown, args.lang, args.currency)
+  // Same event after a language (or currency) change: the same reaction,
+  // rewritten — unless it no longer fits, then the fresh pick below.
+  const rewritten = alreadyShown ? inLanguage(alreadyShown, args.lang, args.currency) : null
+  if (rewritten) return rewritten
 
   shownReactionByEvent.set(key, result)
   if (shownReactionByEvent.size > SHOWN_REACTION_MEMORY) {
@@ -284,14 +330,16 @@ function selectExpenseReaction({
 
   const triggerExpense = findTriggerExpense(expenses, today)
   if (!triggerExpense && !overBudget) return null
+  // Which phrases may accompany this expense (see phraseFitsExpense).
+  const fit = { templates: POOLS[POOLS[lang] ? lang : 'it'], expense: triggerExpense, currency: currency ?? currentCurrency() }
 
   // 1 & 2. Mega expense — absolute euro amounts, independent of budget size.
   if (triggerExpense) {
     if (triggerExpense.amount >= MEGA_1000_AT) {
-      return buildResult({ bucket: 'SPESA_ENORME_1000', pools, state: 'concerned', reason: 'mega_expense_1000', rare: true, jokeHistory, rng })
+      return buildResult({ bucket: 'SPESA_ENORME_1000', pools, state: 'concerned', reason: 'mega_expense_1000', rare: true, jokeHistory, rng, fit })
     }
     if (triggerExpense.amount >= MEGA_500_AT) {
-      return buildResult({ bucket: 'SPESA_ENORME_500', pools, state: 'concerned', reason: 'mega_expense_500', rare: true, jokeHistory, rng })
+      return buildResult({ bucket: 'SPESA_ENORME_500', pools, state: 'concerned', reason: 'mega_expense_500', rare: true, jokeHistory, rng, fit })
     }
 
     // 3. Goal damaged — only a notable expense meaningfully eating into
@@ -300,14 +348,14 @@ function selectExpenseReaction({
     if (damagedGoal) {
       const isVacationGoal = /vacanza/i.test(damagedGoal.label)
       const pool = isVacationGoal ? 'OBIETTIVO_DANNEGGIATO' : 'OBIETTIVO_NO_VACANZA'
-      return buildResult({ bucket: pool, pools, state: 'ironic', reason: 'goal_damaged', insightCategoryId: damagedGoal.id, jokeHistory, rng })
+      return buildResult({ bucket: pool, pools, state: 'ironic', reason: 'goal_damaged', insightCategoryId: damagedGoal.id, jokeHistory, rng, fit })
     }
   }
 
   // 4. Budget exceeded — the one step that fires even with no fresh
   // expense today, same as the "steady state" it replaces.
   if (overBudget) {
-    return buildResult({ bucket: 'BUDGET_SUPERATO', pools, state: 'concerned', reason: 'budget_exceeded', rare: true, jokeHistory, rng })
+    return buildResult({ bucket: 'BUDGET_SUPERATO', pools, state: 'concerned', reason: 'budget_exceeded', rare: true, jokeHistory, rng, fit })
   }
 
   if (!triggerExpense) return null
@@ -321,23 +369,23 @@ function selectExpenseReaction({
   if (hasCategoryHistory && categoryRow.changePercent >= CATEGORY_SEVERE_AT) {
     const bucket = categoryBucketFor(categoryId)
     if (bucket) {
-      return buildResult({ bucket, pools, state: 'concerned', reason: 'category_severe', insightCategoryId: categoryId, rare: true, jokeHistory, rng })
+      return buildResult({ bucket, pools, state: 'concerned', reason: 'category_severe', insightCategoryId: categoryId, rare: true, jokeHistory, rng, fit })
     }
   }
 
   // 6. Repeated expense — same category, several times in a short window.
   if (countRecentSameCategory(expenses, categoryId, today) >= REPEAT_THRESHOLD) {
-    return buildResult({ bucket: 'SPESA_RIPETUTA', pools, state: 'ironic', reason: 'repeated_expense', insightCategoryId: categoryId, jokeHistory, rng })
+    return buildResult({ bucket: 'SPESA_RIPETUTA', pools, state: 'ironic', reason: 'repeated_expense', insightCategoryId: categoryId, jokeHistory, rng, fit })
   }
 
   // 7. Anomalous increase — any category, moderate threshold.
   if (hasCategoryHistory && categoryRow.changePercent >= CATEGORY_ANOMALOUS_AT) {
-    return buildResult({ bucket: 'AUMENTO_ANOMALO', pools, state: 'attentive', reason: 'anomalous_increase', insightCategoryId: categoryId, jokeHistory, rng })
+    return buildResult({ bucket: 'AUMENTO_ANOMALO', pools, state: 'attentive', reason: 'anomalous_increase', insightCategoryId: categoryId, jokeHistory, rng, fit })
   }
 
   // 8. €100+ — the mandatory floor. Strictly greater than 100.
   if (triggerExpense.amount > HUNDRED_PLUS_AT) {
-    return buildResult({ bucket: 'HUNDRED_PLUS', pools, state: 'ironic', reason: 'expense_over_100', rare: true, jokeHistory, rng })
+    return buildResult({ bucket: 'HUNDRED_PLUS', pools, state: 'ironic', reason: 'expense_over_100', rare: true, jokeHistory, rng, fit })
   }
 
   // 9. Positive event — this category is running meaningfully BELOW its
@@ -349,7 +397,7 @@ function selectExpenseReaction({
   // qui (passo 4); senza financialData il comportamento resta quello di prima.
   const noMoneyLeft = typeof financialData?.available === 'number' && financialData.available <= 0
   if (!noMoneyLeft && hasCategoryHistory && categoryRow.changeAmount < 0 && Math.abs(categoryRow.changePercent) >= CATEGORY_ANOMALOUS_AT) {
-    return buildResult({ bucket: 'POSITIVE_EVENT', pools, state: 'happy', reason: 'positive_event', insightCategoryId: categoryId, jokeHistory, rng })
+    return buildResult({ bucket: 'POSITIVE_EVENT', pools, state: 'happy', reason: 'positive_event', insightCategoryId: categoryId, jokeHistory, rng, fit })
   }
 
   // 10. Nothing applies.

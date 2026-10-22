@@ -17,6 +17,7 @@
 import { BEHAVIOR_TYPES } from '../utils/behaviorEngine.js'
 import { computeImportance } from '../utils/importantEventSelector.js'
 import { findCelebratedGoal } from '../utils/goalReached.js'
+import { findTriggerExpense } from '../utils/expenseReactionEngine.js'
 
 export const SPENDY_EVENTS = {
   GOAL_REACHED: 'goal_reached',
@@ -117,12 +118,10 @@ function topicOf(event) {
   return `${event.id}:${event.categoryId ?? 'general'}`
 }
 
-// "La spesa appena registrata" — stessa regola di expenseReactionEngine
-// (findTriggerExpense): la più recente datata oggi, `expenses` è
-// newest-first. Serve solo a sapere DI QUALE spesa parla la reazione.
-function findTriggerExpense(expenses, today) {
-  return expenses.find((expense) => expense.date === today) ?? null
-}
+// "La spesa appena registrata": la STESSA funzione di expenseReactionEngine
+// (findTriggerExpense: la più recente datata oggi, `expenses` è
+// newest-first), così la reazione locale e il contesto dell'AI parlano
+// sempre della stessa spesa. Serve solo a sapere DI QUALE spesa si parla.
 
 function eventFromCoach(coach, { expenses, today, goals, financialData }) {
   const mapping = COACH_REASON_EVENTS[coach?.reason]

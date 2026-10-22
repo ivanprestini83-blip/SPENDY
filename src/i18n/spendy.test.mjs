@@ -207,7 +207,9 @@ section('5. Reazioni alle spese: stessa scelta, nella lingua scelta')
   })
   const scenarios = [
     ['spesa oltre 100 € (SPESA_100 + SPESA_INUTILE)', { expenses: [expense(TODAY, 150, 'casa')], rng: () => 0.5 }, (lang) => [...pool(lang, 'SPESA_100'), ...pool(lang, 'SPESA_INUTILE')][10]],
-    ['spesa enorme 1.000 €', { expenses: [expense(TODAY, 1200, 'casa')], rng: () => 0.5 }, (lang) => pool(lang, 'SPESA_ENORME_1000')[3]],
+    // 1.200 €: escluse le frasi che dicono "1.000 €?!" / "Mille euro?!" (posizioni 0 e 2,
+    // vedi expenseReactionAmounts.test): restano 1, 3, 4, 5, 6 e rng 0.5 sceglie la terza.
+    ['spesa enorme 1.000 €', { expenses: [expense(TODAY, 1200, 'casa')], rng: () => 0.5 }, (lang) => pool(lang, 'SPESA_ENORME_1000')[4]],
     ['frase rara (probabilità bassa)', { expenses: [expense(TODAY, 1200, 'casa')], rng: () => 0.01 }, (lang) => pool(lang, 'RARE_SPECIALI')[0]],
     ['budget superato', { expenses: [], monthlyBudget: 100, available: -10, rng: () => 0.5 }, (lang) => pool(lang, 'BUDGET_SUPERATO')[4]],
     ['obiettivo danneggiato (non vacanza: la frase vacanza esclusa)', { expenses: [expense(TODAY, 150, 'casa')], goals: [{ id: 'g', label: 'Auto', saved: 0, target: 1000 }], rng: () => 0.5 },
