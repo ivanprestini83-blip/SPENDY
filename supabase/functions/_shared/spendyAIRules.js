@@ -305,6 +305,104 @@ const CONTEXT_NUMBER_KINDS = {
 // 150,00 = 150 (stesso valore, con certezza). Nessuna tolleranza.
 const cents = (value) => Math.round(value * 100)
 
+// Fase 2C: il RUOLO di ogni importo del contesto. "Hai speso 980 €" usa una
+// cifra autorizzata (il totale della categoria nel ciclo), ma la presenta
+// come la spesa appena fatta. Quando nel contesto c'è una spesa ('expense'),
+// un importo che è SOLO una statistica deve stare in una parte di frase che
+// nomina quel dato (ROLE_MARKERS): "di solito 120 €", "980 € in questo ciclo",
+// "120 € in più". Senza, la risposta è ambigua e viene scartata
+// (misattributed_amount): l'app mostra la frase locale. L'importo della spesa
+// non ha bisogno di parole: è la lettura di default.
+const EVENT_MONEY_ROLES = {
+  amount: 'cycle_total', // acquisto insolito: totale della categoria nel ciclo
+  expense: { amount: 'expense', usualAmount: 'usual', categoryCycleCurrent: 'cycle_total', categoryCycleUsual: 'usual' },
+  singleExpense: { amount: 'expense', usualAmount: 'usual' },
+  smallExpenses: { total: 'small_total' },
+  cycle: { current: 'cycle_total', usual: 'usual', difference: 'difference' },
+}
+const CONTEXT_MONEY_ROLES = {
+  spending: { today: 'today', usualCycle: 'usual' },
+  primaryEvent: EVENT_MONEY_ROLES,
+  goal: { missing: 'goal' },
+}
+// → Map<centesimi, Set<ruolo>>: lo stesso valore può avere più ruoli (una
+// sola spesa oggi: 'expense' e 'today').
+export function moneyRoles(context) {
+  const roles = new Map()
+  const visit = (value, spec) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return
+    for (const [key, role] of Object.entries(spec)) {
+      const item = value[key]
+      if (role && typeof role === 'object') visit(item, role)
+      else if (typeof item === 'number' && Number.isFinite(item)) {
+        const amount = cents(item)
+        roles.set(amount, (roles.get(amount) ?? new Set()).add(role))
+      }
+    }
+  }
+  visit(context, CONTEXT_MONEY_ROLES)
+  return roles
+}
+// Le parole che nominano un dato, in it/en/es/fr.
+const roleWords = (words) => new RegExp(`(?<!\\p{L})(?:${words})(?!\\p{L})`, 'iu')
+const ROLE_MARKERS = {
+  usual: roleWords("solit\\p{L}*|di solito|media|medie|medio|in media|abitual\\p{L}*|normalmente|tipicamente|in genere|usual\\p{L}*|average|typical\\p{L}*|normally|on average|promedio|habitual\\p{L}*|por lo general|de costumbre|moyenne|habitu\\p{L}*|d['’]habitude|d['’]ordinaire|ordinaire\\p{L}*|en g[ée]n[ée]ral"),
+  cycle_total: roleWords("cicl[oi]|totale|in tutto|finora|fin qui|complessiv\\p{L}*|cycles?|total|so far|altogether|en total|hasta ahora|en lo que va|au total|en tout|jusqu['’]ici|jusqu['’][àa] pr[ée]sent"),
+  difference: roleWords("in più|di più|extra|rispetto|differenz\\p{L}*|in eccesso|more|above|over|difference|de más|más|diferencia|por encima|de plus|en plus|[ée]cart|au-dessus|suppl[ée]mentaire\\p{L}*"),
+  today: roleWords("oggi|today|hoy|aujourd['’]hui"),
+  small_total: roleWords("piccol\\p{L}*|in tutto|insieme|sommat\\p{L}*|small|little|together|add(?:s|ed)? up|in total|pequeñ\\p{L}*|junt[oa]s|en total|petit\\p{L}*|ensemble|au total|en tout"),
+  goal: roleWords("obiettiv\\p{L}*|goal|target|objetivo|meta|objectif|manc\\p{L}*|missing|to go|falt\\p{L}*|manqu\\p{L}*"),
+}
+// "Mese / month / mes / mois" confermano il totale del CICLO solo se il ciclo
+// è il mese di calendario corrente (cycleIsCalendarMonth) e la frase non parla
+// di un mese passato.
+const MONTH_WORD = roleWords('mese|month|mes|mois')
+const PAST_PERIOD = roleWords("scors\\p{L}*|precedent\\p{L}*|passat\\p{L}*|last|previous|past|pasad\\p{L}*|anterior\\p{L}*|dernier|derni[èe]re|pr[ée]c[ée]dent\\p{L}*")
+// "over / above" seguiti da un periodo ("over this cycle", "over the last
+// week", "over 3 days") indicano una durata, non un confronto: lì decide la
+// parola del periodo (ciclo, o mese solo se il ciclo è il mese di calendario).
+const PERIOD_AFTER = '[ \\u00a0\\u202f]+(?:(?:this|the|that|these|those|a|an|its|your|each|every)[ \\u00a0\\u202f]+)?(?:(?:last|past|previous|current|whole|entire|full)[ \\u00a0\\u202f]+)?(?:\\d+[ \\u00a0\\u202f]+)?(?:cycles?|months?|weeks?|days?|periods?|years?)(?!\\p{L})'
+// Un comparativo SUBITO dopo l'importo ("120 € più della media", "€120 over",
+// "120 € más que", "120 € de plus que") lo presenta come una differenza.
+const COMPARATIVE_AFTER = new RegExp(`^(?:[ \\u00a0\\u202f]?(?:[€$£₤]|(?:eur|euros?|euri|usd|gbp|dollar[is]?|dollaro|d[oó]lar(?:es)?|pounds?|sterlin\\p{L}*|libras?|livres?))(?!\\p{L}))?[ \\u00a0\\u202f]+(?:in più|di più|più(?=[ \\u00a0\\u202f](?:del|della|dello|dei|degli|delle|di|che)(?!\\p{L}))|more|(?:over|above)(?!${PERIOD_AFTER})|extra|de más|más(?=[ \\u00a0\\u202f](?:que|de|del)(?!\\p{L}))|de plus|en plus|plus(?=[ \\u00a0\\u202f](?:que|qu['’]|de)(?!\\p{L}))|au-dessus)(?!\\p{L})`, 'iu')
+// "Una spesa media di 120 €", "an average purchase of €120", "un gasto medio",
+// "une dépense moyenne": l'aggettivo descrive LA spesa, non è la media. Con
+// l'articolo determinativo o il possessivo ("la tua spesa media è 120 €")
+// resta una media.
+const ADJECTIVE_AVERAGE = /(?<!\p{L})(?:(?:una|un|uno)[ \u00a0\u202f]+(?:spesa|acquisto|importo)[ \u00a0\u202f]+medi[oa]|an?[ \u00a0\u202f]+average[ \u00a0\u202f]+(?:purchase|expense|spend|amount|transaction)|(?:una|un)[ \u00a0\u202f]+(?:gasto|compra|importe)[ \u00a0\u202f]+medi[oa]|une?[ \u00a0\u202f]+(?:d[ée]pense|achat|montant)[ \u00a0\u202f]+moyen(?:ne)?)(?!\p{L})/giu
+
+// Un complemento iniziale senza cifre, separato da una virgola, vale per
+// l'importo che segue: "Ce mois-ci, Shopping en est à 980 €", "In questo
+// ciclo, …", "En moyenne, tu dépenses 120 €". Solo tempo (ciclo, oggi, mese) e
+// media "pura": "Più del solito, hai speso 120 €" resta senza conferma.
+const USUAL_ADVERBIAL = /^[ \u00a0\u202f]*(?:in media|di media|di solito|solitamente|normalmente|di norma|on average|usually|normally|typically|de media|en promedio|por lo general|habitualmente|en moyenne|d['’]habitude|habituellement|normalement)[ \u00a0\u202f]*$/iu
+const FRONTED_ROLES = new Set(['cycle_total', 'today', 'usual'])
+function precedingClause(text, index) {
+  let start = 0
+  for (const match of text.matchAll(CLAUSE_BREAK)) {
+    if (match.index + match[0].length <= index) start = match.index + match[0].length
+    else break
+  }
+  return start > 0 ? clauseAt(text, start - 1) : ''
+}
+
+// Il ciclo del contesto è il mese di calendario di oggi? Le date del ciclo si
+// ricavano come in getCycleTiming (src/utils/cycle.js): inizio = oggi meno
+// (dayOfCycle - 1) giorni, fine (esclusa) = inizio + cycleDays, e daysRemaining
+// deve tornare. Vero solo se l'inizio è il 1° del mese di oggi e la fine il 1°
+// del mese dopo. Dati mancanti o incoerenti: non dimostrabile → false.
+export function cycleIsCalendarMonth(context) {
+  const today = typeof context?.today === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(context.today) : null
+  const { dayOfCycle, cycleDays, daysRemaining } = context?.budget ?? {}
+  if (!today || ![dayOfCycle, cycleDays, daysRemaining].every(Number.isInteger)) return false
+  if (dayOfCycle < 1 || dayOfCycle > cycleDays || dayOfCycle + daysRemaining !== cycleDays) return false
+  const [year, month, day] = [Number(today[1]), Number(today[2]), Number(today[3])]
+  const start = new Date(Date.UTC(year, month - 1, day - (dayOfCycle - 1)))
+  const end = new Date(start.getTime() + cycleDays * DAY_MS)
+  return start.getUTCDate() === 1 && start.getUTCFullYear() === year && start.getUTCMonth() === month - 1
+    && end.getUTCDate() === 1 && end.getUTCMonth() === (month % 12) && end.getUTCFullYear() === (month === 12 ? year + 1 : year)
+}
+
 // Budget sforato: disponibile negativo, o fascia "exceeded".
 export function isOverBudget(context) {
   const available = context?.budget?.available
@@ -500,7 +598,7 @@ export function readNumbers(text, locale, { today = null, dates = [], labels = [
     // "di solito 3": il significato del numero precedente nella stessa frase.
     if (previous && ['money', 'quantity'].includes(token.kind) && USUAL_BEFORE.test(token.before) && !/[.!?]/.test(work.slice(previous.end, token.index))) token.kind = previous.kind
   })
-  for (const { index, value, kind } of numbers) tokens.push({ index, value, kind })
+  for (const { index, end, value, kind } of numbers) tokens.push({ index, end, value, kind })
   return tokens.sort((a, b) => a.index - b.index)
 }
 
@@ -664,6 +762,7 @@ export function numberProblems(message, context) {
   let badDate = false
   let reservedAmount = false
   const moneyByClause = new Map()
+  const statedAmounts = [] // importi autorizzati scritti dal modello, per il controllo dei ruoli
 
   for (const token of tokens) {
     if (token.kind === 'date') { if (!token.ok) badDate = true; continue }
@@ -679,7 +778,7 @@ export function numberProblems(message, context) {
       if (!allowed.money.has(cents(value))) {
         if (allowed.reserved.has(cents(value))) reservedAmount = true
         else invented.push(value)
-      }
+      } else statedAmounts.push(token)
       const clause = clauseAt(work, token.index)
       const entry = moneyByClause.get(clause) ?? { amounts: [], index: token.index }
       entry.amounts.push(cents(value))
@@ -721,12 +820,39 @@ export function numberProblems(message, context) {
   const malformed = ODD_NUMERAL.test(work) || INVISIBLE_NEAR_DIGIT.test(work) || ACCOUNTING_NEGATIVE.test(work) || tokens.some((token) => token.kind !== 'date' && Number.isNaN(token.value))
   if (malformed) problems.push('malformed_number')
   if (invented.length > 0) problems.push(`invented_numbers:${invented.join(',')}`)
+  if (misattributedAmount(statedAmounts, context, { text, work })) problems.push('misattributed_amount')
   if (reservedAmount) problems.push('reserved_amount')
   if (moneyWhenOver) problems.push('money_when_over_budget')
   if (incoherent) problems.push('incoherent_budget')
   if (badDate) problems.push('invented_date')
   problems.push(...numberWordProblems(text, labels))
   return problems
+}
+
+// Fase 2C: un importo autorizzato presentato con il ruolo sbagliato (vedi
+// moneyRoles). Solo se nel contesto c'è una spesa: è con la spesa che una media
+// o un totale si confondono. Un importo che è ANCHE la spesa va sempre bene.
+function misattributedAmount(tokens, context, { text, work }) {
+  const roles = moneyRoles(context)
+  if (![...roles.values()].some((set) => set.has('expense'))) return false
+  // Per "quanto manca" conta il nome dell'OBIETTIVO, non quello della categoria.
+  const goalLabel = typeof context?.goal?.label === 'string' ? context.goal.label.toLowerCase() : null
+  const calendarMonth = cycleIsCalendarMonth(context)
+  return tokens.some((token) => {
+    const own = roles.get(cents(token.value))
+    if (!own || own.has('expense')) return false
+    // Un comparativo subito dopo l'importo: vale solo se l'importo È la differenza.
+    if (Number.isInteger(token.end) && COMPARATIVE_AFTER.test(work.slice(token.end, token.end + 40))) return !own.has('difference')
+    const clause = clauseAt(work, token.index).replace(ADJECTIVE_AVERAGE, ' ')
+    const original = clauseAt(text, token.index).toLowerCase()
+    const before = precedingClause(work, token.index)
+    const fronted = before && !/\p{Nd}/u.test(before) ? before : ''
+    const names = (role, part) => (role === 'usual' ? (part === clause ? ROLE_MARKERS.usual.test(part) : USUAL_ADVERBIAL.test(part)) : ROLE_MARKERS[role].test(part))
+      || (role === 'cycle_total' && calendarMonth && MONTH_WORD.test(part) && !PAST_PERIOD.test(part))
+    return ![...own].some((role) => names(role, clause)
+      || (fronted && FRONTED_ROLES.has(role) && names(role, fronted))
+      || (role === 'goal' && goalLabel && original.includes(goalLabel)))
+  })
 }
 
 // --- Riferimenti tra virgolette ---------------------------------------

@@ -37,6 +37,11 @@ const round = (value) => (Number.isFinite(value) ? Math.round(value) : null)
 // (financialData.available), non un secondo calcolo. Il modello non lo scrive
 // mai (cifra del budget riservata all'app): serve alla riga di fatti.
 const toCents = (value) => (Number.isFinite(value) ? Math.round(value * 100) / 100 : null)
+// Gli importi REALI di una spesa (e la spesa di oggi) tengono i centesimi:
+// 499,60 € resta 499.6, così il modello non può citare "500 €" come importo
+// esatto e il validatore accetta l'importo vero. Arrotondate all'unità restano
+// solo le statistiche (medie, totali e differenze di ciclo). Il numero viaggia
+// in JSON: punto decimale, nessuna dipendenza dalla lingua dell'interfaccia.
 
 function categoryLabel(categoryId, insight) {
   if (insight?.category?.label) return insight.category.label
@@ -99,7 +104,7 @@ function eventDetails(event, events = []) {
 
   if (event.trigger) {
     details.expense = {
-      amount: round(event.trigger.amount),
+      amount: toCents(event.trigger.amount),
       category: categoryLabel(event.trigger.categoryId),
       ...relatedCategoryFacts(event, events),
     }
@@ -114,7 +119,7 @@ function eventDetails(event, events = []) {
     case SPENDY_EVENTS.EXPENSE_ABOVE_AVERAGE:
     case SPENDY_EVENTS.EXPENSE_BELOW_AVERAGE:
       details.singleExpense = {
-        amount: round(insight.current),
+        amount: toCents(insight.current),
         usualAmount: round(insight.baseline),
         changePercent: round(insight.changePercent),
       }
@@ -222,7 +227,7 @@ export function buildSpendyAIContext({
   // La quota giornaliera conta anche oggi: nell'ultimo giorno è tutto il disponibile.
   if (available > 0) budget.dailyAllowance = Math.floor(available / timing.daysLeftIncludingToday)
 
-  const spending = { today: round(todaysExpenses(expenses, today).total) }
+  const spending = { today: toCents(todaysExpenses(expenses, today).total) }
   const savings = events.find((event) => event.id === SPENDY_EVENTS.SAVINGS_ABOVE_USUAL)
   if (savings?.insight) spending.usualCycle = round(savings.insight.baseline)
 
